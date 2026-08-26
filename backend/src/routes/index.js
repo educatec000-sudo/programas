@@ -1,0 +1,40 @@
+import { Router } from 'express';
+import authRoutes from './auth.routes.js';
+import userRoutes from './user.routes.js';
+import roleRoutes from './role.routes.js';
+import schoolRoutes from './school.routes.js';
+import programRoutes from './program.routes.js';
+import indicatorRoutes from './indicator.routes.js';
+import resultRoutes from './result.routes.js';
+import goalRoutes from './goal.routes.js';
+import rankingRoutes from './ranking.routes.js';
+import analyticsRoutes from './analytics.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
+import reportRoutes from './report.routes.js';
+import importRoutes from './import.routes.js';
+import auditRoutes from './audit.routes.js';
+import notificationRoutes from './notification.routes.js';
+import documentRoutes from './document.routes.js';
+import technicianRoutes from './technician.routes.js';
+
+const router = Router();
+
+router.use('/auth', authRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/schools', schoolRoutes);
+router.use('/tecnicos-escola', technicianRoutes);
+router.use('/programs', programRoutes);
+router.use('/indicators', indicatorRoutes);
+router.use('/results', resultRoutes);
+router.use('/goals', goalRoutes);
+router.use('/rankings', rankingRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/reports', reportRoutes);
+router.use('/imports', importRoutes);
+router.use('/audit', auditRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/documents', documentRoutes);
+router.use('/users', userRoutes);
+router.use('/roles', roleRoutes);
+
+export default router;

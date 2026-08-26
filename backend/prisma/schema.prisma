@@ -1,0 +1,528 @@
+// ============================================================
+// CPE — Controle de Programas Educacionais
+// Schema Prisma | PostgreSQL
+//
+// Cadeia principal:
+//   Escola → Programa → Indicador → Resultado → Meta → Pontuação → Ranking
+//
+// Relação N:N de responsabilidade:
+//   Escola ↔ SchoolTechnician ↔ Usuário (técnico)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------- SEGURANÇA / RBAC ----------------------------
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique // ex.: "schools:write"
+  description String
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+}
+
+model Role {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  description     String?
+  level           Int              @default(10) // 100 = administrador (bypass)
+  active          Boolean          @default(true)
+  // Perfis marcados com esta flag podem ser vinculados como técnicos
+  // responsáveis por escolas (regra de elegibilidade do módulo Técnicos)
+  canBeTechnician Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  permissions     RolePermission[]
+  users           User[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  grantedAt    DateTime @default(now())
+  role         Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model User {
+  id                 String               @id @default(uuid())
+  name               String
+  email              String               @unique
+  passwordHash       String
+  phone              String?
+  roleId             String
+  role               Role                 @relation(fields: [roleId], references: [id])
+  active             Boolean              @default(true)
+  mustChangePassword Boolean              @default(false)
+  failedAttempts     Int                  @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  passwordChangedAt  DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  sessions          Session[]
+  passwordResets    PasswordResetToken[]
+  loginAudits       LoginAttempt[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  importJobs        ImportJob[]
+  resultsCreated    Result[]              @relation("ResultCreatedBy")
+  resultsUpdated    Result[]              @relation("ResultUpdatedBy")
+  goalsCreated      Goal[]
+  documents         Document[]
+  evaluations       Evaluation[]
+  technicianSchools SchoolTechnician[]
+
+  @@index([roleId])
+  @@index([active])
+  @@index([name])
+}
+
+model Session {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(uuid())
+  email     String
+  ip        String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+
+  @@index([email, createdAt])
+}
+
+// ---------------------------- ESCOLAS ----------------------------
+
+enum AdminDependency {
+  FEDERAL
+  ESTADUAL
+  MUNICIPAL
+  PRIVADA
+}
+
+enum SchoolSituation {
+  ATIVA
+  PARALISADA
+  INATIVA
+}
+
+enum SchoolZone {
+  URBANA
+  RURAL
+}
+
+model School {
+  id              String           @id @default(uuid())
+  inep            String?          @unique // código INEP — identificador principal quando presente
+  name            String
+  schoolType      String? // tipo de escola (E.M.E.F., Creche, E.E.E.F.M....)
+  municipality    String
+  address         String?
+  addressNumber   String?
+  addressComplement String?
+  district        String? // bairro
+  cep             String?
+  uf              String?
+  zone            SchoolZone?
+  adminDependency AdminDependency?
+  situation       SchoolSituation  @default(ATIVA)
+  phone           String?
+  email           String?
+  responsible     String?
+  notes           String?
+  // Localização (planilha "LOCALIZAÇÃO ESCOLAS")
+  latitude        Float?
+  longitude       Float?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime? // soft delete
+
+  programs         ProgramSchool[]
+  results          Result[]
+  goals            Goal[]
+  evaluations      Evaluation[]
+  technicianLinks  SchoolTechnician[]
+
+  @@index([name])
+  @@index([municipality])
+  @@index([district])
+  @@index([zone])
+  @@index([situation, deletedAt])
+}
+
+// ---------------------------- TÉCNICOS POR ESCOLA ----------------------------
+
+/**
+ * Vínculo N:N entre Escola e Usuário/Técnico.
+ * Técnico = usuário existente com perfil marcado como canBeTechnician.
+ */
+model SchoolTechnician {
+  id            String   @id @default(uuid())
+  schoolId      String
+  technicianId  String
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  technician User   @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, technicianId])
+  @@index([technicianId])
+}
+
+// ---------------------------- PROGRAMAS ----------------------------
+
+enum ProgramStatus {
+  PLANEJAMENTO
+  EM_EXECUCAO
+  CONCLUIDO
+  SUSPENSO
+  CANCELADO
+}
+
+model Program {
+  id          String        @id @default(uuid())
+  code        String        @unique
+  name        String
+  description String?
+  objective   String?
+  organ       String? // órgão responsável
+  year        Int
+  periodLabel String? // período de vigência (ex.: "Anual", "2025-2026")
+  status      ProgramStatus @default(EM_EXECUCAO)
+  globalGoal  Float? // meta global do programa (%)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  schools     ProgramSchool[]
+  indicators  ProgramIndicator[]
+  results     Result[]
+  goals       Goal[]
+  evaluations Evaluation[]
+
+  @@index([year, status])
+  @@index([name])
+}
+
+model ProgramSchool {
+  programId  String
+  schoolId   String
+  program    Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school     School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  active     Boolean   @default(true)
+  joinedAt   DateTime  @default(now())
+
+  @@id([programId, schoolId])
+  @@index([schoolId])
+}
+
+// ---------------------------- INDICADORES ----------------------------
+
+enum IndicatorStatus {
+  ATIVO
+  INATIVO
+}
+
+enum Polarity {
+  MAIOR_MELHOR
+  MENOR_MELHOR
+}
+
+model IndicatorCategory {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  createdAt   DateTime     @default(now())
+  indicators  Indicator[]
+}
+
+model Indicator {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  description String?
+  categoryId  String?
+  category    IndicatorCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  unit        String? // "%", "alunos", "escolas"...
+  polarity    Polarity         @default(MAIOR_MELHOR)
+  weight      Float            @default(1)
+  defaultGoal Float? // meta padrão
+  minValue    Float?
+  maxValue    Float?
+  periodLabel String?
+  status      IndicatorStatus  @default(ATIVO)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  programs ProgramIndicator[]
+  results  Result[]
+  goals    Goal[]
+
+  @@index([categoryId])
+  @@index([name])
+}
+
+model ProgramIndicator {
+  programId    String
+  indicatorId  String
+  program      Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  indicator    Indicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  weight       Float? // sobrepeso do indicador no programa (padrão: indicator.weight)
+  goal         Float? // meta específica no programa (padrão: indicator.defaultGoal)
+  active       Boolean   @default(true)
+  addedAt      DateTime  @default(now())
+
+  @@id([programId, indicatorId])
+  @@index([indicatorId])
+}
+
+// ---------------------------- RESULTADOS / METAS ----------------------------
+
+enum ResultSource {
+  MANUAL
+  IMPORTACAO
+}
+
+model Result {
+  id          String       @id @default(uuid())
+  programId   String
+  schoolId    String
+  indicatorId String
+  year        Int
+  period      String // "1º Semestre", "2º Semestre", "Anual"...
+  value       Float
+  source      ResultSource @default(MANUAL)
+  notes       String?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  program     Program     @relation(fields: [programId], references: [id])
+  school      School      @relation(fields: [schoolId], references: [id])
+  indicator   Indicator   @relation(fields: [indicatorId], references: [id])
+  createdBy   User?       @relation("ResultCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy   User?       @relation("ResultUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([programId, schoolId, indicatorId, year, period])
+  @@index([schoolId])
+  @@index([indicatorId])
+  @@index([year, period])
+}
+
+enum GoalScope {
+  GERAL
+  PROGRAMA
+  ESCOLA
+  INDICADOR
+}
+
+model Goal {
+  id          String    @id @default(uuid())
+  scope       GoalScope @default(GERAL)
+  programId   String?
+  schoolId    String?
+  indicatorId String?
+  year        Int
+  period      String? // null = vale para todos os períodos do ano
+  value       Float
+  description String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  program    Program?    @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school     School?     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  indicator  Indicator?  @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  createdBy  User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([programId])
+  @@index([schoolId])
+  @@index([indicatorId])
+  @@index([year, period])
+}
+
+// ---------------------------- AVALIAÇÃO / RANKING ----------------------------
+
+model Evaluation {
+  id              String   @id @default(uuid())
+  programId       String
+  schoolId        String
+  year            Int
+  period          String   @default("Anual")
+  score           Float // pontuação percentual ponderada (0-200)
+  maxScore        Float?
+  classification  String // A / B / C / D / E
+  position        Int
+  details         Json? // detalhamento por indicador
+  consolidatedById String?
+  consolidatedAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  program     Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school      School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  consolidatedBy User? @relation(fields: [consolidatedById], references: [id], onDelete: SetNull)
+
+  @@unique([programId, schoolId, year, period])
+  @@index([programId, year, period])
+  @@index([schoolId])
+}
+
+// ---------------------------- IMPORTAÇÕES ----------------------------
+
+enum ImportType {
+  ESCOLAS
+  PROGRAMAS
+  INDICADORES
+  RESULTADOS
+}
+
+enum ImportStatus {
+  PENDENTE
+  IMPORTADO
+  FALHOU
+  CANCELADO
+}
+
+model ImportJob {
+  id            String       @id @default(uuid())
+  type          ImportType
+  filename      String
+  status        ImportStatus @default(PENDENTE)
+  totalRows     Int          @default(0)
+  validRows     Int          @default(0)
+  newRows       Int          @default(0)
+  updatedRows   Int          @default(0)
+  duplicateRows Int          @default(0)
+  errorRows     Int          @default(0)
+  data          Json? // linhas validadas (staging) com status por linha
+  summary       Json?
+  options       Json?
+  error         String? // erro fatal (arquivo ilegível etc.)
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  createdAt     DateTime     @default(now())
+  confirmedAt   DateTime?
+  finishedAt    DateTime?
+
+  errors ImportError[]
+
+  @@index([type, status])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ImportError {
+  id        String    @id @default(uuid())
+  jobId     String
+  job       ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rowNumber Int
+  field     String?
+  message   String
+  value     String?
+  createdAt DateTime  @default(now())
+
+  @@index([jobId])
+}
+
+// ---------------------------- SUPORTE ----------------------------
+
+enum NotificationType {
+  INFO
+  SUCESSO
+  ALERTA
+  ERRO
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @default(INFO)
+  title     String
+  message   String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userName  String? // desnormalizado (usuário pode ser excluído)
+  action    String // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, IMPORT, EXPORT, REPORT...
+  entity    String // School, Program, Result...
+  entityId  String?
+  ip        String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@index([action, createdAt])
+}
+
+model Document {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  entity      String // "Program" | "School" | ...
+  entityId    String
+  filename    String // nome original
+  path        String // caminho relativo em uploads/
+  mimeType    String
+  sizeBytes   Int
+  uploadedById String?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+}

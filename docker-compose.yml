@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: cpe-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cpe
+      POSTGRES_PASSWORD: cpe
+      POSTGRES_DB: cpe
+    ports:
+      - "5432:5432"
+    volumes:
+      - cpe_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cpe -d cpe"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cpe_pgdata:

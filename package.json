@@ -1,0 +1,15 @@
+{
+  "name": "cpe",
+  "version": "1.0.0",
+  "description": "CPE — Controle de Programas Educacionais (frontend + backend + PostgreSQL)",
+  "private": true,
+  "scripts": {
+    "setup": "npm --prefix backend install && npm --prefix frontend install",
+    "db:up": "docker compose up -d",
+    "db:migrate": "npm --prefix backend run prisma:deploy",
+    "db:seed": "npm --prefix backend run prisma:seed",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build"
+  }
+}
