@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
-import { Button, Field, Input, Select, Textarea, Modal, Badge } from '../components/ui.jsx';
+import { Button, Field, Input, Select, Textarea, Modal, Badge, ConfirmDialog } from '../components/ui.jsx';
 import { PROGRAM_STATUS, yearsRange } from '../utils/format.js';
 
 const emptyForm = {
@@ -17,7 +17,7 @@ const emptyForm = {
 export default function Programs() {
   const navigate = useNavigate();
   const { can } = useAuth();
-  const { success } = useToast();
+  const { success, error } = useToast();
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search);
@@ -35,6 +35,7 @@ export default function Programs() {
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const openCreate = () => {
     setForm(emptyForm);
@@ -80,6 +81,21 @@ export default function Programs() {
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setBusy(true);
+    try {
+      await programsApi.remove(deleteTarget.id);
+      success('Programa removido (exclusão lógica).');
+      setDeleteTarget(null);
+      refresh();
+    } catch (err) {
+      error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const columns = [
     { key: 'code', label: 'Código', render: (p) => <span className="mono">{p.code}</span> },
     { key: 'name', label: 'Programa', render: (p) => <strong>{p.name}</strong> },
@@ -97,6 +113,9 @@ export default function Programs() {
       render: (p) => (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
           {can('programs:write') && <Button size="sm" variant="secondary" onClick={() => openEdit(p)}>Editar</Button>}
+          {can('programs:delete') && (
+            <Button size="sm" variant="ghost" title="Excluir" onClick={() => setDeleteTarget(p)}>🗑</Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => navigate(`/programas/${p.id}`)}>Abrir →</Button>
         </div>
       ),
@@ -190,6 +209,17 @@ export default function Programs() {
           </Field>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="Excluir programa"
+        message={`Remover "${deleteTarget?.name}"? A exclusão é lógica e o histórico permanece preservado.`}
+        danger
+        confirmLabel="Excluir"
+        busy={busy}
+      />
     </>
   );
 }
