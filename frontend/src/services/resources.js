@@ -1,4 +1,4 @@
-import { request, download } from './api.js';
+import { request, download, apiUrl } from './api.js';
 
 /** Todas as listagens são carregadas por inteiro e navegadas com rolagem. */
 const allRows = (params = {}) => ({ ...params, page: 1, pageSize: 1000 });
@@ -155,5 +155,5 @@ export const documentsApi = {
   list: (params) => request('/documents', { params }),
   create: (form) => request('/documents', { method: 'POST', body: form }),
   remove: (id) => request(`/documents/${id}`, { method: 'DELETE' }),
-  downloadUrl: (id) => `/api/documents/${id}/download`,
+  downloadUrl: (id) => apiUrl(`/documents/${id}/download`),
 };

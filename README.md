@@ -7,6 +7,20 @@ Aplicação web para gerir escolas, programas educacionais, indicadores, metas, 
 - **Autenticação:** cookies `httpOnly`, access/refresh token, permissões por perfil e troca obrigatória de senha temporária
 - **Importações:** CSV, XLS e XLSX, com pré-visualização, mapeamento de colunas e processamento por linha
 
+## Arquitetura de produção
+
+```text
+Usuário
+  ↓ HTTPS
+Vercel — frontend React + Vite (frontend/)
+  ↓ HTTPS + credentials: include
+Render — backend Express + Prisma (backend/)
+  ↓ DATABASE_URL
+Supabase PostgreSQL existente
+```
+
+A Vercel hospeda somente a interface. O Render hospeda somente a API. O banco permanece no Supabase; nenhum banco adicional é criado.
+
 ## Requisitos
 
 Para trabalhar diretamente no VS Code:
@@ -38,7 +52,10 @@ programas/
 │   └── prisma.config.js
 ├── frontend/
 │   ├── src/                  # aplicação React
-│   └── .env.example
+│   ├── .env.example
+│   └── vercel.json           # SPA frontend-only na Vercel
+├── render.yaml               # Web Service do backend no Render
+├── vercel.json               # fallback frontend-only (não executa o backend)
 └── docker-compose.yml        # PostgreSQL local opcional
 ```
 
@@ -100,6 +117,7 @@ NODE_ENV=development
 PORT=4000
 CORS_ORIGIN=http://localhost:5173
 JWT_ACCESS_SECRET=um-valor-aleatorio-com-pelo-menos-32-caracteres
+JWT_REFRESH_SECRET=outro-valor-aleatorio-e-diferente-com-32-caracteres
 SEED_DEMO=true
 ```
 
@@ -109,11 +127,11 @@ Gere um segredo local:
 openssl rand -hex 32
 ```
 
-`CORS_ORIGIN` aceita uma lista separada por vírgulas quando houver mais de uma origem autorizada.
+`CORS_ORIGIN` é usado no desenvolvimento local. Em produção, o backend aceita somente a origem HTTPS exata definida em `FRONTEND_URL`.
 
-### 4. Aplicar as migrations e gerar o Prisma Client
+### 4. Preparar um banco local novo e descartável
 
-Ainda em `backend/`:
+Se `DATABASE_URL` aponta para um banco local vazio, ainda em `backend/`:
 
 ```bash
 npm run prisma:generate
@@ -122,7 +140,9 @@ npm run prisma:seed
 npm run check
 ```
 
-- `prisma:deploy` aplica somente as migrations versionadas e é o comando correto para instalação e produção.
+Se o seu `.env` aponta para o Supabase existente, execute somente `prisma:generate` e `check`; não aplique migrations nem seed como parte da configuração local.
+
+- `prisma:deploy` aplica as migrations versionadas e só deve ser usado depois de revisar individualmente todas as migrations pendentes.
 - `prisma:migrate` (`prisma migrate dev`) deve ser usado apenas ao **criar** uma nova migration durante o desenvolvimento.
 - Não use `prisma db push` como substituto do histórico de migrations.
 - `db:reset` apaga todos os dados; use somente em um banco descartável de desenvolvimento.
@@ -137,10 +157,13 @@ cp .env.example .env
 O padrão encaminha `/api` ao backend local:
 
 ```dotenv
+VITE_API_URL=
 VITE_API_PROXY=http://localhost:4000
 VITE_DEV_HOST=localhost
 VITE_DEV_PORT=5173
 ```
+
+`VITE_API_URL` fica vazio localmente. Na Vercel, ele recebe a origem do Render, por exemplo `https://cpe-backend.onrender.com`.
 
 Mantenha `VITE_DEV_HOST=localhost` no trabalho local. Use `0.0.0.0` apenas quando precisar expor o servidor à rede e souber controlar o acesso.
 
@@ -297,37 +320,106 @@ git diff --check
 
 Revise migrations, `.env.example`, lockfiles e o diff. Nunca adicione `.env`, segredos, uploads ou dumps com dados reais.
 
-## Produção
+## Produção — frontend na Vercel e backend no Render
 
-Recomendações mínimas:
+### Frontend — Vercel
 
-1. Use PostgreSQL gerenciado ou com backup e recuperação testados.
-2. Configure `NODE_ENV=production`, HTTPS e um `JWT_ACCESS_SECRET` aleatório de 32+ caracteres.
-3. Mantenha `EXPOSE_RESET_URL=false`; integre o envio real de e-mail antes de oferecer recuperação pública de senha.
-4. Defina somente origens confiáveis em `CORS_ORIGIN`.
-5. Execute `npm ci`, `npm run prisma:generate` e `npm run prisma:deploy` no deploy.
-6. Execute o seed seguro uma vez para perfis/permissões e, se necessário, para o administrador inicial.
-7. Gere o frontend com `npm run build` e sirva `frontend/dist` por HTTPS.
-8. Encaminhe `/api` para a API na mesma origem. Isso preserva o modelo de cookies `httpOnly` usado pela aplicação.
-9. Persista e proteja `backend/uploads`; não o exponha como diretório público.
-10. Faça backup do banco e dos uploads de forma coordenada.
+Crie um projeto Vercel conectado a este repositório com:
 
-Exemplo de comandos da API no deploy:
-
-```bash
-cd backend
-npm ci
-npm run prisma:generate
-npm run prisma:deploy
-NODE_ENV=production npm run prisma:seed
-npm start
+```text
+Root Directory: frontend
+Install Command: npm ci
+Build Command: npm run build
+Output Directory: dist
 ```
 
-O backend recusa inicialização de produção sem `DATABASE_URL`, sem segredo forte ou com `EXPOSE_RESET_URL=true`.
+Variável obrigatória na Vercel:
+
+```dotenv
+VITE_API_URL=https://SEU-BACKEND.onrender.com
+```
+
+Informe somente a origem, sem `/api` e sem barra final. O cliente HTTP centralizado em `frontend/src/services/api.js` acrescenta `/api` às rotas. Em desenvolvimento, quando `VITE_API_URL` está vazio, o navegador usa `/api` e o proxy do Vite aponta para `http://localhost:4000`.
+
+O `frontend/vercel.json` mantém o fallback da SPA para `index.html`. O `vercel.json` da raiz também é frontend-only e não contém entrypoint ou função do backend.
+
+### Backend — Render
+
+Crie um **Web Service** conectado ao mesmo repositório:
+
+```text
+Root Directory: backend
+Build Command: npm ci && npm run prisma:generate
+Start Command: npm start
+Health Check Path: /api/health
+```
+
+O script `npm start` executa o servidor Express existente (`node src/server.js`), que escuta `process.env.PORT` com fallback local para `4000`.
+
+O arquivo `render.yaml` contém a mesma configuração. O build não executa seed, reset, `db push` nem migrations, portanto não altera o banco automaticamente.
+
+Variáveis obrigatórias no Render:
+
+```dotenv
+NODE_ENV=production
+DATABASE_URL=URL_DO_POSTGRESQL_SUPABASE_EXISTENTE
+FRONTEND_URL=https://SEU-FRONTEND.vercel.app
+JWT_ACCESS_SECRET=SEGREDO_FORTE_COM_32_OU_MAIS_CARACTERES
+JWT_REFRESH_SECRET=OUTRO_SEGREDO_FORTE_E_DIFERENTE
+EXPOSE_RESET_URL=false
+SEED_DEMO=false
+```
+
+Variáveis opcionais com os padrões atuais:
+
+```dotenv
+API_PREFIX=/api
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL_DAYS=7
+LOGIN_MAX_ATTEMPTS=5
+LOGIN_LOCK_MINUTES=15
+PASSWORD_RESET_TTL_HOURS=24
+UPLOAD_DIR=uploads
+MAX_UPLOAD_MB=10
+```
+
+O refresh token atual é opaco, aleatório, rotativo e armazenado somente como hash no PostgreSQL; ele não é um JWT. `JWT_REFRESH_SECRET` é mantido separado e obrigatório em produção para nunca reutilizar o segredo do access token em uma evolução futura, sem substituir a arquitetura atual.
+
+### CORS e cookies
+
+- Produção aceita somente a origem exata de `FRONTEND_URL`.
+- `credentials: true` permanece habilitado no backend.
+- O cliente usa `credentials: 'include'` em todas as chamadas.
+- Cookies continuam `httpOnly`, têm `secure=true` e `sameSite=none` em produção, `path=/` e não definem `domain` (host-only no Render).
+- Tokens não são gravados em `localStorage`, `sessionStorage` ou `document.cookie`.
+
+Como Vercel e Render são sites diferentes, o navegador precisa permitir cookies cross-site. Para maior compatibilidade futura, um domínio próprio com subdomínios para frontend e API é recomendável, mas não é necessário para o primeiro deploy.
+
+### Prisma e Supabase
+
+O backend usa o mesmo `DATABASE_URL` e o mesmo schema Prisma. O Render executa apenas `prisma generate` no build. **Não execute migrations como parte desta separação de infraestrutura.**
+
+A migration já versionada `20260827000000_remove_school_municipality_uf_and_clear_schools` contém exclusões permanentes de escolas e registros relacionados. Ela não foi criada nem alterada nesta separação, porém deve ser tratada como bloqueio operacional: não execute `npm run prisma:deploy` contra o Supabase existente sem uma decisão explícita, backup e revisão de dados.
+
+Em uma manutenção futura aprovada, o comando de produção é `npm run prisma:deploy`, mas somente após conferir quais migrations estão pendentes. Nunca execute `prisma migrate reset` ou `prisma db push` no banco de produção. Não configure outro banco no Render.
+
+### Uploads no Render
+
+Importações são temporárias: o arquivo é analisado e removido, enquanto a prévia fica no PostgreSQL. Já os documentos anexados são armazenados atualmente em `UPLOAD_DIR`. Como o filesystem padrão do Render é efêmero, documentos podem desaparecer após restart ou deploy. Esta separação não implementa um storage novo; use disco persistente do Render ou object storage em uma etapa posterior.
+
+### Ordem recomendada de publicação
+
+1. Faça backup e confira o estado das migrations sem executar alterações destrutivas.
+2. Publique o backend no Render e teste `/api/health`.
+3. Cadastre `VITE_API_URL` na Vercel e publique o frontend.
+4. Atualize `FRONTEND_URL` no Render com a URL final da Vercel e redeploy o backend.
+5. Teste login, refresh, logout e as rotas protegidas no navegador.
+
+O backend recusa inicialização de produção sem `DATABASE_URL`, `FRONTEND_URL`, segredos distintos e fortes, ou com `EXPOSE_RESET_URL=true`.
 
 ## Segurança implementada
 
-- Cookies de autenticação `httpOnly`, `sameSite=lax` e `secure` em produção
+- Cookies de autenticação `httpOnly`: `sameSite=lax` localmente; `sameSite=none` e `secure` em produção
 - Access token curto, refresh token rotativo e revogação de sessão
 - Bloqueio temporário após tentativas de login inválidas
 - Rate limiting nas rotas de autenticação

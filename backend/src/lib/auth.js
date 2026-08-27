@@ -58,13 +58,20 @@ export function durationToMs(value, fallback = 15 * 60 * 1000) {
 
 // ------------------------------ Cookies ------------------------------
 
-export function setAuthCookies(res, { accessToken, refreshToken }) {
-  const base = {
+function authCookieOptions() {
+  return {
     httpOnly: true,
-    sameSite: 'lax',
     secure: env.isProd,
+    // Vercel e Render possuem origens diferentes. SameSite=None + Secure é
+    // necessário para o navegador enviar os cookies nas chamadas cross-site.
+    sameSite: env.isProd ? 'none' : 'lax',
     path: '/',
+    // Sem "domain": o cookie permanece host-only no domínio do backend Render.
   };
+}
+
+export function setAuthCookies(res, { accessToken, refreshToken }) {
+  const base = authCookieOptions();
   res.cookie(cookies.access, accessToken, { ...base, maxAge: durationToMs(env.jwtAccessTtl) });
   res.cookie(cookies.refresh, refreshToken, {
     ...base,
@@ -73,7 +80,7 @@ export function setAuthCookies(res, { accessToken, refreshToken }) {
 }
 
 export function clearAuthCookies(res) {
-  const opts = { httpOnly: true, sameSite: 'lax', secure: env.isProd, path: '/' };
+  const opts = authCookieOptions();
   res.clearCookie(cookies.access, opts);
   res.clearCookie(cookies.refresh, opts);
 }

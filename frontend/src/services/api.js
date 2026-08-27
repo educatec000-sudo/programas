@@ -4,12 +4,19 @@
  * - renovação transparente da sessão (refresh token) em 401
  * - erros normalizados: { code, message, details }
  */
-const BASE = '/api';
+const API_ORIGIN = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
+const BASE = API_ORIGIN ? `${API_ORIGIN}/api` : '/api';
+
+/** Monta uma URL da API sem espalhar o endereço do backend pelo frontend. */
+export function apiUrl(path = '') {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${BASE}${normalizedPath}`;
+}
 
 let refreshing = null;
 
 async function rawRequest(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(apiUrl(path), {
     credentials: 'include',
     headers: {
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),

@@ -11,3 +11,6 @@ backend/*.db
 .DS_Store
 .vscode/
 .idea/
+
+# Pacotes de entrega gerados localmente não fazem parte do monorepo.
+/*.zip
