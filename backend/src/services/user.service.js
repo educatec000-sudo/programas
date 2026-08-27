@@ -4,6 +4,21 @@ import { hashPassword } from '../lib/auth.js';
 import { audit, AuditAction } from '../lib/audit.js';
 import { parsePagination, buildPagination } from '../lib/pagination.js';
 
+const ADMIN_LEVEL = 100;
+
+function assertCanManageRole(actor, role) {
+  if (!role?.active) throw new HttpError(422, 'Perfil inválido ou inativo', 'VALIDATION_ERROR');
+  if (actor.role.level < ADMIN_LEVEL && role.level >= actor.role.level) {
+    throw new HttpError(403, 'Você não pode atribuir um perfil de nível igual ou superior ao seu', 'FORBIDDEN');
+  }
+}
+
+function assertCanManageUser(actor, target) {
+  if (actor.role.level < ADMIN_LEVEL && target.role?.level >= actor.role.level) {
+    throw new HttpError(403, 'Você não pode gerenciar um usuário de nível igual ou superior ao seu', 'FORBIDDEN');
+  }
+}
+
 const userSelect = {
   id: true,
   name: true,
@@ -82,7 +97,7 @@ export async function createUser(data, actor, ip) {
   if (exists) throw conflict('Já existe um usuário com este e-mail');
 
   const role = await prisma.role.findUnique({ where: { id: data.roleId } });
-  if (!role) throw new HttpError(422, 'Perfil inválido', 'VALIDATION_ERROR');
+  assertCanManageRole(actor, role);
 
   const user = await prisma.user.create({
     data: {
@@ -110,8 +125,16 @@ export async function createUser(data, actor, ip) {
 }
 
 export async function updateUser(id, data, actor, ip) {
-  const target = await prisma.user.findUnique({ where: { id } });
+  const target = await prisma.user.findUnique({ where: { id }, include: { role: true } });
   if (!target) throw notFound('Usuário não encontrado');
+  assertCanManageUser(actor, target);
+  if (target.id === actor.id && (data.active === false || (data.roleId && data.roleId !== target.roleId))) {
+    throw new HttpError(400, 'Você não pode desativar a própria conta nem alterar o próprio perfil', 'SELF_UPDATE');
+  }
+  if (data.roleId) {
+    const role = await prisma.role.findUnique({ where: { id: data.roleId } });
+    assertCanManageRole(actor, role);
+  }
 
   if (data.email && data.email !== target.email) {
     const exists = await prisma.user.findUnique({ where: { email: data.email } });
@@ -153,9 +176,10 @@ export async function updateUser(id, data, actor, ip) {
 
 /** Exclusão lógica: desativa e encerra sessões (mantém histórico/auditoria). */
 export async function deleteUser(id, actor, ip) {
-  const target = await prisma.user.findUnique({ where: { id } });
+  const target = await prisma.user.findUnique({ where: { id }, include: { role: true } });
   if (!target) throw notFound('Usuário não encontrado');
   if (target.id === actor.id) throw new HttpError(400, 'Você não pode excluir o próprio usuário', 'SELF_DELETE');
+  assertCanManageUser(actor, target);
 
   await prisma.$transaction([
     prisma.user.update({ where: { id }, data: { active: false } }),
@@ -174,8 +198,9 @@ export async function deleteUser(id, actor, ip) {
 }
 
 export async function adminResetPassword(id, newPassword, mustChange, actor, ip) {
-  const target = await prisma.user.findUnique({ where: { id } });
+  const target = await prisma.user.findUnique({ where: { id }, include: { role: true } });
   if (!target) throw notFound('Usuário não encontrado');
+  assertCanManageUser(actor, target);
 
   await prisma.$transaction([
     prisma.user.update({
@@ -211,8 +236,9 @@ export async function adminResetPassword(id, newPassword, mustChange, actor, ip)
 }
 
 export async function unlockUser(id, actor, ip) {
-  const target = await prisma.user.findUnique({ where: { id } });
+  const target = await prisma.user.findUnique({ where: { id }, include: { role: true } });
   if (!target) throw notFound('Usuário não encontrado');
+  assertCanManageUser(actor, target);
   await prisma.user.update({ where: { id }, data: { failedAttempts: 0, lockedUntil: null } });
   await audit({
     userId: actor.id,

@@ -25,7 +25,10 @@ export async function login({ email, password, ip, userAgent }) {
   const attemptsKey = email.trim().toLowerCase();
 
   // 1) Usuário bloqueado?
-  const existing = await prisma.user.findUnique({ where: { email: attemptsKey } });
+  const existing = await prisma.user.findUnique({
+    where: { email: attemptsKey },
+    include: { role: { select: { active: true } } },
+  });
   if (existing?.lockedUntil && existing.lockedUntil > new Date()) {
     await prisma.loginAttempt.create({
       data: { email: attemptsKey, ip, userAgent, success: false, userId: existing.id },
@@ -76,11 +79,11 @@ export async function login({ email, password, ip, userAgent }) {
     );
   }
 
-  if (!user.active) {
+  if (!user.active || !user.role.active) {
     await prisma.loginAttempt.create({
       data: { email: attemptsKey, ip, userAgent, success: false, userId: user.id },
     });
-    throw new HttpError(403, 'Usuário desativado. Contate o administrador.', 'USER_INACTIVE');
+    throw new HttpError(403, 'Usuário ou perfil desativado. Contate o administrador.', 'USER_INACTIVE');
   }
 
   // 2) Credenciais válidas — cria sessão
@@ -161,15 +164,25 @@ export async function refresh(refreshToken, { ip }) {
   if (!session || session.revokedAt || session.expiresAt < new Date()) {
     throw unauthorized('Sessão encerrada ou expirada', 'SESSION_INVALID');
   }
-  if (!session.user.active) throw unauthorized('Usuário inativo', 'USER_INACTIVE');
+  if (!session.user.active || !session.user.role.active) {
+    throw unauthorized('Usuário ou perfil inativo', 'USER_INACTIVE');
+  }
 
   const rotated = generateRefreshToken();
   const expiresAt = new Date(Date.now() + env.jwtRefreshTtlDays * 24 * 60 * 60 * 1000);
 
-  await prisma.session.update({
-    where: { id: session.id },
+  const rotatedSession = await prisma.session.updateMany({
+    where: {
+      id: session.id,
+      tokenHash,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+    },
     data: { tokenHash: rotated.tokenHash, lastUsedAt: new Date(), expiresAt, ...(ip && { ip }) },
   });
+  if (rotatedSession.count !== 1) {
+    throw unauthorized('Este token de renovação já foi utilizado', 'SESSION_ROTATED');
+  }
 
   const accessToken = signAccessToken({
     sub: session.user.id,
@@ -286,8 +299,16 @@ export async function resetPassword(token, newPassword, ip) {
   if (!record || record.usedAt || record.expiresAt < new Date()) throw invalid;
 
   const passwordHash = await hashPassword(newPassword);
-  await prisma.$transaction([
-    prisma.user.update({
+  await prisma.$transaction(async (tx) => {
+    // A reivindicação condicional torna o token de uso único mesmo com duas
+    // requisições concorrentes tentando consumi-lo ao mesmo tempo.
+    const claimed = await tx.passwordResetToken.updateMany({
+      where: { id: record.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    });
+    if (claimed.count !== 1) throw invalid;
+
+    await tx.user.update({
       where: { id: record.userId },
       data: {
         passwordHash,
@@ -296,16 +317,12 @@ export async function resetPassword(token, newPassword, ip) {
         failedAttempts: 0,
         lockedUntil: null,
       },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: record.id },
-      data: { usedAt: new Date() },
-    }),
-    prisma.session.updateMany({
+    });
+    await tx.session.updateMany({
       where: { userId: record.userId, revokedAt: null },
       data: { revokedAt: new Date() },
-    }),
-  ]);
+    });
+  });
 
   await audit({
     userId: record.userId,

@@ -1,4 +1,4 @@
-export function parsePagination(query = {}, { maxPageSize = 100, defaultPageSize = 20 } = {}) {
+export function parsePagination(query = {}, { maxPageSize = 1000, defaultPageSize = 1000 } = {}) {
   let page = parseInt(query.page, 10);
   let pageSize = parseInt(query.pageSize, 10);
   if (!Number.isFinite(page) || page < 1) page = 1;

@@ -15,7 +15,7 @@ export const numberish = (schema) =>
 
 export const paginationQuery = z.object({
   page: z.coerce.number().int().min(1).optional(),
-  pageSize: z.coerce.number().int().min(1).max(200).optional(),
+  pageSize: z.coerce.number().int().min(1).max(1000).optional(),
   search: z.string().trim().max(200).optional(),
   sort: z.string().trim().max(50).optional(),
   dir: z.enum(['asc', 'desc']).optional(),

@@ -10,6 +10,9 @@ export default function ProtectedRoute({ permission, children }) {
 
   if (booting) return <LoadingBlock label="Verificando sessão..." />;
   if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  if (user.mustChangePassword && location.pathname !== '/perfil') {
+    return <Navigate to="/perfil" state={{ passwordChangeRequired: true }} replace />;
+  }
   if (permission && !can(permission)) {
     return (
       <div className="centered" style={{ minHeight: '50vh' }}>

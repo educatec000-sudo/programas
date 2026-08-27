@@ -46,12 +46,18 @@ export const analyzeSchools = wrap(async (req, res) => {
 });
 
 export const executeSchools = wrap(async (req, res) => {
-  const schema = z.object({
-    analyzeId: z.string().min(5).max(120),
-    mapping: z.record(z.string().max(40), z.string().max(200)).default({}),
-  });
-  const { analyzeId, mapping } = schema.parse(req.body || {});
-  const job = await importService.executeSchoolsImport({ analyzeId, mapping }, req.user, getClientIp(req));
+  let rawMapping = {};
+  try {
+    rawMapping = req.body?.mapping ? JSON.parse(req.body.mapping) : {};
+  } catch {
+    rawMapping = null;
+  }
+  const mapping = z.record(z.string().max(40), z.string().max(200)).parse(rawMapping);
+  const job = await importService.executeSchoolsImport(
+    { file: req.file, mapping },
+    req.user,
+    getClientIp(req),
+  );
   res.status(201).json(serializeJob(job, { includeData: true }));
 });
 

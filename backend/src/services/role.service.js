@@ -4,6 +4,19 @@ import { audit, AuditAction } from '../lib/audit.js';
 
 // `permissions` em Role é a tabela de junção RolePermission — para ler a chave
 // é preciso navegar até a permissão: permission.key
+const ADMIN_LEVEL = 100;
+
+function assertRoleAuthority(actor, { level, permissionKeys = [] }) {
+  if (actor.role.level >= ADMIN_LEVEL) return;
+  if (level !== undefined && level >= actor.role.level) {
+    throw conflict('Você não pode criar ou elevar um perfil para nível igual ou superior ao seu');
+  }
+  const forbiddenKeys = permissionKeys.filter((key) => !actor.permissions.has(key));
+  if (forbiddenKeys.length) {
+    throw conflict(`Você não pode conceder permissões que não possui: ${forbiddenKeys.join(', ')}`);
+  }
+}
+
 const rolePermissionsInclude = {
   permissions: { select: { permission: { select: { key: true } } } },
 };
@@ -44,13 +57,19 @@ export async function listPermissions() {
 }
 
 export async function createRole(data, actor, ip) {
-  const exists = await prisma.role.findUnique({ where: { name: data.name } });
+  const exists = await prisma.role.findFirst({
+    where: { name: { equals: data.name, mode: 'insensitive' } },
+  });
   if (exists) throw conflict('Já existe um perfil com este nome');
 
-  const permissionKeys = data.permissionKeys || [];
+  const permissionKeys = [...new Set(data.permissionKeys || [])];
+  assertRoleAuthority(actor, { level: data.level ?? 10, permissionKeys });
   const permissions = permissionKeys.length
     ? await prisma.permission.findMany({ where: { key: { in: permissionKeys } } })
     : [];
+  if (permissions.length !== permissionKeys.length) {
+    throw conflict('Uma ou mais permissões informadas não existem');
+  }
 
   const role = await prisma.role.create({
     data: {
@@ -85,15 +104,33 @@ export async function createRole(data, actor, ip) {
 export async function updateRole(id, data, actor, ip) {
   const role = await prisma.role.findUnique({ where: { id }, include: { permissions: true } });
   if (!role) throw notFound('Perfil não encontrado');
-  if (role.level >= 100 && data.level !== undefined && data.level < 100) {
+  if (actor.role.level < ADMIN_LEVEL && role.level >= actor.role.level) {
+    throw conflict('Você não pode editar um perfil de nível igual ou superior ao seu');
+  }
+  if (role.level >= ADMIN_LEVEL && data.level !== undefined && data.level < ADMIN_LEVEL) {
     throw conflict('O perfil Administrador deve manter nível 100');
   }
+  if (data.name && data.name !== role.name) {
+    const duplicate = await prisma.role.findFirst({
+      where: { id: { not: id }, name: { equals: data.name, mode: 'insensitive' } },
+    });
+    if (duplicate) throw conflict('Já existe um perfil com este nome');
+  }
 
-  const permissionKeys = data.permissionKeys;
+  const permissionKeys = data.permissionKeys === undefined
+    ? undefined
+    : [...new Set(data.permissionKeys)];
+  assertRoleAuthority(actor, {
+    level: data.level ?? role.level,
+    permissionKeys: permissionKeys || [],
+  });
   const permissions =
-    permissionKeys && permissionKeys.length
+    permissionKeys?.length
       ? await prisma.permission.findMany({ where: { key: { in: permissionKeys } } })
       : [];
+  if (permissionKeys && permissions.length !== permissionKeys.length) {
+    throw conflict('Uma ou mais permissões informadas não existem');
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.role.update({

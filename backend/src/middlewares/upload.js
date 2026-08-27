@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { env } from '../config/env.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const uploadRoot = path.resolve(__dirname, '../../', env.uploadDir);
+// Vercel Functions possuem sistema de arquivos somente leitura; apenas /tmp
+// pode ser usado durante a execução. Importações são processadas na mesma
+// requisição e o conteúdo validado fica persistido no PostgreSQL.
+export const uploadRoot = process.env.VERCEL
+  ? path.join('/tmp', 'cpe-uploads')
+  : path.resolve(__dirname, '../../', env.uploadDir);
 export const documentsDir = path.join(uploadRoot, 'documents');
 export const importsDir = path.join(uploadRoot, 'imports');
 

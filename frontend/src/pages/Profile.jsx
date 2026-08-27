@@ -7,7 +7,7 @@ import { Button, Field, Input, Badge, Alert, ConfirmDialog } from '../components
 import { fmtDateTime } from '../utils/format.js';
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const { success, error } = useToast();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -36,6 +36,7 @@ export default function Profile() {
     setBusy(true);
     try {
       await authApi.changePassword({ currentPassword, newPassword });
+      await refreshUser();
       success('Senha alterada. Outras sessões foram encerradas.');
       setCurrentPassword(''); setNewPassword(''); setConfirm('');
       refreshSessions();
@@ -63,6 +64,10 @@ export default function Profile() {
   return (
     <>
       <PageHeader title="Meu perfil" subtitle="Dados da conta, troca de senha e sessões ativas" />
+
+      {user?.mustChangePassword && (
+        <Alert type="warn">Por segurança, altere a senha temporária antes de acessar o restante do sistema.</Alert>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 16, alignItems: 'start' }}>
         <div className="card card-pad">

@@ -8,16 +8,17 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import ImportWizard from '../components/ImportWizard.jsx';
 import { Button, Field, Input, Select, Modal, Badge, ConfirmDialog } from '../components/ui.jsx';
-import { SCHOOL_SITUATION, DEPENDENCY } from '../utils/format.js';
+import { SCHOOL_SITUATION, SCHOOL_ZONE, DEPENDENCY } from '../utils/format.js';
 
 const emptyForm = {
   inep: '', name: '', schoolType: '', situation: 'ATIVA', adminDependency: 'MUNICIPAL',
-  address: '', addressNumber: '', addressComplement: '', district: '', cep: '', municipality: '', uf: 'PA', zone: '',
+  address: '', addressNumber: '', addressComplement: '', district: '', cep: '', zone: '',
   responsible: '', phone: '', email: '',
   latitude: '', longitude: '', notes: '',
 };
 
 const SECTION_TITLE = { fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--primary-dark)', margin: '18px 0 10px', borderBottom: '1px solid var(--border)', paddingBottom: 4 };
+const coordinate = (value) => (value == null ? '—' : Number(value).toFixed(6).replace(/0+$/, '').replace(/\.$/, ''));
 
 export default function Schools() {
   const navigate = useNavigate();
@@ -28,29 +29,24 @@ export default function Schools() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search);
   const [zone, setZone] = useState('');
-  const [situation, setSituation] = useState('');
-  const [municipality, setMunicipality] = useState('');
   const [hasCoordinates, setHasCoordinates] = useState('');
-  const [page, setPage] = useState(1);
   const [sort, setSort] = useState('name');
   const [dir, setDir] = useState('asc');
 
   const filters = {
-    search: debouncedSearch, zone, situation,
-    ...(municipality && { municipality }),
+    search: debouncedSearch, zone,
     ...(hasCoordinates && { hasCoordinates }),
-    page, pageSize: 15, sort, dir,
+    page: 1, pageSize: 1000, sort, dir,
   };
 
   const { data, loading, refresh } = useApi(() => schoolsApi.list(filters), [
-    debouncedSearch, zone, situation, municipality, hasCoordinates, page, sort, dir,
+    debouncedSearch, zone, hasCoordinates, sort, dir,
   ]);
   const { data: stats, refresh: refreshStats } = useApi(() => schoolsApi.stats(), []);
-  const { data: filterOptions } = useApi(() => schoolsApi.filters(), []);
 
-  const hasFilters = search || zone || situation || municipality || hasCoordinates;
+  const hasFilters = search || zone || hasCoordinates;
   const clearFilters = () => {
-    setSearch(''); setZone(''); setSituation(''); setMunicipality(''); setHasCoordinates(''); setPage(1);
+    setSearch(''); setZone(''); setHasCoordinates('');
   };
 
   // ---- importação ----
@@ -74,7 +70,7 @@ export default function Schools() {
         inep: s.inep || '', name: s.name, schoolType: s.schoolType || '',
         situation: s.situation, adminDependency: s.adminDependency || 'MUNICIPAL',
         address: s.address || '', addressNumber: s.addressNumber || '', addressComplement: s.addressComplement || '',
-        district: s.district || '', cep: s.cep || '', municipality: s.municipality, uf: s.uf || '', zone: s.zone || '',
+        district: s.district || '', cep: s.cep || '', zone: s.zone || '',
         responsible: s.responsible || '', phone: s.phone || '', email: s.email || '',
         latitude: s.latitude ?? '', longitude: s.longitude ?? '', notes: s.notes || '',
       });
@@ -196,24 +192,13 @@ export default function Schools() {
       { key: 'responsible', label: 'Gestor(a)', render: (s) => s.responsible || '—' },
       {
         key: 'zone', label: 'Zona',
-        render: (s) => (s.zone ? <Badge cls={s.zone === 'RURAL' ? 'badge-yellow' : 'badge-blue'}>{s.zone === 'RURAL' ? 'Rural' : 'Urbana'}</Badge> : '—'),
+        render: (s) => {
+          const info = SCHOOL_ZONE[s.zone];
+          return info ? <Badge cls={info.cls}>{info.label}</Badge> : '—';
+        },
       },
-      {
-        key: 'location', label: 'Localização', align: 'center',
-        render: (s) =>
-          s.latitude != null && s.longitude != null ? (
-            <a href={`https://www.google.com/maps?q=${s.latitude},${s.longitude}`} target="_blank" rel="noreferrer"
-              title={`${s.latitude}, ${s.longitude}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 15 }}>
-              📍
-            </a>
-          ) : (
-            <span style={{ color: 'var(--text-3)' }}>—</span>
-          ),
-      },
-      {
-        key: 'situation', label: 'Status', sortable: true,
-        render: (s) => { const info = SCHOOL_SITUATION[s.situation]; return <Badge cls={info?.cls}>{info?.label}</Badge>; },
-      },
+      { key: 'latitude', label: 'Latitude', render: (s) => <span className="mono">{coordinate(s.latitude)}</span> },
+      { key: 'longitude', label: 'Longitude', render: (s) => <span className="mono">{coordinate(s.longitude)}</span> },
       {
         key: 'actions', label: '', align: 'right',
         render: (s) => (
@@ -251,38 +236,27 @@ export default function Schools() {
       {/* resumo — apenas o essencial */}
       <div className="stats-grid">
         <MiniStat icon="🏫" tone="blue" value={stats?.total} label="Total de escolas" />
-        <MiniStat icon="✅" tone="green" value={stats?.ativas} label="Ativas" />
-        <MiniStat icon="🏙" tone="violet" value={stats?.urbana} label="Urbanas" />
-        <MiniStat icon="🌾" tone="yellow" value={stats?.rural} label="Rurais" />
+        <MiniStat icon="🏙" tone="violet" value={stats?.sede} label="Sede" />
+        <MiniStat icon="🛣" tone="yellow" value={stats?.estradas} label="Estradas" />
+        <MiniStat icon="🏝" tone="green" value={stats?.ilhas} label="Ilhas" />
       </div>
 
       {/* pesquisa + filtros em uma linha */}
       <div className="filter-bar">
         <div className="field grow">
           <label>Buscar</label>
-          <Input placeholder="Escola, INEP, endereço ou gestor(a)..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+          <Input placeholder="Escola, INEP, endereço ou gestor(a)..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Field label="Zona">
-          <Select value={zone} onChange={(e) => { setZone(e.target.value); setPage(1); }}>
+          <Select value={zone} onChange={(e) => setZone(e.target.value)}>
             <option value="">Todas</option>
-            <option value="URBANA">Urbana</option>
-            <option value="RURAL">Rural</option>
-          </Select>
-        </Field>
-        <Field label="Situação">
-          <Select value={situation} onChange={(e) => { setSituation(e.target.value); setPage(1); }}>
-            <option value="">Todas</option>
-            {Object.entries(SCHOOL_SITUATION).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Município">
-          <Select value={municipality} onChange={(e) => { setMunicipality(e.target.value); setPage(1); }}>
-            <option value="">Todos</option>
-            {(filterOptions?.municipalities || []).map((m) => <option key={m} value={m}>{m}</option>)}
+            <option value="SEDE">Sede</option>
+            <option value="ESTRADAS">Estradas</option>
+            <option value="ILHAS">Ilhas</option>
           </Select>
         </Field>
         <Field label="Coordenadas">
-          <Select value={hasCoordinates} onChange={(e) => { setHasCoordinates(e.target.value); setPage(1); }}>
+          <Select value={hasCoordinates} onChange={(e) => setHasCoordinates(e.target.value)}>
             <option value="">Todas</option>
             <option value="true">Com coordenadas</option>
             <option value="false">Sem coordenadas</option>
@@ -309,8 +283,7 @@ export default function Schools() {
         columns={columns}
         rows={data?.data || []}
         loading={loading}
-        pagination={data?.pagination}
-        onPageChange={setPage}
+        footer={<span>{data?.pagination?.total ?? 0} escola(s) — role a página para visualizar todas</span>}
         sort={sort}
         dir={dir}
         onSort={(s, d) => { setSort(s); setDir(d); }}
@@ -337,7 +310,7 @@ export default function Schools() {
         <form onSubmit={submit}>
           <div style={SECTION_TITLE}>Identificação</div>
           <div className="form-grid">
-            <Field label="Código INEP" hint="Opcional — sem ele, deduplicamos por Nome + Município">
+            <Field label="Código INEP" hint="Identificador principal da escola">
               <Input value={form.inep} onChange={set('inep')} pattern="\d{6,10}" />
             </Field>
             <Field label="Nome da escola" required>
@@ -370,13 +343,12 @@ export default function Schools() {
             </div>
             <Field label="Bairro"><Input value={form.district} onChange={set('district')} /></Field>
             <Field label="CEP" hint="8 dígitos"><Input value={form.cep} onChange={set('cep')} /></Field>
-            <Field label="Município" required><Input value={form.municipality} onChange={set('municipality')} required /></Field>
-            <Field label="UF"><Input value={form.uf} onChange={set('uf')} maxLength={2} placeholder="PA" style={{ textTransform: 'uppercase' }} /></Field>
             <Field label="Zona">
               <Select value={form.zone} onChange={set('zone')}>
                 <option value="">—</option>
-                <option value="URBANA">Urbana</option>
-                <option value="RURAL">Rural</option>
+                {Object.entries(SCHOOL_ZONE).map(([key, info]) => (
+                  <option key={key} value={key}>{info.label}</option>
+                ))}
               </Select>
             </Field>
           </div>

@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { notFound, HttpError } from '../lib/errors.js';
+import { notFound, conflict, HttpError } from '../lib/errors.js';
 import { audit, AuditAction } from '../lib/audit.js';
 import { parsePagination, buildPagination } from '../lib/pagination.js';
 
@@ -50,10 +50,41 @@ async function assertDimensions(data) {
     const i = await prisma.indicator.findFirst({ where: { id: data.indicatorId, deletedAt: null } });
     if (!i) throw new HttpError(422, 'Indicador informado não existe', 'VALIDATION_ERROR');
   }
+  if (data.programId && data.schoolId) {
+    const link = await prisma.programSchool.findUnique({
+      where: { programId_schoolId: { programId: data.programId, schoolId: data.schoolId } },
+    });
+    if (!link?.active) {
+      throw new HttpError(422, 'A escola não está ativa no programa informado', 'VALIDATION_ERROR');
+    }
+  }
+  if (data.programId && data.indicatorId) {
+    const link = await prisma.programIndicator.findUnique({
+      where: { programId_indicatorId: { programId: data.programId, indicatorId: data.indicatorId } },
+    });
+    if (!link?.active) {
+      throw new HttpError(422, 'O indicador não está ativo no programa informado', 'VALIDATION_ERROR');
+    }
+  }
+}
+
+function goalIdentity(data) {
+  return {
+    scope: data.scope,
+    programId: data.programId ?? null,
+    schoolId: data.schoolId ?? null,
+    indicatorId: data.indicatorId ?? null,
+    year: Number(data.year),
+    period: data.period ?? null,
+  };
 }
 
 export async function createGoal(data, actor, ip) {
   await assertDimensions(data);
+  const duplicate = await prisma.goal.findFirst({ where: goalIdentity(data) });
+  if (duplicate) {
+    throw conflict('Já existe uma meta para o mesmo escopo, dimensões, ano e período');
+  }
   const goal = await prisma.goal.create({
     data: { ...data, createdById: actor.id },
     include: goalInclude,
@@ -73,6 +104,17 @@ export async function createGoal(data, actor, ip) {
 export async function updateGoal(id, data, actor, ip) {
   const existing = await prisma.goal.findUnique({ where: { id } });
   if (!existing) throw notFound('Meta não encontrada');
+  if (data.period !== undefined && data.period !== existing.period) {
+    const duplicate = await prisma.goal.findFirst({
+      where: {
+        ...goalIdentity({ ...existing, period: data.period }),
+        id: { not: id },
+      },
+    });
+    if (duplicate) {
+      throw conflict('Já existe uma meta para o mesmo escopo, dimensões, ano e período');
+    }
+  }
   const goal = await prisma.goal.update({
     where: { id },
     data: {
@@ -134,14 +176,14 @@ export function resolveGoalFromList(goals, { programId, schoolId, indicatorId, p
 export async function lookupGoal(params) {
   const { programId, schoolId, indicatorId, year, period } = params;
   const goals = await prisma.goal.findMany({
-    where: { year, ...(programId ? {} : {}), OR: [] },
+    where: { year: Number(year) },
     include: goalInclude,
+    orderBy: { createdAt: 'desc' },
   });
   const filtered = goals.filter((g) => {
-    if (programId && g.programId && g.programId !== programId) return false;
-    if (schoolId && g.schoolId && g.schoolId !== schoolId) return false;
-    if (indicatorId && g.indicatorId && g.indicatorId !== indicatorId) return false;
-    if (!g.programId && !g.schoolId && !g.indicatorId) return false;
+    if (g.programId && g.programId !== programId) return false;
+    if (g.schoolId && g.schoolId !== schoolId) return false;
+    if (g.indicatorId && g.indicatorId !== indicatorId) return false;
     return true;
   });
   const resolved = resolveGoalFromList(filtered, { programId, schoolId, indicatorId, period });

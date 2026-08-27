@@ -81,7 +81,6 @@ export default function Dashboard() {
                     <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {s.name}
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{s.municipality}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 800, fontSize: 15 }}>{fmt(s.score)}%</div>

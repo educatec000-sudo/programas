@@ -1,5 +1,23 @@
 import XLSX from 'xlsx';
+import * as cptable from 'xlsx/dist/cpexcel.full.mjs';
 import fs from 'node:fs';
+import path from 'node:path';
+import { TextDecoder } from 'node:util';
+
+// Necessário no build ESM do SheetJS para CSV/XLS legados com acentos.
+XLSX.set_cptable(cptable);
+
+function csvCodepage(buffer, filePath) {
+  if (path.extname(filePath).toLowerCase() !== '.csv') return undefined;
+  try {
+    // Arquivos UTF-8 continuam em 65001. O CSV oficial anexado foi exportado
+    // pelo Excel em Windows-1252, portanto uma decodificação UTF-8 estrita falha.
+    new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    return 65001;
+  } catch {
+    return 1252;
+  }
+}
 
 /** Normaliza chave de coluna: minúscula, sem acentos, só letras e números. */
 export function normalizeKey(key) {
@@ -35,8 +53,13 @@ export function toNumber(value) {
 export function parseSpreadsheet(filePath) {
   const buffer = fs.readFileSync(filePath);
   let book;
+  const codepage = csvCodepage(buffer, filePath);
   try {
-    book = XLSX.read(buffer, { type: 'buffer', codepage: 65001, raw: false });
+    book = XLSX.read(buffer, {
+      type: 'buffer',
+      ...(codepage && { codepage }),
+      raw: false,
+    });
   } catch (err) {
     throw new Error(`Não foi possível ler o arquivo: ${err.message}`);
   }

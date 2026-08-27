@@ -1,9 +1,9 @@
 /**
  * ============================================================
- * NORMALIZAÇÃO DE COORDENADAS — planilha LOCALIZAÇÃO ESCOLAS.xlsx
+ * NORMALIZAÇÃO DE COORDENADAS — planilha LOCALIZAÇÃO ESCOLAS
  * ============================================================
  *
- * Padrão observado NA PRÓPRIA PLANILHA oficial (Benevides/PA):
+ * Padrão observado NA PRÓPRIA PLANILHA oficial (Abaetetuba/PA):
  * as colunas LATITUDE e LONGTUDE vêm como INTEIROS com decimais
  * implícitas — o separador decimal se perdeu na exportação:
  *
@@ -18,8 +18,8 @@
  *      inteiro com decimais implícitas: divide-se por potências de 10
  *      decrescentes (10⁷ → 10³) até o resultado cair na FAIXA PLAUSÍVEL
  *      da região Norte do Brasil / Pará:
- *          latitude : 0.2 ≤ |v| ≤ 10   (Benevides ≈ -1.6)
- *          longitude: 10 ≤ |v| ≤ 90    (Benevides ≈ -48.2)
+ *          latitude : 0.2 ≤ |v| ≤ 10   (Abaetetuba ≈ -1.7)
+ *          longitude: 10 ≤ |v| ≤ 90    (Abaetetuba ≈ -48.9)
  *   3. Nenhuma divisão produz valor plausível => retorna null
  *      (a linha é marcada como ERRO citando a coluna — nunca inventa
  *      coordenada e nunca interrompe a importação).

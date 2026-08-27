@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { prisma } from '../lib/prisma.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { audit, AuditAction } from '../lib/audit.js';
@@ -10,7 +9,6 @@ import { IMPORT_ROW_STATUS } from '../lib/constants.js';
 import { notify } from './notification.service.js';
 import { schoolsStrategy } from '../modules/imports/schools.strategy.js';
 import { autoMapColumns, SCHOOL_FIELD_KEYS } from '../modules/imports/schoolFields.js';
-import { importsDir } from '../middlewares/upload.js';
 
 const MAX_ROWS = 5000;
 const MAX_STORED_ERRORS = 1000;
@@ -153,17 +151,32 @@ export async function confirmJob(id, actor, ip) {
   if (validRows.length && strategy) {
     try {
       const ctx = await strategy.loadContext();
-      applied = await strategy.apply(validRows, ctx);
+      applied = await strategy.apply(validRows, ctx, { actor });
     } catch (err) {
       failure = err.message;
     }
   }
 
+  const rowFailures = Array.isArray(applied.failures) ? applied.failures : [];
+  const partial = !failure && rowFailures.length > 0;
+  if (rowFailures.length) {
+    await prisma.importError.createMany({
+      data: rowFailures.slice(0, MAX_STORED_ERRORS).map((item) => ({
+        jobId: id,
+        rowNumber: Number(item.rowNumber) || 0,
+        message: item.message || 'Falha ao gravar a linha',
+        field: null,
+        value: '',
+      })),
+    });
+  }
+
   const updated = await prisma.importJob.update({
     where: { id },
     data: {
-      status: failure ? 'FALHOU' : 'IMPORTADO',
-      error: failure,
+      status: failure ? 'FALHOU' : partial ? 'PARCIAL' : 'IMPORTADO',
+      error: failure || (partial ? `${rowFailures.length} linha(s) falharam durante a gravação` : null),
+      errorRows: job.errorRows + rowFailures.length,
       confirmedAt: new Date(),
       finishedAt: new Date(),
       summary: {
@@ -171,14 +184,10 @@ export async function confirmJob(id, actor, ip) {
         confirmedBy: actor.name,
         created: applied.created,
         updated: applied.updated,
+        failedDuringApply: rowFailures.length,
       },
     },
   });
-
-  // limpa o arquivo retido da análise (somente após a gravação)
-  if (ANALYZE_ID_PATTERN.test(job.filename || '')) {
-    cleanup(path.join(importsDir, job.filename));
-  }
 
   await audit({
     userId: actor.id,
@@ -191,11 +200,15 @@ export async function confirmJob(id, actor, ip) {
   });
 
   await notify(actor.id, {
-    type: failure ? 'ERRO' : 'SUCESSO',
-    title: failure ? `Importação falhou: ${job.filename}` : `Importação concluída: ${job.filename}`,
+    type: failure ? 'ERRO' : partial ? 'ALERTA' : 'SUCESSO',
+    title: failure
+      ? `Importação falhou: ${job.filename}`
+      : partial
+        ? `Importação parcial: ${job.filename}`
+        : `Importação concluída: ${job.filename}`,
     message: failure
       ? `Erro ao gravar os dados: ${failure}`
-      : `${applied.created} registro(s) criado(s) e ${applied.updated} atualizado(s) de ${job.filename}.`,
+      : `${applied.created} registro(s) criado(s), ${applied.updated} atualizado(s) e ${rowFailures.length} falha(s) em ${job.filename}.`,
     link: '/importacoes',
   });
 
@@ -267,29 +280,13 @@ function cleanup(path) {
 // de Colunas:  1) analyze  →  2) execute (mapeamento)  →  3) confirm
 // ============================================================
 
-const ANALYZE_ID_PATTERN = /^[0-9]{10,14}-[a-f0-9]{12}\.(csv|xlsx|xls)$/;
-
-/** Remove arquivos de análise abandonados há mais de 24h. */
-function sweepOldAnalyzeFiles() {
-  try {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    for (const f of fs.readdirSync(importsDir)) {
-      const full = path.join(importsDir, f);
-      try {
-        if (ANALYZE_ID_PATTERN.test(f) && fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full);
-      } catch { /* ignora */ }
-    }
-  } catch { /* ignora */ }
-}
-
 /**
  * ETAPA 1 — Analisa a planilha: cabeçalhos detectados, sugestão de mapeamento
- * (aliases), amostra de dados e total de linhas. Nada é gravado; o arquivo
- * fica retido em uploads/imports até a execução (ou varredura de 24h).
+ * (aliases), amostra de dados e total de linhas. Nada é gravado e o arquivo
+ * temporário é eliminado na mesma requisição (compatível com Vercel).
  */
 export async function analyzeSchoolsFile({ file }, actor, ip) {
   if (!file) throw new HttpError(400, 'Envie o arquivo no campo "file"', 'BAD_REQUEST');
-  sweepOldAnalyzeFiles();
 
   let rows;
   try {
@@ -298,6 +295,7 @@ export async function analyzeSchoolsFile({ file }, actor, ip) {
     cleanup(file.path);
     throw new HttpError(422, err.message, 'PARSE_ERROR');
   }
+  cleanup(file.path);
 
   if (!rows.length) {
     cleanup(file.path);
@@ -333,7 +331,6 @@ export async function analyzeSchoolsFile({ file }, actor, ip) {
   });
 
   return {
-    analyzeId: path.basename(file.path),
     filename: file.originalname,
     totalRows: rows.length,
     headers,
@@ -348,20 +345,21 @@ export async function analyzeSchoolsFile({ file }, actor, ip) {
 }
 
 /**
- * ETAPA 2 — Executa a importação com o mapeamento validado: reprocessa o
- * arquivo retido, classifica as linhas (NOVO/ATUALIZAR/DUPLICADO/ERRO) e cria
- * o ImportJob em staging. A gravação só ocorre na confirmação (etapa 3).
+ * ETAPA 2 — Recebe novamente a planilha junto com o mapeamento, classifica as
+ * linhas (NOVO/ATUALIZAR/DUPLICADO/ERRO) e cria o ImportJob em staging.
+ * Arquivo e processamento permanecem na mesma requisição serverless.
  */
-export async function executeSchoolsImport({ analyzeId, mapping }, actor, ip) {
-  if (!ANALYZE_ID_PATTERN.test(analyzeId || '')) {
-    throw new HttpError(400, 'Identificador de análise inválido', 'BAD_REQUEST');
-  }
-  const filePath = path.join(importsDir, analyzeId);
-  if (!fs.existsSync(filePath)) {
-    throw new HttpError(410, 'Arquivo de análise não encontrado (expira em 24h). Envie a planilha novamente.', 'GONE');
-  }
+export async function executeSchoolsImport({ file, mapping }, actor, ip) {
+  if (!file) throw new HttpError(400, 'Envie novamente a planilha', 'BAD_REQUEST');
 
-  const rows = parseSpreadsheet(filePath);
+  let rows;
+  try {
+    rows = parseSpreadsheet(file.path);
+  } catch (err) {
+    throw new HttpError(422, err.message, 'PARSE_ERROR');
+  } finally {
+    cleanup(file.path);
+  }
   const headers = [...new Set(rows.flatMap((r) => Object.keys(r.raw)))];
 
   // mapeamento válido: chaves conhecidas + cabeçalhos existentes no arquivo
@@ -404,13 +402,13 @@ export async function executeSchoolsImport({ analyzeId, mapping }, actor, ip) {
   const job = await prisma.importJob.create({
     data: {
       type: 'ESCOLAS',
-      filename: analyzeId,
+      filename: file.originalname,
       status: 'PENDENTE',
       userId: actor.id,
       ...summary,
       data: staged,
       summary: {
-        originalFilename: analyzeId,
+        originalFilename: file.originalname,
         mapping: cleanMapping,
         unmappedColumns,
         mappedBy: actor.name,
@@ -439,11 +437,10 @@ export async function executeSchoolsImport({ analyzeId, mapping }, actor, ip) {
     action: AuditAction.IMPORT_PREVIEW,
     entity: 'ImportJob',
     entityId: job.id,
-    metadata: { stage: 'MAPEAMENTO', filename: analyzeId, mapping: cleanMapping, unmappedColumns, ...summary },
+    metadata: { stage: 'MAPEAMENTO', filename: file.originalname, mapping: cleanMapping, unmappedColumns, ...summary },
     ip,
   });
 
-  // o arquivo é retido até a CONFIRMAÇÃO — permite revalidar com mapeamento
-  // ajustado sem novo upload; a varredura de 24h limpa arquivos abandonados
+  // As linhas validadas ficam no PostgreSQL; o arquivo temporário já foi removido.
   return job;
 }

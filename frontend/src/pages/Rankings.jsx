@@ -47,7 +47,7 @@ export default function Rankings() {
       render: (r) => (
         <div>
           <strong>{r.schoolName}</strong>
-          <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>INEP {r.schoolInep} · {r.municipality}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>INEP {r.schoolInep}</div>
         </div>
       ),
     },

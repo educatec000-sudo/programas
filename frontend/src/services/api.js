@@ -98,7 +98,12 @@ export async function download(path, { params, fallbackName = 'arquivo' } = {}) 
     const s = qs.toString();
     if (s) url += `?${s}`;
   }
-  const res = await rawRequest(url);
+  let res = await rawRequest(url);
+  if (res.status === 401) {
+    const refreshed = await tryRefresh();
+    if (refreshed) res = await rawRequest(url);
+    else window.dispatchEvent(new CustomEvent('cpe:unauthenticated'));
+  }
   if (!res.ok) {
     let payload = null;
     try {

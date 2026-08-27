@@ -23,7 +23,6 @@ export default function TechnicianSchools() {
   const [view, setView] = useState('geral');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search);
-  const [municipality, setMunicipality] = useState('');
   const [situation, setSituation] = useState('');
   const [unassigned, setUnassigned] = useState(false);
   const [page, setPage] = useState(1);
@@ -34,7 +33,7 @@ export default function TechnicianSchools() {
 
   const filters = {
     search: debouncedSearch,
-    ...(isTechView ? {} : { municipality, ...(situation && { situation }) }),
+    ...(isTechView ? {} : { ...(situation && { situation }) }),
     ...(unassigned ? { unassigned: 'true' } : {}),
     page,
     pageSize: 15,
@@ -43,11 +42,10 @@ export default function TechnicianSchools() {
   };
 
   const { data: stats, refresh: refreshStats } = useApi(() => techniciansApi.stats(), []);
-  const { data: municipalities } = useApi(() => schoolsApi.municipalities(), []);
 
   const { data: geral, loading: loadingGeral, refresh: refreshGeral } = useApi(
     () => (view !== 'tecnico' ? techniciansApi.geral(filters) : Promise.resolve(null)),
-    [view, debouncedSearch, municipality, situation, unassigned, page, sort, dir],
+    [view, debouncedSearch, situation, unassigned, page, sort, dir],
   );
   const { data: techs, loading: loadingTechs, refresh: refreshTechs } = useApi(
     () => (view === 'tecnico' ? techniciansApi.technicians(filters) : Promise.resolve(null)),
@@ -62,7 +60,6 @@ export default function TechnicianSchools() {
 
   const clearFilters = () => {
     setSearch('');
-    setMunicipality('');
     setSituation('');
     setUnassigned(false);
     setPage(1);
@@ -110,11 +107,10 @@ export default function TechnicianSchools() {
       render: (s) => (
         <div>
           <strong>{s.name}</strong>
-          <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{s.address || s.municipality}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{s.address || '—'}</div>
         </div>
       ),
     },
-    { key: 'municipality', label: 'Município', sortable: true },
     {
       key: 'situation', label: 'Situação', sortable: true,
       render: (s) => { const info = SCHOOL_SITUATION[s.situation]; return <Badge cls={info?.cls}>{info?.label}</Badge>; },
@@ -245,12 +241,6 @@ export default function TechnicianSchools() {
         </div>
         {!isTechView && (
           <>
-            <Field label="Município">
-              <Select value={municipality} onChange={(e) => { setMunicipality(e.target.value); setPage(1); }}>
-                <option value="">Todos</option>
-                {(municipalities || []).map((m) => <option key={m} value={m}>{m}</option>)}
-              </Select>
-            </Field>
             <Field label="Situação">
               <Select value={situation} onChange={(e) => { setSituation(e.target.value); setPage(1); }}>
                 <option value="">Todas</option>
@@ -324,7 +314,6 @@ export default function TechnicianSchools() {
           <>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
               <Info label="INEP" value={schoolModal.inep} mono />
-              <Info label="Município" value={schoolModal.municipality} />
               <Info label="Situação" value={<Badge cls={SCHOOL_SITUATION[schoolModal.situation]?.cls}>{SCHOOL_SITUATION[schoolModal.situation]?.label}</Badge>} />
               {schoolModal.latitude != null && <Info label="Latitude" value={schoolModal.latitude} />}
               {schoolModal.longitude != null && <Info label="Longitude" value={schoolModal.longitude} />}
@@ -387,7 +376,7 @@ export default function TechnicianSchools() {
             ) : (
               <table className="data-table" style={{ border: '1px solid var(--border)', borderRadius: 9 }}>
                 <thead>
-                  <tr><th>#</th><th>Escola</th><th>INEP</th><th>Município</th><th>Situação</th>{can('technicians:delete') && <th />}</tr>
+                  <tr><th>#</th><th>Escola</th><th>INEP</th><th>Situação</th>{can('technicians:delete') && <th />}</tr>
                 </thead>
                 <tbody>
                   {techModal.schools.map((s, i) => (
@@ -395,7 +384,6 @@ export default function TechnicianSchools() {
                       <td>{i + 1}</td>
                       <td><strong>{s.name}</strong></td>
                       <td><span className="mono">{s.inep}</span></td>
-                      <td>{s.municipality}</td>
                       <td><Badge cls={SCHOOL_SITUATION[s.situation]?.cls}>{SCHOOL_SITUATION[s.situation]?.label}</Badge></td>
                       {can('technicians:delete') && (
                         <td className="center">
@@ -444,30 +432,63 @@ export default function TechnicianSchools() {
 /** Modal de criação de vínculos (escola + um ou vários técnicos). */
 function LinkModal({ open, onClose, onCreated }) {
   const { error } = useToast();
-  const { data: schools } = useApi(() => (open ? schoolsApi.list({ pageSize: 200 }) : Promise.resolve(null)), [open]);
-  const { data: eligible } = useApi(() => (open ? techniciansApi.eligible() : Promise.resolve(null)), [open]);
+  const { data: schools } = useApi(
+    () => (open ? schoolsApi.list({ pageSize: 1000 }) : Promise.resolve(null)),
+    [open],
+  );
+  const { data: eligible } = useApi(
+    () => (open ? techniciansApi.eligible() : Promise.resolve(null)),
+    [open],
+  );
 
-  const [schoolId, setSchoolId] = useState('');
-  const [selected, setSelected] = useState([]);
+  const [technicianId, setTechnicianId] = useState('');
+  const [selectedSchoolIds, setSelectedSchoolIds] = useState([]);
+  const [linkedSchoolIds, setLinkedSchoolIds] = useState([]);
   const [notes, setNotes] = useState('');
   const [schoolFilter, setSchoolFilter] = useState('');
-  const [techFilter, setTechFilter] = useState('');
+  const [technicianFilter, setTechnicianFilter] = useState('');
+  const [loadingLinks, setLoadingLinks] = useState(false);
   const [busy, setBusy] = useState(false);
 
   React.useEffect(() => {
-    if (open?.schoolId) setSchoolId(open.schoolId);
-    else setSchoolId('');
-    setSelected([]);
+    setTechnicianId('');
+    setSelectedSchoolIds(open?.schoolId ? [open.schoolId] : []);
+    setLinkedSchoolIds([]);
     setNotes('');
     setSchoolFilter('');
-    setTechFilter('');
+    setTechnicianFilter('');
   }, [open]);
 
+  React.useEffect(() => {
+    let active = true;
+    if (!technicianId) {
+      setLinkedSchoolIds([]);
+      return () => { active = false; };
+    }
+
+    setLoadingLinks(true);
+    techniciansApi.byTechnician(technicianId)
+      .then((technician) => {
+        if (!active) return;
+        const linked = (technician.schools || []).map((school) => school.id);
+        setLinkedSchoolIds(linked);
+        setSelectedSchoolIds((ids) => ids.filter((id) => !linked.includes(id)));
+      })
+      .catch((err) => active && error(err.message))
+      .finally(() => active && setLoadingLinks(false));
+
+    return () => { active = false; };
+  }, [technicianId]);
+
   const submit = async () => {
-    if (!schoolId || !selected.length) return;
+    if (!technicianId || !selectedSchoolIds.length) return;
     setBusy(true);
     try {
-      const res = await techniciansApi.create({ schoolId, technicianIds: selected, notes });
+      const res = await techniciansApi.create({
+        technicianId,
+        schoolIds: selectedSchoolIds,
+        notes,
+      });
       onCreated(res);
       onClose();
     } catch (err) {
@@ -477,26 +498,56 @@ function LinkModal({ open, onClose, onCreated }) {
     }
   };
 
-  const schoolOptions = (schools?.data || []).filter((s) =>
-    !schoolFilter ||
-    s.name.toLowerCase().includes(schoolFilter.toLowerCase()) ||
-    s.inep.includes(schoolFilter),
+  const normalizedSchoolFilter = schoolFilter.trim().toLowerCase();
+  const schoolOptions = (schools?.data || []).filter((school) =>
+    !normalizedSchoolFilter ||
+    school.name.toLowerCase().includes(normalizedSchoolFilter) ||
+    String(school.inep || '').includes(normalizedSchoolFilter) ||
+    String(school.address || '').toLowerCase().includes(normalizedSchoolFilter) ||
+    String(school.zone || '').toLowerCase().includes(normalizedSchoolFilter),
   );
-  const techOptions = (eligible?.data || []).filter((t) =>
-    !techFilter || t.name.toLowerCase().includes(techFilter.toLowerCase()) || t.email.toLowerCase().includes(techFilter.toLowerCase()),
+
+  const normalizedTechnicianFilter = technicianFilter.trim().toLowerCase();
+  const technicianOptions = (eligible?.data || []).filter((technician) =>
+    !normalizedTechnicianFilter ||
+    technician.name.toLowerCase().includes(normalizedTechnicianFilter) ||
+    technician.email.toLowerCase().includes(normalizedTechnicianFilter),
   );
+
+  const linkedSet = new Set(linkedSchoolIds);
+  const selectableFilteredIds = schoolOptions
+    .filter((school) => !linkedSet.has(school.id))
+    .map((school) => school.id);
+  const allFilteredSelected =
+    selectableFilteredIds.length > 0 &&
+    selectableFilteredIds.every((id) => selectedSchoolIds.includes(id));
+
+  const toggleSchool = (schoolId) => {
+    setSelectedSchoolIds((ids) =>
+      ids.includes(schoolId) ? ids.filter((id) => id !== schoolId) : [...ids, schoolId],
+    );
+  };
+
+  const toggleAllFiltered = () => {
+    setSelectedSchoolIds((ids) => {
+      if (allFilteredSelected) {
+        return ids.filter((id) => !selectableFilteredIds.includes(id));
+      }
+      return [...new Set([...ids, ...selectableFilteredIds])];
+    });
+  };
 
   return (
     <Modal
       open={Boolean(open)}
       onClose={onClose}
-      title="Novo vínculo técnico ↔ escola"
+      title="Novo vínculo — técnico e escolas"
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button onClick={submit} disabled={busy || !schoolId || !selected.length}>
-            {busy ? 'Criando...' : `Vincular ${selected.length} técnico(s)`}
+          <Button onClick={submit} disabled={busy || !technicianId || !selectedSchoolIds.length}>
+            {busy ? 'Criando vínculos...' : `Vincular a ${selectedSchoolIds.length} escola(s)`}
           </Button>
         </>
       }
@@ -508,38 +559,92 @@ function LinkModal({ open, onClose, onCreated }) {
         </Alert>
       )}
 
-      <div className="form-grid">
-        <Field label="Escola *" hint="Filtre por nome ou INEP para localizar">
-          <Input placeholder="Filtrar escolas..." value={schoolFilter} onChange={(e) => setSchoolFilter(e.target.value)} />
-          <Select value={schoolId} onChange={(e) => setSchoolId(e.target.value)} style={{ marginTop: 6 }}>
-            <option value="">Selecione a escola...</option>
-            {schoolOptions.slice(0, 300).map((s) => (
-              <option key={s.id} value={s.id}>{s.inep} — {s.name} ({s.municipality})</option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Técnicos *" hint="Usuários com perfil marcado como técnico">
-          <Input placeholder="Filtrar técnicos..." value={techFilter} onChange={(e) => setTechFilter(e.target.value)} />
-          <div style={{ marginTop: 6, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
-            {techOptions.map((t) => (
-              <label key={t.id} className="dropdown-item" style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
+      <Field label="1. Selecione o técnico *" hint="Pesquise pelo nome ou e-mail">
+        <Input
+          placeholder="Filtrar técnicos..."
+          value={technicianFilter}
+          onChange={(e) => setTechnicianFilter(e.target.value)}
+        />
+        <Select
+          value={technicianId}
+          onChange={(e) => {
+            setTechnicianId(e.target.value);
+            setSelectedSchoolIds(open?.schoolId ? [open.schoolId] : []);
+          }}
+          style={{ marginTop: 6 }}
+        >
+          <option value="">Selecione o técnico...</option>
+          {technicianOptions.map((technician) => (
+            <option key={technician.id} value={technician.id}>
+              {technician.name} — {technician.email}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      <Field
+        label="2. Selecionar escolas *"
+        hint="Escolha várias escolas para o técnico. Filtre por nome, INEP, endereço ou zona."
+      >
+        <Input
+          placeholder="Filtrar todas as escolas..."
+          value={schoolFilter}
+          onChange={(e) => setSchoolFilter(e.target.value)}
+        />
+
+        <label
+          className="checkbox-row"
+          style={{ marginTop: 8, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8 }}
+        >
+          <input
+            type="checkbox"
+            checked={allFilteredSelected}
+            disabled={!technicianId || selectableFilteredIds.length === 0 || loadingLinks}
+            onChange={toggleAllFiltered}
+            style={{ width: 16, height: 16 }}
+          />
+          <strong>Selecionar todas as {selectableFilteredIds.length} escola(s) filtrada(s)</strong>
+        </label>
+
+        <div style={{ marginTop: 6, maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+          {schoolOptions.map((school) => {
+            const alreadyLinked = linkedSet.has(school.id);
+            const checked = alreadyLinked || selectedSchoolIds.includes(school.id);
+            return (
+              <label
+                key={school.id}
+                className="dropdown-item"
+                style={{ cursor: alreadyLinked || !technicianId ? 'default' : 'pointer', borderBottom: '1px solid var(--border)', opacity: !technicianId ? 0.65 : 1 }}
+              >
                 <input
                   type="checkbox"
+                  checked={checked}
+                  disabled={!technicianId || alreadyLinked || loadingLinks}
+                  onChange={() => toggleSchool(school.id)}
                   style={{ width: 16, height: 16, accentColor: 'var(--primary)', marginTop: 2 }}
-                  checked={selected.includes(t.id)}
-                  onChange={(e) => setSelected((sel) => (e.target.checked ? [...sel, t.id] : sel.filter((x) => x !== t.id)))}
                 />
-                <div>
-                  <div style={{ fontWeight: 600 }}>{t.name}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{t.email} · {t.schoolsCount} escola(s)</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <strong>{school.name}</strong>
+                    {alreadyLinked && <Badge cls="badge-green">já vinculada</Badge>}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+                    INEP {school.inep || '—'}{school.address ? ` · ${school.address}` : ''}{school.zone ? ` · ${school.zone}` : ''}
+                  </div>
                 </div>
               </label>
-            ))}
-            {!techOptions.length && <div className="table-empty">Nenhum técnico encontrado</div>}
-          </div>
-        </Field>
-      </div>
-      <Field label="Observação do vínculo (opcional)">
+            );
+          })}
+          {!schoolOptions.length && <div className="table-empty">Nenhuma escola encontrada com esse filtro</div>}
+        </div>
+
+        <div style={{ marginTop: 7, fontSize: 12.5, color: 'var(--text-2)' }}>
+          <strong>{selectedSchoolIds.length}</strong> nova(s) escola(s) selecionada(s)
+          {technicianId && <> · <strong>{linkedSchoolIds.length}</strong> vínculo(s) já existente(s)</>}
+        </div>
+      </Field>
+
+      <Field label="Observação dos vínculos (opcional)">
         <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex.: responsável desde 2026" />
       </Field>
     </Modal>

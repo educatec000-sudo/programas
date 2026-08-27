@@ -1,5 +1,5 @@
 import React from 'react';
-import { LoadingBlock, EmptyState, Button } from './ui.jsx';
+import { LoadingBlock, EmptyState } from './ui.jsx';
 
 /**
  * Tabela de dados com ordenação e paginação controladas pela página.
@@ -13,7 +13,6 @@ export default function DataTable({
   rowKey = (r) => r.id,
   onRowClick,
   pagination,
-  onPageChange,
   sort,
   dir,
   onSort,
@@ -76,24 +75,7 @@ export default function DataTable({
           {(pagination || footer) && (
             <div className="table-footer">
               {pagination ? (
-                <>
-                  <span>
-                    {pagination.total} registro(s) · página {pagination.page} de {pagination.totalPages}
-                  </span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <Button size="sm" variant="secondary" disabled={pagination.page <= 1} onClick={() => onPageChange(pagination.page - 1)}>
-                      ← Anterior
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={pagination.page >= pagination.totalPages}
-                      onClick={() => onPageChange(pagination.page + 1)}
-                    >
-                      Próxima →
-                    </Button>
-                  </div>
-                </>
+                <span>{pagination.total} registro(s) — role a página para visualizar toda a lista</span>
               ) : (
                 footer
               )}

@@ -27,12 +27,18 @@ export async function getStats() {
     await Promise.all([
       prisma.school.count({ where: { deletedAt: null } }),
       prisma.schoolTechnician.findMany({
-        where: { school: { deletedAt: null } },
+        where: {
+          school: { deletedAt: null },
+          technician: { active: true, role: { canBeTechnician: true } },
+        },
         distinct: ['schoolId'],
         select: { schoolId: true },
       }),
       prisma.schoolTechnician.findMany({
-        where: { technician: { active: true } },
+        where: {
+          school: { deletedAt: null },
+          technician: { active: true, role: { canBeTechnician: true } },
+        },
         distinct: ['technicianId'],
         select: { technicianId: true },
       }),
@@ -58,7 +64,7 @@ export async function getStats() {
  */
 export async function listGeral(query) {
   const { page, pageSize, skip, take } = parsePagination(query);
-  const { search, municipality, situation, zone, unassigned } = query;
+  const { search, situation, zone, unassigned } = query;
 
   const where = {
     deletedAt: null,
@@ -67,14 +73,24 @@ export async function listGeral(query) {
         { name: { contains: search, mode: 'insensitive' } },
         { inep: { contains: search } },
         { address: { contains: search, mode: 'insensitive' } },
-        { municipality: { contains: search, mode: 'insensitive' } },
-        { technicianLinks: { some: { technician: { name: { contains: search, mode: 'insensitive' } } } } },
+        {
+          technicianLinks: {
+            some: {
+              technician: {
+                active: true,
+                role: { canBeTechnician: true },
+                name: { contains: search, mode: 'insensitive' },
+              },
+            },
+          },
+        },
       ],
     }),
-    ...(municipality && { municipality: { equals: municipality, mode: 'insensitive' } }),
     ...(situation && { situation }),
     ...(zone && { zone }),
-    ...(unassigned === 'true' && { technicianLinks: { none: {} } }),
+    ...(unassigned === 'true' && {
+      technicianLinks: { none: { technician: { active: true, role: { canBeTechnician: true } } } },
+    }),
   };
 
   const orderBy = { [SORTABLE[query.sort] || 'name']: query.dir === 'desc' ? 'desc' : 'asc' };
@@ -85,6 +101,7 @@ export async function listGeral(query) {
       where,
       include: {
         technicianLinks: {
+          where: { technician: { active: true, role: { canBeTechnician: true } } },
           include: linkTechnicianInclude,
           orderBy: { technician: { name: 'asc' } },
         },
@@ -100,7 +117,6 @@ export async function listGeral(query) {
       id: s.id,
       inep: s.inep,
       name: s.name,
-      municipality: s.municipality,
       address: s.address,
       zone: s.zone,
       situation: s.situation,
@@ -118,7 +134,7 @@ export async function listGeral(query) {
   };
 }
 
-const SORTABLE = { name: 'name', inep: 'inep', municipality: 'municipality', createdAt: 'createdAt' };
+const SORTABLE = { name: 'name', inep: 'inep', createdAt: 'createdAt' };
 
 /**
  * Visão Técnico: técnicos (elegíveis ou já vinculados) com suas escolas.
@@ -157,8 +173,16 @@ export async function listTechnicians(query) {
   // base: técnicos elegíveis (perfil marcado) ou que já possuem vínculos
   const base =
     unassigned === 'true'
-      ? { role: { canBeTechnician: true }, technicianSchools: { none: {} } }
-      : { OR: [{ role: { canBeTechnician: true } }, { technicianSchools: { some: {} } }] };
+      ? {
+          role: { canBeTechnician: true },
+          technicianSchools: { none: { school: { deletedAt: null } } },
+        }
+      : {
+          OR: [
+            { role: { canBeTechnician: true } },
+            { technicianSchools: { some: { school: { deletedAt: null } } } },
+          ],
+        };
 
   // busca por nome do técnico, e-mail ou nome de escola atendida
   const searchWhere = search
@@ -168,7 +192,13 @@ export async function listTechnicians(query) {
           { email: { contains: search, mode: 'insensitive' } },
           ...(unassigned === 'true'
             ? []
-            : [{ technicianSchools: { some: { school: { name: { contains: search, mode: 'insensitive' } } } } }]),
+            : [{
+                technicianSchools: {
+                  some: {
+                    school: { deletedAt: null, name: { contains: search, mode: 'insensitive' } },
+                  },
+                },
+              }]),
         ],
       }
     : null;
@@ -187,7 +217,7 @@ export async function listTechnicians(query) {
         technicianSchools: {
           where: { school: { deletedAt: null } },
           include: {
-            school: { select: { id: true, inep: true, name: true, municipality: true, situation: true } },
+            school: { select: { id: true, inep: true, name: true, situation: true } },
           },
           orderBy: { school: { name: 'asc' } },
         },
@@ -222,6 +252,7 @@ export async function getBySchool(schoolId) {
     where: { id: schoolId, deletedAt: null },
     include: {
       technicianLinks: {
+        where: { technician: { active: true, role: { canBeTechnician: true } } },
         include: linkTechnicianInclude,
         orderBy: { technician: { name: 'asc' } },
       },
@@ -233,7 +264,6 @@ export async function getBySchool(schoolId) {
     id: school.id,
     inep: school.inep,
     name: school.name,
-    municipality: school.municipality,
     address: school.address,
     district: school.district,
     zone: school.zone,
@@ -256,7 +286,7 @@ export async function getBySchool(schoolId) {
 /** Técnico → todas as escolas atendidas. */
 export async function getByTechnician(technicianId) {
   const user = await prisma.user.findFirst({
-    where: { id: technicianId },
+    where: { id: technicianId, active: true, role: { canBeTechnician: true } },
     select: {
       ...technicianSelect,
       active: true,
@@ -265,7 +295,7 @@ export async function getByTechnician(technicianId) {
         include: {
           school: {
             select: {
-              id: true, inep: true, name: true, municipality: true,
+              id: true, inep: true, name: true,
               zone: true, situation: true, latitude: true, longitude: true,
             },
           },
@@ -293,36 +323,85 @@ export async function getByTechnician(technicianId) {
 }
 
 /**
- * Cria um ou vários vínculos técnico ↔ escola.
+ * Vincula um técnico a uma ou várias escolas de uma só vez.
  * Impede duplicidade (constraint UNIQUE + skipDuplicates) e valida a
- * elegibilidade: usuário ativo com perfil canBeTechnician.
+ * elegibilidade do técnico e a existência de todas as escolas selecionadas.
  */
-export async function createLinks({ schoolId, technicianIds, notes }, actor, ip) {
-  const school = await prisma.school.findFirst({ where: { id: schoolId, deletedAt: null } });
+async function createTechnicianSchoolLinks({ technicianId, schoolIds, notes }, actor, ip) {
+  const technician = await prisma.user.findUnique({
+    where: { id: technicianId },
+    include: { role: { select: { name: true, canBeTechnician: true } } },
+  });
+  if (!technician) throw notFound('Técnico não encontrado');
+  if (!technician.active || !technician.role.canBeTechnician) {
+    throw new HttpError(
+      422,
+      `Usuário não elegível como técnico: ${technician.name} (perfil ${technician.role.name}). Habilite "pode ser técnico" no perfil.`,
+      'VALIDATION_ERROR',
+    );
+  }
+
+  const uniqueSchoolIds = [...new Set(schoolIds)];
+  const schools = await prisma.school.findMany({
+    where: { id: { in: uniqueSchoolIds }, deletedAt: null },
+    select: { id: true, inep: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+  if (schools.length !== uniqueSchoolIds.length) {
+    throw new HttpError(422, 'Uma ou mais escolas selecionadas não existem ou foram excluídas', 'VALIDATION_ERROR');
+  }
+
+  const result = await prisma.schoolTechnician.createMany({
+    data: uniqueSchoolIds.map((schoolId) => ({ schoolId, technicianId, notes: notes ?? null })),
+    skipDuplicates: true,
+  });
+  const duplicates = uniqueSchoolIds.length - result.count;
+
+  await audit({
+    userId: actor.id,
+    userName: actor.name,
+    action: AuditAction.CREATE,
+    entity: 'SchoolTechnician',
+    entityId: technicianId,
+    metadata: {
+      technician: { id: technician.id, name: technician.name },
+      schools: schools.slice(0, 200),
+      requested: uniqueSchoolIds.length,
+      created: result.count,
+      duplicatesSkipped: duplicates,
+    },
+    ip,
+  });
+
+  return {
+    created: result.count,
+    duplicates,
+    technician: { id: technician.id, name: technician.name },
+    schools: schools.length,
+  };
+}
+
+async function createSchoolTechnicianLinks({ schoolId, technicianIds, notes }, actor, ip) {
+  const school = await prisma.school.findFirst({
+    where: { id: schoolId, deletedAt: null },
+    select: { id: true, inep: true, name: true },
+  });
   if (!school) throw notFound('Escola não encontrada');
 
   const users = await prisma.user.findMany({
     where: { id: { in: technicianIds } },
     include: { role: { select: { name: true, canBeTechnician: true } } },
   });
-
-  const invalid = users.filter((u) => !u.active || !u.role.canBeTechnician);
-  if (invalid.length) {
-    throw new HttpError(
-      422,
-      `Usuário(s) não elegível(is) como técnico: ${invalid.map((u) => `${u.name} (perfil ${u.role.name} sem permissão de técnico)`).join(', ')}. Habilite "pode ser técnico" no perfil.`,
-      'VALIDATION_ERROR',
-    );
-  }
-  if (users.length < technicianIds.length) {
-    throw new HttpError(422, 'Um ou mais usuários informados não existem', 'VALIDATION_ERROR');
+  const invalid = users.filter((user) => !user.active || !user.role.canBeTechnician);
+  if (users.length !== technicianIds.length || invalid.length) {
+    throw new HttpError(422, 'Um ou mais usuários não existem ou não são elegíveis como técnico', 'VALIDATION_ERROR');
   }
 
-  const requested = technicianIds.length;
   const result = await prisma.schoolTechnician.createMany({
     data: technicianIds.map((technicianId) => ({ schoolId, technicianId, notes: notes ?? null })),
     skipDuplicates: true,
   });
+  const duplicates = technicianIds.length - result.count;
 
   await audit({
     userId: actor.id,
@@ -331,19 +410,23 @@ export async function createLinks({ schoolId, technicianIds, notes }, actor, ip)
     entity: 'SchoolTechnician',
     entityId: schoolId,
     metadata: {
-      school: { id: schoolId, inep: school.inep, name: school.name },
-      technicians: users.map((u) => ({ id: u.id, name: u.name })),
+      school,
+      technicians: users.map((user) => ({ id: user.id, name: user.name })),
+      requested: technicianIds.length,
       created: result.count,
-      duplicatesSkipped: requested - result.count,
+      duplicatesSkipped: duplicates,
     },
     ip,
   });
 
-  return {
-    created: result.count,
-    duplicates: requested - result.count,
-    school: { id: school.id, name: school.name, inep: school.inep },
-  };
+  return { created: result.count, duplicates, school };
+}
+
+export async function createLinks(payload, actor, ip) {
+  if ('technicianId' in payload) {
+    return createTechnicianSchoolLinks(payload, actor, ip);
+  }
+  return createSchoolTechnicianLinks(payload, actor, ip);
 }
 
 /** Atualiza observações do vínculo. */
@@ -412,7 +495,6 @@ export async function geralForExport(query) {
   return data.map((s) => ({
     inep: s.inep,
     name: s.name,
-    municipality: s.municipality,
     zone: s.zone || '',
     situation: s.situation,
     technicians: s.technicians.map((t) => t.name).join(', '),

@@ -46,8 +46,8 @@ model Role {
 model RolePermission {
   roleId       String
   permissionId String
-  grantedAt    DateTime @default(now())
-  role         Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  grantedAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
@@ -55,21 +55,21 @@ model RolePermission {
 }
 
 model User {
-  id                 String               @id @default(uuid())
+  id                 String    @id @default(uuid())
   name               String
-  email              String               @unique
+  email              String    @unique
   passwordHash       String
   phone              String?
   roleId             String
-  role               Role                 @relation(fields: [roleId], references: [id])
-  active             Boolean              @default(true)
-  mustChangePassword Boolean              @default(false)
-  failedAttempts     Int                  @default(0)
+  role               Role      @relation(fields: [roleId], references: [id])
+  active             Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  failedAttempts     Int       @default(0)
   lockedUntil        DateTime?
   lastLoginAt        DateTime?
   passwordChangedAt  DateTime?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   sessions          Session[]
   passwordResets    PasswordResetToken[]
@@ -77,8 +77,8 @@ model User {
   auditLogs         AuditLog[]
   notifications     Notification[]
   importJobs        ImportJob[]
-  resultsCreated    Result[]              @relation("ResultCreatedBy")
-  resultsUpdated    Result[]              @relation("ResultUpdatedBy")
+  resultsCreated    Result[]             @relation("ResultCreatedBy")
+  resultsUpdated    Result[]             @relation("ResultUpdatedBy")
   goalsCreated      Goal[]
   documents         Document[]
   evaluations       Evaluation[]
@@ -149,42 +149,42 @@ enum SchoolSituation {
 enum SchoolZone {
   URBANA
   RURAL
+  SEDE
+  ESTRADAS
+  ILHAS
 }
 
 model School {
-  id              String           @id @default(uuid())
-  inep            String?          @unique // código INEP — identificador principal quando presente
-  name            String
-  schoolType      String? // tipo de escola (E.M.E.F., Creche, E.E.E.F.M....)
-  municipality    String
-  address         String?
-  addressNumber   String?
+  id                String           @id @default(uuid())
+  inep              String?          @unique // código INEP — identificador principal quando presente
+  name              String
+  schoolType        String? // tipo de escola (E.M.E.F., Creche, E.E.E.F.M....)
+  address           String?
+  addressNumber     String?
   addressComplement String?
-  district        String? // bairro
-  cep             String?
-  uf              String?
-  zone            SchoolZone?
-  adminDependency AdminDependency?
-  situation       SchoolSituation  @default(ATIVA)
-  phone           String?
-  email           String?
-  responsible     String?
-  notes           String?
+  district          String? // bairro
+  cep               String?
+  zone              SchoolZone?
+  adminDependency   AdminDependency?
+  situation         SchoolSituation  @default(ATIVA)
+  phone             String?
+  email             String?
+  responsible       String?
+  notes             String?
   // Localização (planilha "LOCALIZAÇÃO ESCOLAS")
-  latitude        Float?
-  longitude       Float?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deletedAt       DateTime? // soft delete
+  latitude          Float?
+  longitude         Float?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime? // soft delete
 
-  programs         ProgramSchool[]
-  results          Result[]
-  goals            Goal[]
-  evaluations      Evaluation[]
-  technicianLinks  SchoolTechnician[]
+  programs        ProgramSchool[]
+  results         Result[]
+  goals           Goal[]
+  evaluations     Evaluation[]
+  technicianLinks SchoolTechnician[]
 
   @@index([name])
-  @@index([municipality])
   @@index([district])
   @@index([zone])
   @@index([situation, deletedAt])
@@ -197,12 +197,12 @@ model School {
  * Técnico = usuário existente com perfil marcado como canBeTechnician.
  */
 model SchoolTechnician {
-  id            String   @id @default(uuid())
-  schoolId      String
-  technicianId  String
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(uuid())
+  schoolId     String
+  technicianId String
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   technician User   @relation(fields: [technicianId], references: [id], onDelete: Cascade)
@@ -247,12 +247,12 @@ model Program {
 }
 
 model ProgramSchool {
-  programId  String
-  schoolId   String
-  program    Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  school     School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  active     Boolean   @default(true)
-  joinedAt   DateTime  @default(now())
+  programId String
+  schoolId  String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  joinedAt  DateTime @default(now())
 
   @@id([programId, schoolId])
   @@index([schoolId])
@@ -271,30 +271,30 @@ enum Polarity {
 }
 
 model IndicatorCategory {
-  id          String       @id @default(uuid())
-  name        String       @unique
+  id          String      @id @default(uuid())
+  name        String      @unique
   description String?
-  createdAt   DateTime     @default(now())
+  createdAt   DateTime    @default(now())
   indicators  Indicator[]
 }
 
 model Indicator {
-  id          String           @id @default(uuid())
-  code        String           @unique
+  id          String             @id @default(uuid())
+  code        String             @unique
   name        String
   description String?
   categoryId  String?
   category    IndicatorCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   unit        String? // "%", "alunos", "escolas"...
-  polarity    Polarity         @default(MAIOR_MELHOR)
-  weight      Float            @default(1)
+  polarity    Polarity           @default(MAIOR_MELHOR)
+  weight      Float              @default(1)
   defaultGoal Float? // meta padrão
   minValue    Float?
   maxValue    Float?
   periodLabel String?
-  status      IndicatorStatus  @default(ATIVO)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  status      IndicatorStatus    @default(ATIVO)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   deletedAt   DateTime?
 
   programs ProgramIndicator[]
@@ -306,14 +306,14 @@ model Indicator {
 }
 
 model ProgramIndicator {
-  programId    String
-  indicatorId  String
-  program      Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  indicator    Indicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
-  weight       Float? // sobrepeso do indicador no programa (padrão: indicator.weight)
-  goal         Float? // meta específica no programa (padrão: indicator.defaultGoal)
-  active       Boolean   @default(true)
-  addedAt      DateTime  @default(now())
+  programId   String
+  indicatorId String
+  program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  indicator   Indicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  weight      Float? // sobrepeso do indicador no programa (padrão: indicator.weight)
+  goal        Float? // meta específica no programa (padrão: indicator.defaultGoal)
+  active      Boolean   @default(true)
+  addedAt     DateTime  @default(now())
 
   @@id([programId, indicatorId])
   @@index([indicatorId])
@@ -341,16 +341,17 @@ model Result {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  program     Program     @relation(fields: [programId], references: [id])
-  school      School      @relation(fields: [schoolId], references: [id])
-  indicator   Indicator   @relation(fields: [indicatorId], references: [id])
-  createdBy   User?       @relation("ResultCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy   User?       @relation("ResultUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  program   Program   @relation(fields: [programId], references: [id])
+  school    School    @relation(fields: [schoolId], references: [id])
+  indicator Indicator @relation(fields: [indicatorId], references: [id])
+  createdBy User?     @relation("ResultCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?     @relation("ResultUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@unique([programId, schoolId, indicatorId, year, period])
   @@index([schoolId])
   @@index([indicatorId])
   @@index([year, period])
+  @@index([programId, year, period])
 }
 
 enum GoalScope {
@@ -374,37 +375,38 @@ model Goal {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  program    Program?    @relation(fields: [programId], references: [id], onDelete: Cascade)
-  school     School?     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  indicator  Indicator?  @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
-  createdBy  User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  program   Program?   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school    School?    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  indicator Indicator? @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  createdBy User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([programId])
   @@index([schoolId])
   @@index([indicatorId])
   @@index([year, period])
+  @@index([programId, indicatorId, schoolId, year, period])
 }
 
 // ---------------------------- AVALIAÇÃO / RANKING ----------------------------
 
 model Evaluation {
-  id              String   @id @default(uuid())
-  programId       String
-  schoolId        String
-  year            Int
-  period          String   @default("Anual")
-  score           Float // pontuação percentual ponderada (0-200)
-  maxScore        Float?
-  classification  String // A / B / C / D / E
-  position        Int
-  details         Json? // detalhamento por indicador
+  id               String   @id @default(uuid())
+  programId        String
+  schoolId         String
+  year             Int
+  period           String   @default("Anual")
+  score            Float // pontuação percentual ponderada (0-200)
+  maxScore         Float?
+  classification   String // A / B / C / D / E
+  position         Int
+  details          Json? // detalhamento por indicador
   consolidatedById String?
-  consolidatedAt  DateTime @default(now())
-  createdAt       DateTime @default(now())
+  consolidatedAt   DateTime @default(now())
+  createdAt        DateTime @default(now())
 
-  program     Program @relation(fields: [programId], references: [id], onDelete: Cascade)
-  school      School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  consolidatedBy User? @relation(fields: [consolidatedById], references: [id], onDelete: SetNull)
+  program        Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school         School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  consolidatedBy User?   @relation(fields: [consolidatedById], references: [id], onDelete: SetNull)
 
   @@unique([programId, schoolId, year, period])
   @@index([programId, year, period])
@@ -423,6 +425,7 @@ enum ImportType {
 enum ImportStatus {
   PENDENTE
   IMPORTADO
+  PARCIAL
   FALHOU
   CANCELADO
 }
@@ -509,18 +512,18 @@ model AuditLog {
 }
 
 model Document {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  entity      String // "Program" | "School" | ...
-  entityId    String
-  filename    String // nome original
-  path        String // caminho relativo em uploads/
-  mimeType    String
-  sizeBytes   Int
+  id           String    @id @default(uuid())
+  title        String
+  description  String?
+  entity       String // "Program" | "School" | ...
+  entityId     String
+  filename     String // nome original
+  path         String // caminho relativo em uploads/
+  mimeType     String
+  sizeBytes    Int
   uploadedById String?
-  createdAt   DateTime  @default(now())
-  deletedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
 
   uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 

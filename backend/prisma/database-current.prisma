@@ -1,0 +1,485 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  description String
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+}
+
+model Role {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  description     String?
+  level           Int              @default(10)
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  canBeTechnician Boolean          @default(false)
+  permissions     RolePermission[]
+  users           User[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  grantedAt    DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model User {
+  id                 String               @id @default(uuid())
+  name               String
+  email              String               @unique
+  passwordHash       String
+  phone              String?
+  roleId             String
+  active             Boolean              @default(true)
+  mustChangePassword Boolean              @default(false)
+  failedAttempts     Int                  @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  passwordChangedAt  DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  auditLogs          AuditLog[]
+  documents          Document[]
+  evaluations        Evaluation[]
+  goalsCreated       Goal[]
+  importJobs         ImportJob[]
+  loginAudits        LoginAttempt[]
+  notifications      Notification[]
+  passwordResets     PasswordResetToken[]
+  resultsCreated     Result[]             @relation("ResultCreatedBy")
+  resultsUpdated     Result[]             @relation("ResultUpdatedBy")
+  technicianSchools  SchoolTechnician[]
+  sessions           Session[]
+  role               Role                 @relation(fields: [roleId], references: [id])
+
+  @@index([roleId])
+  @@index([active])
+  @@index([name])
+}
+
+model Session {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  ip        String?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(uuid())
+  email     String
+  ip        String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([email, createdAt])
+}
+
+model School {
+  id                String             @id @default(uuid())
+  inep              String?            @unique
+  name              String
+  address           String?
+  district          String?
+  zone              SchoolZone?
+  phone             String?
+  email             String?
+  responsible       String?
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  latitude          Float?
+  longitude         Float?
+  addressComplement String?
+  addressNumber     String?
+  cep               String?
+  schoolType        String?
+  uf                String?
+  evaluations       Evaluation[]
+  goals             Goal[]
+  programs          ProgramSchool[]
+  results           Result[]
+  technicianLinks   SchoolTechnician[]
+
+  @@index([name])
+  @@index([district])
+  @@index([zone])
+}
+
+/// *
+///  * V├¡nculo N:N entre Escola e Usu├írio/T├®cnico.
+///  * T├®cnico = usu├írio existente com perfil marcado como canBeTechnician.
+model SchoolTechnician {
+  id           String   @id @default(uuid())
+  schoolId     String
+  technicianId String
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  technician   User     @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, technicianId])
+  @@index([technicianId])
+}
+
+model Program {
+  id          String             @id @default(uuid())
+  code        String             @unique
+  name        String
+  description String?
+  objective   String?
+  organ       String?
+  year        Int
+  periodLabel String?
+  status      ProgramStatus      @default(EM_EXECUCAO)
+  globalGoal  Float?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+  evaluations Evaluation[]
+  goals       Goal[]
+  indicators  ProgramIndicator[]
+  schools     ProgramSchool[]
+  results     Result[]
+
+  @@index([year, status])
+  @@index([name])
+}
+
+model ProgramSchool {
+  programId String
+  schoolId  String
+  active    Boolean  @default(true)
+  joinedAt  DateTime @default(now())
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@id([programId, schoolId])
+  @@index([schoolId])
+}
+
+model IndicatorCategory {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  indicators  Indicator[]
+}
+
+model Indicator {
+  id          String             @id @default(uuid())
+  code        String             @unique
+  name        String
+  description String?
+  categoryId  String?
+  unit        String?
+  polarity    Polarity           @default(MAIOR_MELHOR)
+  weight      Float              @default(1)
+  defaultGoal Float?
+  minValue    Float?
+  maxValue    Float?
+  periodLabel String?
+  status      IndicatorStatus    @default(ATIVO)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+  goals       Goal[]
+  category    IndicatorCategory? @relation(fields: [categoryId], references: [id])
+  programs    ProgramIndicator[]
+  results     Result[]
+
+  @@index([categoryId])
+  @@index([name])
+}
+
+model ProgramIndicator {
+  programId   String
+  indicatorId String
+  weight      Float?
+  goal        Float?
+  active      Boolean   @default(true)
+  addedAt     DateTime  @default(now())
+  indicator   Indicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@id([programId, indicatorId])
+  @@index([indicatorId])
+}
+
+model Result {
+  id          String       @id @default(uuid())
+  programId   String
+  schoolId    String
+  indicatorId String
+  year        Int
+  period      String
+  value       Float
+  source      ResultSource @default(MANUAL)
+  notes       String?
+  createdById String?
+  updatedById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdBy   User?        @relation("ResultCreatedBy", fields: [createdById], references: [id])
+  indicator   Indicator    @relation(fields: [indicatorId], references: [id])
+  program     Program      @relation(fields: [programId], references: [id])
+  school      School       @relation(fields: [schoolId], references: [id])
+  updatedBy   User?        @relation("ResultUpdatedBy", fields: [updatedById], references: [id])
+
+  @@unique([programId, schoolId, indicatorId, year, period])
+  @@index([schoolId])
+  @@index([indicatorId])
+  @@index([year, period])
+  @@index([programId, year, period])
+}
+
+model Goal {
+  id          String     @id @default(uuid())
+  scope       GoalScope  @default(GERAL)
+  programId   String?
+  schoolId    String?
+  indicatorId String?
+  year        Int
+  period      String?
+  value       Float
+  description String?
+  createdById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdBy   User?      @relation(fields: [createdById], references: [id])
+  indicator   Indicator? @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
+  program     Program?   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school      School?    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([programId])
+  @@index([schoolId])
+  @@index([indicatorId])
+  @@index([year, period])
+  @@index([programId, indicatorId, schoolId, year, period])
+}
+
+model Evaluation {
+  id               String   @id @default(uuid())
+  programId        String
+  schoolId         String
+  year             Int
+  period           String   @default("Anual")
+  score            Float
+  maxScore         Float?
+  classification   String
+  position         Int
+  details          Json?
+  consolidatedById String?
+  consolidatedAt   DateTime @default(now())
+  createdAt        DateTime @default(now())
+  consolidatedBy   User?    @relation(fields: [consolidatedById], references: [id])
+  program          Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, schoolId, year, period])
+  @@index([programId, year, period])
+  @@index([schoolId])
+}
+
+model ImportJob {
+  id            String        @id @default(uuid())
+  type          ImportType
+  filename      String
+  status        ImportStatus  @default(PENDENTE)
+  totalRows     Int           @default(0)
+  validRows     Int           @default(0)
+  newRows       Int           @default(0)
+  updatedRows   Int           @default(0)
+  duplicateRows Int           @default(0)
+  errorRows     Int           @default(0)
+  data          Json?
+  summary       Json?
+  options       Json?
+  error         String?
+  userId        String
+  createdAt     DateTime      @default(now())
+  confirmedAt   DateTime?
+  finishedAt    DateTime?
+  errors        ImportError[]
+  user          User          @relation(fields: [userId], references: [id])
+
+  @@index([type, status])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ImportError {
+  id        String    @id @default(uuid())
+  jobId     String
+  rowNumber Int
+  field     String?
+  message   String
+  value     String?
+  createdAt DateTime  @default(now())
+  job       ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType @default(INFO)
+  title     String
+  message   String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  userName  String?
+  action    String
+  entity    String
+  entityId  String?
+  ip        String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+  @@index([action, createdAt])
+}
+
+model Document {
+  id           String    @id @default(uuid())
+  title        String
+  description  String?
+  entity       String
+  entityId     String
+  filename     String
+  path         String
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id])
+
+  @@index([entity, entityId])
+}
+
+enum AdminDependency {
+  FEDERAL
+  ESTADUAL
+  MUNICIPAL
+  PRIVADA
+}
+
+enum SchoolSituation {
+  ATIVA
+  PARALISADA
+  INATIVA
+}
+
+enum SchoolZone {
+  URBANA
+  RURAL
+}
+
+enum ProgramStatus {
+  PLANEJAMENTO
+  EM_EXECUCAO
+  CONCLUIDO
+  SUSPENSO
+  CANCELADO
+}
+
+enum IndicatorStatus {
+  ATIVO
+  INATIVO
+}
+
+enum Polarity {
+  MAIOR_MELHOR
+  MENOR_MELHOR
+}
+
+enum ResultSource {
+  MANUAL
+  IMPORTACAO
+}
+
+enum GoalScope {
+  GERAL
+  PROGRAMA
+  ESCOLA
+  INDICADOR
+}
+
+enum ImportType {
+  ESCOLAS
+  PROGRAMAS
+  INDICADORES
+  RESULTADOS
+}
+
+enum ImportStatus {
+  PENDENTE
+  IMPORTADO
+  PARCIAL
+  FALHOU
+  CANCELADO
+}
+
+enum NotificationType {
+  INFO
+  SUCESSO
+  ALERTA
+  ERRO
+}
+
+

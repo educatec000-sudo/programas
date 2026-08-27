@@ -40,6 +40,10 @@ const SCHOOL_NAMES = [
   ['E.M.E.F. Primavera', 'Primavera', 'RURAL'],
 ];
 
+export const DEMO_SCHOOL_INEPS = SCHOOL_NAMES.map((_, index) =>
+  String(15010000 + (index + 1) * 137),
+);
+
 const CATEGORIES = [
   ['Alfabetização e Leitura', 'Indicadores de alfabetização e proficiência leitora'],
   ['Fluxo Escolar', 'Evasão, aprovação e distorção idade-série'],
@@ -106,7 +110,34 @@ const PROGRAMS = [
   },
 ];
 
+export const DEMO_CATEGORY_NAMES = CATEGORIES.map(([name]) => name);
+export const DEMO_INDICATOR_CODES = INDICATORS.map(([code]) => code);
+export const DEMO_PROGRAM_CODES = PROGRAMS.map(({ code }) => code);
+
 const PERIODS_PER_YEAR = ['1º Semestre', '2º Semestre'];
+
+async function upsertDemoGoal(prisma, data) {
+  const identity = {
+    scope: data.scope,
+    programId: data.programId ?? null,
+    schoolId: data.schoolId ?? null,
+    indicatorId: data.indicatorId ?? null,
+    year: data.year,
+    period: data.period ?? null,
+  };
+  const existing = await prisma.goal.findFirst({ where: identity, orderBy: { createdAt: 'asc' } });
+  if (existing) {
+    return prisma.goal.update({
+      where: { id: existing.id },
+      data: {
+        value: data.value,
+        description: data.description ?? null,
+        createdById: data.createdById ?? null,
+      },
+    });
+  }
+  return prisma.goal.create({ data });
+}
 
 export async function seedDemoData(prisma) {
   const rand = rng(20250825);
@@ -116,21 +147,25 @@ export async function seedDemoData(prisma) {
   const schools = [];
   for (let i = 0; i < SCHOOL_NAMES.length; i++) {
     const [name, municipality, zone] = SCHOOL_NAMES[i];
+    const inep = DEMO_SCHOOL_INEPS[i];
+    const data = {
+      name,
+      municipality,
+      district: zone === 'RURAL' ? 'Zona Rural' : ['Centro', 'Bairro Novo', 'Cidade Nova', 'Terra Firme'][i % 4],
+      zone,
+      adminDependency: 'MUNICIPAL',
+      situation: i === 23 ? 'PARALISADA' : 'ATIVA',
+      address: `Av. Principal, ${100 + i * 12}`,
+      phone: `(91) 9${String(8000 + i * 37).slice(0, 4)}-${String(1000 + i * 111).slice(0, 4)}`,
+      email: `emef${String(i + 1).padStart(2, '0')}@educa.pa.gov.br`,
+      responsible: `Diretor(a) ${String.fromCharCode(65 + (i % 26))}. Silva`,
+      deletedAt: null,
+    };
     schools.push(
-      await prisma.school.create({
-        data: {
-          inep: String(15010000 + (i + 1) * 137),
-          name,
-          municipality,
-          district: zone === 'RURAL' ? 'Zona Rural' : ['Centro', 'Bairro Novo', 'Cidade Nova', 'Terra Firme'][i % 4],
-          zone,
-          adminDependency: 'MUNICIPAL',
-          situation: i === 23 ? 'PARALISADA' : 'ATIVA',
-          address: `Av. Principal, ${100 + i * 12}`,
-          phone: `(91) 9${String(8000 + i * 37).slice(0, 4)}-${String(1000 + i * 111).slice(0, 4)}`,
-          email: `emef${String(i + 1).padStart(2, '0')}@educa.pa.gov.br`,
-          responsible: `Diretor(a) ${String.fromCharCode(65 + (i % 26))}. Silva`,
-        },
+      await prisma.school.upsert({
+        where: { inep },
+        update: data,
+        create: { inep, ...data },
       }),
     );
   }
@@ -139,17 +174,34 @@ export async function seedDemoData(prisma) {
   // Categorias e indicadores
   const categories = [];
   for (const [name, description] of CATEGORIES) {
-    categories.push(await prisma.indicatorCategory.create({ data: { name, description } }));
+    categories.push(
+      await prisma.indicatorCategory.upsert({
+        where: { name },
+        update: { description },
+        create: { name, description },
+      }),
+    );
   }
   const indicators = [];
   for (const [code, name, catIdx, unit, polarity, weight, defaultGoal, minValue, maxValue] of INDICATORS) {
+    const data = {
+      name,
+      unit,
+      polarity,
+      weight,
+      defaultGoal,
+      minValue,
+      maxValue,
+      categoryId: categories[catIdx].id,
+      description: `${name} — acompanha a evolução ao longo dos períodos letivos.`,
+      status: 'ATIVO',
+      deletedAt: null,
+    };
     indicators.push(
-      await prisma.indicator.create({
-        data: {
-          code, name, unit, polarity, weight, defaultGoal, minValue, maxValue,
-          categoryId: categories[catIdx].id,
-          description: `${name} — acompanha a evolução ao longo dos períodos letivos.`,
-        },
+      await prisma.indicator.upsert({
+        where: { code },
+        update: data,
+        create: { code, ...data },
       }),
     );
   }
@@ -160,62 +212,76 @@ export async function seedDemoData(prisma) {
   const admin = await prisma.user.findUnique({ where: { email: 'admin@cpe.local' } });
   const programs = [];
   for (const def of PROGRAMS) {
-    const program = await prisma.program.create({
-      data: {
-        code: def.code, name: def.name, year: def.year, status: def.status, organ: def.organ,
-        objective: def.objective, globalGoal: def.globalGoal, periodLabel: def.periodLabel,
-        description: `${def.name} — programa de educação sob responsabilidade do ${def.organ}, ciclo ${def.year}.`,
-      },
+    const programData = {
+      name: def.name,
+      year: def.year,
+      status: def.status,
+      organ: def.organ,
+      objective: def.objective,
+      globalGoal: def.globalGoal,
+      periodLabel: def.periodLabel,
+      description: `${def.name} — programa de educação sob responsabilidade do ${def.organ}, ciclo ${def.year}.`,
+      deletedAt: null,
+    };
+    const program = await prisma.program.upsert({
+      where: { code: def.code },
+      update: programData,
+      create: { code: def.code, ...programData },
     });
     programs.push(program);
 
-    await prisma.programSchool.createMany({
-      data: schools.slice(def.schools[0], def.schools[1] + 1).map((s) => ({
-        programId: program.id,
-        schoolId: s.id,
-      })),
-    });
+    for (const school of schools.slice(def.schools[0], def.schools[1] + 1)) {
+      await prisma.programSchool.upsert({
+        where: {
+          programId_schoolId: { programId: program.id, schoolId: school.id },
+        },
+        update: { active: true },
+        create: { programId: program.id, schoolId: school.id },
+      });
+    }
 
     for (const [code, weight, goal] of def.indicators) {
-      await prisma.programIndicator.create({
-        data: {
+      const indicator = indicatorByCode.get(code);
+      await prisma.programIndicator.upsert({
+        where: {
+          programId_indicatorId: { programId: program.id, indicatorId: indicator.id },
+        },
+        update: { weight, goal, active: true },
+        create: {
           programId: program.id,
-          indicatorId: indicatorByCode.get(code).id,
+          indicatorId: indicator.id,
           weight,
           goal,
         },
       });
-      // Meta do indicador dentro do programa
-      await prisma.goal.create({
-        data: {
-          scope: 'PROGRAMA',
-          programId: program.id,
-          indicatorId: indicatorByCode.get(code).id,
-          year: def.year,
-          value: goal,
-          description: `Meta do indicador ${code} no programa ${def.code}`,
-          createdById: admin?.id,
-        },
+      await upsertDemoGoal(prisma, {
+        scope: 'PROGRAMA',
+        programId: program.id,
+        indicatorId: indicator.id,
+        year: def.year,
+        value: goal,
+        description: `Meta do indicador ${code} no programa ${def.code}`,
+        createdById: admin?.id,
       });
     }
   }
   console.log(`   ${programs.length} programas com escolas, indicadores e metas`);
 
   // Metas específicas de algumas escolas (demonstram resolução por especificidade)
-  await prisma.goal.createMany({
-    data: [
-      {
-        scope: 'ESCOLA', schoolId: schools[0].id, programId: programs[1].id,
-        indicatorId: indicatorByCode.get('IND-001').id, year: 2025, value: 95,
-        description: 'Meta diferenciada — escola de referência em alfabetização', createdById: admin?.id,
-      },
-      {
-        scope: 'ESCOLA', schoolId: schools[3].id, programId: programs[3].id,
-        indicatorId: indicatorByCode.get('IND-010').id, year: 2025, value: 95,
-        description: 'Meta diferenciada de conectividade', createdById: admin?.id,
-      },
-    ],
-  });
+  for (const goal of [
+    {
+      scope: 'ESCOLA', schoolId: schools[0].id, programId: programs[1].id,
+      indicatorId: indicatorByCode.get('IND-001').id, year: 2025, value: 95,
+      description: 'Meta diferenciada — escola de referência em alfabetização', createdById: admin?.id,
+    },
+    {
+      scope: 'ESCOLA', schoolId: schools[3].id, programId: programs[3].id,
+      indicatorId: indicatorByCode.get('IND-010').id, year: 2025, value: 95,
+      description: 'Meta diferenciada de conectividade', createdById: admin?.id,
+    },
+  ]) {
+    await upsertDemoGoal(prisma, goal);
+  }
 
   // Resultados — 2 períodos por ano, com evolução realista
   const quality = schools.map(() => 0.72 + rand() * 0.4); // 0.72..1.12
@@ -259,22 +325,27 @@ export async function seedDemoData(prisma) {
   await prisma.result.createMany({ data: results, skipDuplicates: true });
   console.log(`   ${results.length} resultados lançados (2024-2025, 1º/2º semestre)`);
 
-  // Notificações de boas-vindas
+  // Notificações de boas-vindas (sem duplicar em novas execuções do seed)
   if (admin) {
-    await prisma.notification.createMany({
-      data: [
-        {
-          userId: admin.id, type: 'INFO',
-          title: 'Bem-vindo ao CPE',
-          message: 'O sistema foi inicializado com dados de demonstração. Explore o dashboard, rankings e relatórios.',
-        },
-        {
-          userId: admin.id, type: 'SUCESSO',
-          title: 'Seed concluído',
-          message: 'Permissões, perfis, usuários, escolas, programas, indicadores, metas e resultados criados.',
-        },
-      ],
-    });
+    for (const notification of [
+      {
+        type: 'INFO',
+        title: 'Bem-vindo ao CPE',
+        message: 'O sistema foi inicializado com dados de demonstração. Explore o dashboard, rankings e relatórios.',
+      },
+      {
+        type: 'SUCESSO',
+        title: 'Seed concluído',
+        message: 'Permissões, perfis, usuários, escolas, programas, indicadores, metas e resultados criados.',
+      },
+    ]) {
+      const existing = await prisma.notification.findFirst({
+        where: { userId: admin.id, title: notification.title },
+      });
+      if (!existing) {
+        await prisma.notification.create({ data: { userId: admin.id, ...notification } });
+      }
+    }
   }
   console.log('>> dados de demonstração prontos');
 }

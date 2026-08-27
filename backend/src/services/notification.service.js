@@ -8,7 +8,7 @@ export async function notify(userId, { type = 'INFO', title, message, link = nul
   }
 }
 
-export async function listNotifications(userId, { unreadOnly = false, take = 50 } = {}) {
+export async function listNotifications(userId, { unreadOnly = false, take = 1000 } = {}) {
   const where = { userId, ...(unreadOnly && { readAt: null }) };
   const [notifications, unread] = await Promise.all([
     prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take }),

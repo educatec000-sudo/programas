@@ -1,13 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { authApi } from '../services/resources.js';
-import { useToast } from './ToastContext.jsx';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [booting, setBooting] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     let alive = true;

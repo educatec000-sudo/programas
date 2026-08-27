@@ -17,10 +17,6 @@ export const filters = wrap(async (_req, res) => {
   res.json(await schoolService.listFilterOptions());
 });
 
-export const municipalities = wrap(async (_req, res) => {
-  res.json(await schoolService.listMunicipalities());
-});
-
 export const get = wrap(async (req, res) => {
   res.json(await schoolService.getSchool(parseIdParams(req)));
 });
@@ -49,13 +45,11 @@ export const history = wrap(async (req, res) => {
 
 export const exportSchools = wrap(async (req, res) => {
   const format = req.query.format || 'csv';
-  const { data } = await schoolService.listSchools({ ...req.query, page: 1, pageSize: 200 });
+  const { data } = await schoolService.listSchools({ ...req.query, page: 1, pageSize: 1000 });
   const columns = [
     { key: 'inep', label: 'INEP' },
     { key: 'name', label: 'Nome' },
     { key: 'schoolType', label: 'Tipo' },
-    { key: 'municipality', label: 'Município' },
-    { key: 'uf', label: 'UF' },
     { key: 'addressFull', label: 'Endereço' },
     { key: 'district', label: 'Bairro' },
     { key: 'cep', label: 'CEP' },

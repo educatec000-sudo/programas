@@ -8,6 +8,7 @@
  *   - técnico sem escola
  */
 import bcrypt from 'bcryptjs';
+import { DEMO_SCHOOL_INEPS } from './demo.js';
 
 export async function seedTechnicians(prisma) {
   const technicianRole = await prisma.role.findUnique({ where: { name: 'Técnico' } });
@@ -35,19 +36,19 @@ export async function seedTechnicians(prisma) {
   }
   console.log(`   ${Object.keys(techs).length} usuários técnicos garantidos (senha Tec@1234)`);
 
-  // 2) vínculos de demonstração (apenas em banco vazio de vínculos)
-  const existingLinks = await prisma.schoolTechnician.count();
-  if (existingLinks > 0) {
-    console.log('   vínculos técnico-escola já existentes — mantidos');
+  // 2) vínculos de demonstração. Se uma execução anterior foi interrompida,
+  // os upserts abaixo completam somente o que estiver faltando.
+  const demoIneps = DEMO_SCHOOL_INEPS.slice(0, 8);
+  const schoolRows = await prisma.school.findMany({
+    where: { inep: { in: demoIneps }, deletedAt: null },
+    select: { id: true, inep: true, name: true },
+  });
+  const schoolByInep = new Map(schoolRows.map((school) => [school.inep, school]));
+  const schools = demoIneps.map((inep) => schoolByInep.get(inep)).filter(Boolean);
+  if (schools.length < 8) {
+    console.log('   escolas de demonstração insuficientes — vínculos técnicos ignorados');
     return;
   }
-
-  const schools = await prisma.school.findMany({
-    where: { deletedAt: null },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true },
-  });
-  if (schools.length < 8) return;
 
   const links = [
     // escola com vários técnicos

@@ -1,8 +1,11 @@
 import { request, download } from './api.js';
 
+/** Todas as listagens são carregadas por inteiro e navegadas com rolagem. */
+const allRows = (params = {}) => ({ ...params, page: 1, pageSize: 1000 });
+
 /** Fábrica de recursos REST padrão (lista, cria, edita, exclui). */
 const crud = (base) => ({
-  list: (params) => request(base, { params }),
+  list: (params) => request(base, { params: allRows(params) }),
   get: (id) => request(`${base}/${id}`),
   create: (body, params) => request(base, { method: 'POST', body, params }),
   update: (id, body) => request(`${base}/${id}`, { method: 'PUT', body }),
@@ -26,10 +29,9 @@ export const dashboardApi = {
 
 export const schoolsApi = {
   ...crud('/schools'),
-  municipalities: () => request('/schools/municipalities'),
   stats: () => request('/schools/stats'),
   filters: () => request('/schools/filters'),
-  history: (id, params) => request(`/schools/${id}/history`, { params }),
+  history: (id, params) => request(`/schools/${id}/history`, { params: allRows(params) }),
   export: (params) => download('/schools/export', { params, fallbackName: 'escolas.csv' }),
   batchDelete: (ids) => request('/schools/batch-delete', { method: 'POST', body: { ids } }),
 };
@@ -37,8 +39,8 @@ export const schoolsApi = {
 /** Técnicos por Escola — relação N:N Usuário(técnico) ↔ Escola. */
 export const techniciansApi = {
   stats: () => request('/tecnicos-escola/stats'),
-  geral: (params) => request('/tecnicos-escola', { params }),
-  technicians: (params) => request('/tecnicos-escola/technicians', { params }),
+  geral: (params) => request('/tecnicos-escola', { params: allRows(params) }),
+  technicians: (params) => request('/tecnicos-escola/technicians', { params: allRows(params) }),
   eligible: () => request('/tecnicos-escola/technicians', { params: { eligible: 'true' } }),
   bySchool: (id) => request(`/tecnicos-escola/escola/${id}`),
   byTechnician: (id) => request(`/tecnicos-escola/tecnico/${id}`),
@@ -83,7 +85,7 @@ export const goalsApi = {
 export const rankingsApi = {
   get: (params) => request('/rankings', { params }),
   consolidate: (body) => request('/rankings/consolidate', { method: 'POST', body }),
-  evaluations: (params) => request('/rankings/evaluations', { params }),
+  evaluations: (params) => request('/rankings/evaluations', { params: allRows(params) }),
 };
 
 export const analyticsApi = {
@@ -112,9 +114,13 @@ export const importsApi = {
     form.append('file', file);
     return request('/imports/schools/analyze', { method: 'POST', body: form });
   },
-  executeSchools: (analyzeId, mapping) =>
-    request('/imports/schools/execute', { method: 'POST', body: { analyzeId, mapping } }),
-  list: (params) => request('/imports', { params }),
+  executeSchools: (file, mapping) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mapping', JSON.stringify(mapping || {}));
+    return request('/imports/schools/execute', { method: 'POST', body: form });
+  },
+  list: (params) => request('/imports', { params: allRows(params) }),
   get: (id) => request(`/imports/${id}`),
   confirm: (id) => request(`/imports/${id}/confirm`, { method: 'POST' }),
   cancel: (id) => request(`/imports/${id}/cancel`, { method: 'POST' }),
@@ -135,7 +141,7 @@ export const rolesApi = {
 };
 
 export const auditApi = {
-  list: (params) => request('/audit', { params }),
+  list: (params) => request('/audit', { params: allRows(params) }),
   stats: () => request('/audit/stats'),
 };
 

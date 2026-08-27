@@ -37,12 +37,23 @@ export const resultsStrategy = {
   ],
 
   async loadContext() {
-    const [programs, schools, indicators, results] = await Promise.all([
-      prisma.program.findMany({ select: { id: true, code: true, name: true } }),
+    const [programs, schools, indicators, results, schoolLinks, indicatorLinks] = await Promise.all([
+      prisma.program.findMany({ where: { deletedAt: null }, select: { id: true, code: true, name: true } }),
       prisma.school.findMany({ where: { deletedAt: null }, select: { id: true, inep: true, name: true } }),
-      prisma.indicator.findMany({ where: { deletedAt: null }, select: { id: true, code: true, name: true } }),
+      prisma.indicator.findMany({
+        where: { deletedAt: null, status: 'ATIVO' },
+        select: { id: true, code: true, name: true },
+      }),
       prisma.result.findMany({
         select: { programId: true, schoolId: true, indicatorId: true, year: true, period: true, value: true },
+      }),
+      prisma.programSchool.findMany({
+        where: { active: true },
+        select: { programId: true, schoolId: true },
+      }),
+      prisma.programIndicator.findMany({
+        where: { active: true },
+        select: { programId: true, indicatorId: true },
       }),
     ]);
     const programByCode = new Map();
@@ -61,7 +72,15 @@ export const resultsStrategy = {
     const existingValues = new Map(
       results.map((r) => [`${r.programId}|${r.schoolId}|${r.indicatorId}|${r.year}|${r.period}`, r.value]),
     );
-    return { programByCode, schoolByInep: new Map(schools.map((s) => [s.inep, s])), indicatorByCode, existing, existingValues };
+    return {
+      programByCode,
+      schoolByInep: new Map(schools.filter((s) => s.inep).map((s) => [s.inep, s])),
+      indicatorByCode,
+      existing,
+      existingValues,
+      schoolLinks: new Set(schoolLinks.map((link) => `${link.programId}|${link.schoolId}`)),
+      indicatorLinks: new Set(indicatorLinks.map((link) => `${link.programId}|${link.indicatorId}`)),
+    };
   },
 
   buildRow(row, ctx) {
@@ -83,7 +102,14 @@ export const resultsStrategy = {
 
     const indicator = indicatorKey ? ctx.indicatorByCode.get(indicatorKey) : undefined;
     if (!indicatorKey) errors.push({ field: 'indicador', message: 'Indicador é obrigatório' });
-    else if (!indicator) errors.push({ field: 'indicador', message: `Indicador não encontrado: "${indicatorKey}"` });
+    else if (!indicator) errors.push({ field: 'indicador', message: `Indicador ativo não encontrado: "${indicatorKey}"` });
+
+    if (program && school && !ctx.schoolLinks.has(`${program.id}|${school.id}`)) {
+      errors.push({ field: 'inep', message: `A escola ${school.name} não está ativa no programa ${program.code}` });
+    }
+    if (program && indicator && !ctx.indicatorLinks.has(`${program.id}|${indicator.id}`)) {
+      errors.push({ field: 'indicador', message: `O indicador ${indicator.code} não está ativo no programa ${program.code}` });
+    }
 
     if (!year || year < 2000 || year > 2100) errors.push({ field: 'ano', message: 'Ano inválido' });
     if (!period) {
@@ -121,7 +147,7 @@ export const resultsStrategy = {
     return rowData.key && ctx.existing.has(rowData.key) ? IMPORT_ROW_STATUS.ATUALIZAR : IMPORT_ROW_STATUS.NOVO;
   },
 
-  async apply(validRows, ctx) {
+  async apply(validRows, ctx, { actor } = {}) {
     let created = 0;
     let updated = 0;
     await prisma.$transaction(async (tx) => {
@@ -138,8 +164,17 @@ export const resultsStrategy = {
         };
         await tx.result.upsert({
           where,
-          create: { ...d, source: 'IMPORTACAO' },
-          update: { value: d.value, notes: d.notes, source: 'IMPORTACAO' },
+          create: {
+            ...d,
+            source: 'IMPORTACAO',
+            ...(actor?.id && { createdById: actor.id, updatedById: actor.id }),
+          },
+          update: {
+            value: d.value,
+            notes: d.notes,
+            source: 'IMPORTACAO',
+            ...(actor?.id && { updatedById: actor.id }),
+          },
         });
         ctx.existing.has(row.key) ? updated++ : created++;
       }

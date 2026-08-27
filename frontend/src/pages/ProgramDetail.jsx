@@ -8,7 +8,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { Button, Field, Input, Modal, Badge, LoadingBlock, Tabs, Select, ConfirmDialog } from '../components/ui.jsx';
 import { EvolutionChart, ClassificationDonut } from '../components/charts.jsx';
-import { PROGRAM_STATUS, CLASSIFICATION_INFO, fmt, fmtDateTime, PERIODS, yearsRange } from '../utils/format.js';
+import { PROGRAM_STATUS, CLASSIFICATION_INFO, SCHOOL_ZONE, fmt, fmtDateTime, PERIODS, yearsRange } from '../utils/format.js';
 
 export default function ProgramDetail() {
   const { id } = useParams();
@@ -241,8 +241,7 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
         columns={[
           { key: 'inep', label: 'INEP', render: (s) => <span className="mono">{s.inep}</span> },
           { key: 'name', label: 'Escola', render: (s) => <strong>{s.name}</strong> },
-          { key: 'municipality', label: 'Município' },
-          { key: 'zone', label: 'Zona', render: (s) => (s.zone === 'RURAL' ? 'Rural' : 'Urbana') },
+          { key: 'zone', label: 'Zona', render: (s) => SCHOOL_ZONE[s.zone]?.label || '—' },
           { key: 'linkActive', label: 'Participação', render: (s) => s.linkActive ? <Badge cls="badge-green">Ativa</Badge> : <Badge cls="badge-yellow">Inativa</Badge> },
           { key: 'joinedAt', label: 'Desde', render: (s) => fmtDateTime(s.joinedAt) },
           {
@@ -287,7 +286,7 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
               />
               <div>
                 <div style={{ fontWeight: 600 }}>{s.name}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>INEP {s.inep} · {s.municipality}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>INEP {s.inep}</div>
               </div>
             </label>
           ))}
@@ -570,7 +569,6 @@ function RankingTab({ program, ranking, loading, can, year, period, success, err
           { key: 'position', label: '#', width: 60, align: 'center', render: (r) => <strong>{r.position}</strong> },
           { key: 'schoolName', label: 'Escola', render: (r) => <strong>{r.schoolName}</strong> },
           { key: 'schoolInep', label: 'INEP', render: (r) => <span className="mono">{r.schoolInep}</span> },
-          { key: 'municipality', label: 'Município' },
           { key: 'score', label: 'Pontuação', align: 'right', render: (r) => <strong style={{ fontSize: 14 }}>{fmt(r.score)}%</strong> },
           {
             key: 'classification', label: 'Classificação',

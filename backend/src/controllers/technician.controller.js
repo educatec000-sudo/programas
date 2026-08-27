@@ -48,7 +48,6 @@ export const exportGeral = wrap(async (req, res) => {
   const columns = [
     { key: 'inep', label: 'INEP' },
     { key: 'name', label: 'Escola' },
-    { key: 'municipality', label: 'Município' },
     { key: 'zone', label: 'Zona' },
     { key: 'situation', label: 'Situação' },
     { key: 'technicians', label: 'Técnicos Responsáveis' },

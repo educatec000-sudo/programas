@@ -46,6 +46,16 @@ export function generateResetToken() {
 
 export const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 
+/** Converte TTL simples aceito pelo jsonwebtoken (30s, 15m, 2h, 7d) em ms. */
+export function durationToMs(value, fallback = 15 * 60 * 1000) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value * 1000;
+  const match = String(value || '').trim().match(/^(\d+)\s*(ms|s|m|h|d)$/i);
+  if (!match) return fallback;
+  const amount = Number(match[1]);
+  const factors = { ms: 1, s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+  return amount * factors[match[2].toLowerCase()];
+}
+
 // ------------------------------ Cookies ------------------------------
 
 export function setAuthCookies(res, { accessToken, refreshToken }) {
@@ -55,7 +65,7 @@ export function setAuthCookies(res, { accessToken, refreshToken }) {
     secure: env.isProd,
     path: '/',
   };
-  res.cookie(cookies.access, accessToken, { ...base, maxAge: 15 * 60 * 1000 });
+  res.cookie(cookies.access, accessToken, { ...base, maxAge: durationToMs(env.jwtAccessTtl) });
   res.cookie(cookies.refresh, refreshToken, {
     ...base,
     maxAge: env.jwtRefreshTtlDays * 24 * 60 * 60 * 1000,

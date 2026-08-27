@@ -53,15 +53,7 @@ export const SCHOOL_FIELD_GROUPS = [
         aliases: ['cep', 'codigopostal', 'nudecep'],
       },
       {
-        key: 'municipality', label: 'Município', required: false,
-        aliases: ['municipio', 'cidade', 'nomedomunicipio', 'nomemunicipio', 'municipiodeendereco'],
-      },
-      {
-        key: 'uf', label: 'UF', required: false,
-        aliases: ['uf', 'estado', 'sigla', 'sguf', 'unidadeFederativa'],
-      },
-      {
-        key: 'zone', label: 'Zona (urbana/rural)', required: false,
+        key: 'zone', label: 'Zona (Sede/Estradas/Ilhas)', required: false,
         aliases: ['zona', 'localizacao', 'tplocalizacao', 'localizacaodaescola'],
       },
       {

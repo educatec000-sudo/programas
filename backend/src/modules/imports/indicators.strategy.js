@@ -44,7 +44,7 @@ export const indicatorsStrategy = {
 
   buildRow(row, ctx) {
     const errors = [];
-    const code = str(pickField(row.raw, this.aliases.code));
+    const code = str(pickField(row.raw, this.aliases.code)).toUpperCase();
     const name = str(pickField(row.raw, this.aliases.name));
     const category = str(pickField(row.raw, this.aliases.category));
     const weight = toNumber(pickField(row.raw, this.aliases.weight));
@@ -107,11 +107,13 @@ export const indicatorsStrategy = {
         delete d.category;
         d.categoryId = categoryName ? ctx.categoryByName.get(categoryName.toLowerCase())?.id ?? null : null;
 
-        if (ctx.byCode.has(code.toLowerCase())) {
-          await tx.indicator.update({ where: { code }, data: d });
+        const existing = ctx.byCode.get(code.toLowerCase());
+        if (existing) {
+          await tx.indicator.update({ where: { id: existing.id }, data: d });
           updated++;
         } else {
-          await tx.indicator.create({ data: { code, name, ...d } });
+          const createdIndicator = await tx.indicator.create({ data: { code, name, ...d } });
+          ctx.byCode.set(code.toLowerCase(), createdIndicator);
           created++;
         }
       }

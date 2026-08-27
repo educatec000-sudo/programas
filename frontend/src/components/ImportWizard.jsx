@@ -12,8 +12,6 @@ const FIELD_LIST = [
   { key: 'addressComplement', label: 'Complemento' },
   { key: 'district', label: 'Bairro' },
   { key: 'cep', label: 'CEP' },
-  { key: 'municipality', label: 'Município' },
-  { key: 'uf', label: 'UF' },
   { key: 'zone', label: 'Zona' },
   { key: 'schoolType', label: 'Tipo de escola' },
   { key: 'adminDependency', label: 'Dependência' },
@@ -44,6 +42,7 @@ export default function ImportWizard({ type = 'ESCOLAS', open, onClose, onImport
   const [mapping, setMapping] = useState({});
   const [job, setJob] = useState(null);
   const [fileInfo, setFileInfo] = useState(null); // { name, totalRows }
+  const [sourceFile, setSourceFile] = useState(null); // necessário para reenviar após o mapeamento
   const [result, setResult] = useState(null);
 
   const isSchools = type === 'ESCOLAS';
@@ -56,6 +55,7 @@ export default function ImportWizard({ type = 'ESCOLAS', open, onClose, onImport
     setMapping({});
     setJob(null);
     setFileInfo(null);
+    setSourceFile(null);
     setResult(null);
   };
   const close = () => {
@@ -69,6 +69,7 @@ export default function ImportWizard({ type = 'ESCOLAS', open, onClose, onImport
     setBusy(true);
     try {
       if (isSchools) {
+        setSourceFile(file);
         const an = await importsApi.analyzeSchools(file);
         const suggested = an.suggestedMapping || {};
         setAnalyze(an);
@@ -80,7 +81,7 @@ export default function ImportWizard({ type = 'ESCOLAS', open, onClose, onImport
           toast('Não reconhecemos a coluna do nome. Selecione qual é.', { type: 'warning' });
         } else {
           // fluxo direto: detecção automática completa
-          const executed = await importsApi.executeSchools(an.analyzeId, suggested);
+          const executed = await importsApi.executeSchools(file, suggested);
           setJob(executed);
           setPhase('preview');
         }
@@ -105,7 +106,8 @@ export default function ImportWizard({ type = 'ESCOLAS', open, onClose, onImport
       if (job?.status === 'PENDENTE') {
         await importsApi.cancel(job.id).catch(() => {});
       }
-      const executed = await importsApi.executeSchools(analyze.analyzeId, mapping);
+      if (!sourceFile) throw new Error('Selecione novamente a planilha.');
+      const executed = await importsApi.executeSchools(sourceFile, mapping);
       setJob(executed);
       setPhase('preview');
     } catch (err) {
@@ -121,12 +123,15 @@ export default function ImportWizard({ type = 'ESCOLAS', open, onClose, onImport
     try {
       const res = await importsApi.confirm(job.id);
       setResult(res);
-      success(
+      const message =
         `${res.created} ${label.toLowerCase()} cadastrada(s), ${res.updated} atualizada(s)` +
-          `${res.duplicates ? `, ${res.duplicates} duplicada(s) ignorada(s)` : ''}` +
-          `${res.errors ? `, ${res.errors} com erro` : ''}.`,
-        { title: 'Importação concluída' },
-      );
+        `${res.duplicates ? `, ${res.duplicates} duplicada(s) ignorada(s)` : ''}` +
+        `${res.errors ? `, ${res.errors} com erro` : ''}.`;
+      if (res.status === 'PARCIAL') {
+        toast(message, { type: 'warning', title: 'Importação parcial' });
+      } else {
+        success(message, { title: 'Importação concluída' });
+      }
       onImported?.(res);
       setPhase('result');
     } catch (err) {
@@ -382,8 +387,10 @@ export default function ImportWizard({ type = 'ESCOLAS', open, onClose, onImport
       {/* ---------- 3. resultado ---------- */}
       {phase === 'result' && result && (
         <div style={{ textAlign: 'center', padding: '26px 10px' }}>
-          <div style={{ fontSize: 44 }}>✅</div>
-          <h3 style={{ margin: '10px 0 6px' }}>Importação concluída</h3>
+          <div style={{ fontSize: 44 }}>{result.status === 'PARCIAL' ? '⚠️' : '✅'}</div>
+          <h3 style={{ margin: '10px 0 6px' }}>
+            Importação {result.status === 'PARCIAL' ? 'parcial' : 'concluída'}
+          </h3>
           <p style={{ color: 'var(--text-2)', fontSize: 14, marginBottom: 4 }}>
             Total: <strong>{job?.totalRows ?? '—'}</strong> linha(s) processada(s)
           </p>

@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import { LoadingBlock, Tabs, Badge, EmptyState, Button, Modal, Select, Input, Field, ConfirmDialog, Alert } from '../components/ui.jsx';
 import DataTable from '../components/DataTable.jsx';
-import { SCHOOL_SITUATION, DEPENDENCY, fmtDateTime, AUDIT_ACTION_LABELS, ENTITY_LABELS, PROGRAM_STATUS } from '../utils/format.js';
+import { SCHOOL_SITUATION, SCHOOL_ZONE, DEPENDENCY, fmtDateTime, AUDIT_ACTION_LABELS, ENTITY_LABELS, PROGRAM_STATUS } from '../utils/format.js';
 
 const SECTION = {
   fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
@@ -80,7 +80,7 @@ export default function SchoolDetail() {
     <>
       <PageHeader
         title={school.name}
-        subtitle={`INEP ${school.inep || '—'} · ${school.municipality}${school.uf ? `/${school.uf}` : ''}`}
+        subtitle={`INEP ${school.inep || '—'}`}
         actions={
           <>
             {situation && <Badge cls={situation.cls}>{situation.label}</Badge>}
@@ -119,9 +119,7 @@ export default function SchoolDetail() {
               <KV label="Complemento">{school.addressComplement}</KV>
               <KV label="Bairro">{school.district}</KV>
               <KV label="CEP">{school.cep ? school.cep.replace(/(\d{5})(\d{3})/, '$1-$2') : '—'}</KV>
-              <KV label="Município">{school.municipality}</KV>
-              <KV label="UF">{school.uf}</KV>
-              <KV label="Zona">{school.zone === 'URBANA' ? 'Urbana' : school.zone === 'RURAL' ? 'Rural' : '—'}</KV>
+              <KV label="Zona">{SCHOOL_ZONE[school.zone]?.label || '—'}</KV>
             </div>
           </div>
 

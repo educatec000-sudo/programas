@@ -72,7 +72,6 @@ export async function getDashboard({ year } = {}) {
       topSchools: topSchools.rows.map((r) => ({
         position: r.position,
         name: r.schoolName,
-        municipality: r.municipality,
         score: r.score,
         classification: r.classification,
       })),

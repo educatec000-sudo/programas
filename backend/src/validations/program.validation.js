@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { uuid, emptyToNull, periodEnum } from './common.validation.js';
 
 export const createProgramSchema = z.object({
-  code: z.string().trim().min(2).max(40),
+  code: z.string().trim().min(2).max(40).transform((value) => value.toUpperCase()),
   name: z.string().trim().min(3).max(200),
   description: emptyToNull(z.string().max(2000)),
   objective: emptyToNull(z.string().max(2000)),

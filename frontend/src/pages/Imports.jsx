@@ -62,7 +62,10 @@ export default function Imports() {
     setBusy(true);
     try {
       const res = await importsApi.confirm(preview.id);
-      success(`Importação concluída: ${res.created} criado(s), ${res.updated} atualizado(s).`);
+      toast(
+        `Importação ${res.status === 'PARCIAL' ? 'parcial' : 'concluída'}: ${res.created} criado(s), ${res.updated} atualizado(s), ${res.errors} erro(s).`,
+        { type: res.status === 'PARCIAL' ? 'warning' : 'success' },
+      );
       setPreview(null);
       refresh();
     } catch (err) {
@@ -250,10 +253,10 @@ export default function Imports() {
             {preview.validRows === 0 && preview.status === 'PENDENTE' && (
               <Alert type="warn">Nenhuma linha válida — corrija os erros no arquivo e envie novamente.</Alert>
             )}
-            {preview.status === 'IMPORTADO' && (
-              <Alert type="success">
-                Importação concluída em {fmtDateTime(preview.confirmedAt)} por {preview.summary?.confirmedBy || '—'} —
-                {' '}{preview.summary?.created ?? preview.newRows} criado(s), {preview.summary?.updated ?? preview.updatedRows} atualizado(s).
+            {(preview.status === 'IMPORTADO' || preview.status === 'PARCIAL') && (
+              <Alert type={preview.status === 'PARCIAL' ? 'warn' : 'success'}>
+                Importação {preview.status === 'PARCIAL' ? 'parcial' : 'concluída'} em {fmtDateTime(preview.confirmedAt)} por {preview.summary?.confirmedBy || '—'} —
+                {' '}{preview.summary?.created ?? preview.newRows} criado(s), {preview.summary?.updated ?? preview.updatedRows} atualizado(s), {preview.summary?.failedDuringApply ?? 0} falha(s) na gravação.
               </Alert>
             )}
 

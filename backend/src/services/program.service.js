@@ -68,7 +68,6 @@ export async function getProgram(id) {
               id: true,
               inep: true,
               name: true,
-              municipality: true,
               zone: true,
               situation: true,
             },
@@ -182,10 +181,29 @@ export async function addSchools(id, schoolIds, actor, ip) {
   const program = await prisma.program.findFirst({ where: { id, deletedAt: null } });
   if (!program) throw notFound('Programa não encontrado');
 
-  const result = await prisma.programSchool.createMany({
-    data: schoolIds.map((schoolId) => ({ programId: id, schoolId })),
-    skipDuplicates: true,
+  const schools = await prisma.school.findMany({
+    where: { id: { in: schoolIds }, deletedAt: null },
+    select: { id: true },
   });
+  if (schools.length !== new Set(schoolIds).size) {
+    throw conflict('Uma ou mais escolas não existem ou foram excluídas');
+  }
+
+  const existing = await prisma.programSchool.findMany({
+    where: { programId: id, schoolId: { in: schoolIds }, active: true },
+    select: { schoolId: true },
+  });
+  const alreadyActive = new Set(existing.map((link) => link.schoolId));
+  await prisma.$transaction(
+    [...new Set(schoolIds)].map((schoolId) =>
+      prisma.programSchool.upsert({
+        where: { programId_schoolId: { programId: id, schoolId } },
+        create: { programId: id, schoolId, active: true },
+        update: { active: true },
+      }),
+    ),
+  );
+  const added = [...new Set(schoolIds)].filter((schoolId) => !alreadyActive.has(schoolId)).length;
 
   await audit({
     userId: actor.id,
@@ -193,10 +211,10 @@ export async function addSchools(id, schoolIds, actor, ip) {
     action: AuditAction.UPDATE,
     entity: 'Program',
     entityId: id,
-    metadata: { addedSchools: schoolIds.length, inserted: result.count },
+    metadata: { requestedSchools: schoolIds.length, activated: added },
     ip,
   });
-  return { added: result.count };
+  return { added };
 }
 
 export async function updateSchoolLink(id, schoolId, active, actor, ip) {
@@ -224,6 +242,12 @@ export async function removeSchool(id, schoolId, actor, ip) {
     where: { programId_schoolId: { programId: id, schoolId } },
   });
   if (!link) throw notFound('Escola não participa deste programa');
+  const linkedResults = await prisma.result.count({ where: { programId: id, schoolId } });
+  if (linkedResults > 0) {
+    throw conflict(
+      'Este vínculo possui resultados. Desative a participação em vez de removê-la para preservar a integridade histórica.',
+    );
+  }
   await prisma.programSchool.delete({ where: { programId_schoolId: { programId: id, schoolId } } });
   await audit({
     userId: actor.id,
@@ -242,15 +266,42 @@ export async function addIndicators(id, items, actor, ip) {
   const program = await prisma.program.findFirst({ where: { id, deletedAt: null } });
   if (!program) throw notFound('Programa não encontrado');
 
-  const result = await prisma.programIndicator.createMany({
-    data: items.map((it) => ({
-      programId: id,
-      indicatorId: it.indicatorId,
-      weight: it.weight ?? null,
-      goal: it.goal ?? null,
-    })),
-    skipDuplicates: true,
+  const uniqueIds = [...new Set(items.map((item) => item.indicatorId))];
+  const indicators = await prisma.indicator.findMany({
+    where: { id: { in: uniqueIds }, deletedAt: null },
+    select: { id: true },
   });
+  if (indicators.length !== uniqueIds.length) {
+    throw conflict('Um ou mais indicadores não existem ou foram excluídos');
+  }
+
+  const existing = await prisma.programIndicator.findMany({
+    where: { programId: id, indicatorId: { in: uniqueIds }, active: true },
+    select: { indicatorId: true },
+  });
+  const alreadyActive = new Set(existing.map((link) => link.indicatorId));
+  const byId = new Map(items.map((item) => [item.indicatorId, item]));
+  await prisma.$transaction(
+    uniqueIds.map((indicatorId) => {
+      const item = byId.get(indicatorId);
+      return prisma.programIndicator.upsert({
+        where: { programId_indicatorId: { programId: id, indicatorId } },
+        create: {
+          programId: id,
+          indicatorId,
+          weight: item.weight ?? null,
+          goal: item.goal ?? null,
+          active: true,
+        },
+        update: {
+          weight: item.weight ?? null,
+          goal: item.goal ?? null,
+          active: true,
+        },
+      });
+    }),
+  );
+  const added = uniqueIds.filter((indicatorId) => !alreadyActive.has(indicatorId)).length;
 
   await audit({
     userId: actor.id,
@@ -258,10 +309,10 @@ export async function addIndicators(id, items, actor, ip) {
     action: AuditAction.UPDATE,
     entity: 'Program',
     entityId: id,
-    metadata: { addedIndicators: items },
+    metadata: { indicators: items, activated: added },
     ip,
   });
-  return { added: result.count };
+  return { added };
 }
 
 export async function updateProgramIndicator(id, indicatorId, data, actor, ip) {
@@ -293,6 +344,12 @@ export async function removeIndicator(id, indicatorId, actor, ip) {
     where: { programId_indicatorId: { programId: id, indicatorId } },
   });
   if (!link) throw notFound('Indicador não vinculado a este programa');
+  const linkedResults = await prisma.result.count({ where: { programId: id, indicatorId } });
+  if (linkedResults > 0) {
+    throw conflict(
+      'Este vínculo possui resultados. Desative o indicador no programa em vez de removê-lo para preservar o histórico.',
+    );
+  }
   await prisma.programIndicator.delete({
     where: { programId_indicatorId: { programId: id, indicatorId } },
   });

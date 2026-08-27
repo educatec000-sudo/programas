@@ -53,6 +53,14 @@ export const SCHOOL_SITUATION = {
   INATIVA: { label: 'Inativa', cls: 'badge-red' },
 };
 
+export const SCHOOL_ZONE = {
+  SEDE: { label: 'Sede', cls: 'badge-blue' },
+  ESTRADAS: { label: 'Estradas', cls: 'badge-yellow' },
+  ILHAS: { label: 'Ilhas', cls: 'badge-green' },
+  URBANA: { label: 'Urbana', cls: 'badge-blue' },
+  RURAL: { label: 'Rural', cls: 'badge-yellow' },
+};
+
 export const DEPENDENCY = {
   FEDERAL: 'Federal', ESTADUAL: 'Estadual', MUNICIPAL: 'Municipal', PRIVADA: 'Privada',
 };
@@ -60,6 +68,7 @@ export const DEPENDENCY = {
 export const IMPORT_STATUS = {
   PENDENTE: { label: 'Pendente', cls: 'badge-yellow' },
   IMPORTADO: { label: 'Importado', cls: 'badge-green' },
+  PARCIAL: { label: 'Parcial', cls: 'badge-yellow' },
   FALHOU: { label: 'Falhou', cls: 'badge-red' },
   CANCELADO: { label: 'Cancelado', cls: 'badge-gray' },
 };

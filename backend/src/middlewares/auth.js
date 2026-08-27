@@ -39,26 +39,41 @@ export async function authenticate(req, _res, next) {
         name: true,
         email: true,
         active: true,
+        mustChangePassword: true,
         role: {
           select: {
             id: true,
             name: true,
             level: true,
+            active: true,
             permissions: { select: { permission: { select: { key: true } } } },
           },
         },
       },
     });
-    if (!user || !user.active) throw unauthorized('Usuário inválido ou inativo', 'USER_INACTIVE');
+    if (!user || !user.active || !user.role.active) {
+      throw unauthorized('Usuário ou perfil inválido/inativo', 'USER_INACTIVE');
+    }
 
     req.user = {
       id: user.id,
       name: user.name,
       email: user.email,
+      mustChangePassword: user.mustChangePassword,
       role: { id: user.role.id, name: user.role.name, level: user.role.level },
       permissions: new Set(user.role.permissions.map((rp) => rp.permission.key)),
       sessionId: session.id,
     };
+
+    // Contas marcadas para troca obrigatória só acessam as rotas de conta.
+    // Isso torna mustChangePassword uma regra real, não apenas um aviso da UI.
+    if (user.mustChangePassword && !req.originalUrl.startsWith(`${env.apiPrefix}/auth/`)) {
+      throw new HttpError(
+        403,
+        'Altere sua senha antes de continuar',
+        'PASSWORD_CHANGE_REQUIRED',
+      );
+    }
     next();
   } catch (err) {
     next(err);

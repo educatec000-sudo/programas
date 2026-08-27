@@ -13,23 +13,31 @@ export function attainment(value, goal, polarity = 'MAIOR_MELHOR') {
   if (g <= 0) return null;
   let pct;
   if (polarity === 'MENOR_MELHOR') {
-    pct = v <= g ? 100 : (g / v) * 100; // quanto mais abaixo da meta, melhor (100% garantido)
+    // Ex.: meta 10 e resultado 5 => 200%. Zero representa o melhor resultado
+    // possível e recebe o teto; valores negativos não são comparáveis.
+    if (v < 0) return null;
+    pct = v === 0 ? ATTAINMENT_CAP : (g / v) * 100;
   } else {
     pct = (v / g) * 100;
   }
-  return Math.min(ATTAINMENT_CAP, Math.round(pct * 10) / 10);
+  return Math.max(0, Math.min(ATTAINMENT_CAP, Math.round(pct * 10) / 10));
 }
 
 /** Carrega tudo o que é preciso para calcular pontuações de um escopo. */
 export async function loadScope({ programId, indicatorId, year, schoolId }) {
+  const parsedYear = Number(year);
+  const hasYear = Number.isInteger(parsedYear);
   const resultWhere = {
-    year: Number(year),
+    ...(hasYear && { year: parsedYear }),
     ...(programId && { programId }),
     ...(indicatorId && { indicatorId }),
     ...(schoolId && { schoolId }),
+    program: { deletedAt: null },
+    school: { deletedAt: null },
+    indicator: { deletedAt: null },
   };
 
-  const [results, goals, programIndicators, indicatorsRaw, schoolsRaw, programsRaw] = await Promise.all([
+  const [results, goals, programIndicators, programSchools, indicatorsRaw, schoolsRaw, programsRaw] = await Promise.all([
     prisma.result.findMany({
       where: resultWhere,
       select: {
@@ -43,10 +51,12 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
       },
     }),
     prisma.goal.findMany({
-      where: { year: Number(year) },
+      where: { ...(hasYear && { year: parsedYear }) },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         scope: true,
+        year: true,
         programId: true,
         schoolId: true,
         indicatorId: true,
@@ -69,13 +79,21 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
         indicator: { select: { weight: true, defaultGoal: true, polarity: true } },
       },
     }),
+    prisma.programSchool.findMany({
+      where: {
+        active: true,
+        program: { deletedAt: null, ...(programId ? { id: programId } : {}) },
+        school: { deletedAt: null, ...(schoolId ? { id: schoolId } : {}) },
+      },
+      select: { programId: true, schoolId: true },
+    }),
     prisma.indicator.findMany({
       where: { deletedAt: null },
       select: { id: true, code: true, name: true, unit: true, polarity: true, weight: true, defaultGoal: true },
     }),
     prisma.school.findMany({
       where: { deletedAt: null },
-      select: { id: true, inep: true, name: true, municipality: true },
+      select: { id: true, inep: true, name: true },
     }),
     prisma.program.findMany({
       where: { deletedAt: null },
@@ -96,10 +114,22 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
     });
   }
 
-  return { results, goals, programIndicatorMap, indicatorById, schoolById, programById };
+  const programSchoolSet = new Set(
+    programSchools.map((link) => `${link.programId}:${link.schoolId}`),
+  );
+
+  return {
+    results,
+    goals,
+    programIndicatorMap,
+    programSchoolSet,
+    indicatorById,
+    schoolById,
+    programById,
+  };
 }
 
-function resolveGoal(goals, { programId, schoolId, indicatorId, period }) {
+function resolveGoal(goals, { programId, schoolId, indicatorId, year, period }) {
   const score = (g) =>
     (g.indicatorId === indicatorId && g.indicatorId ? 8 : 0) +
     (g.programId ? 4 : 0) +
@@ -108,6 +138,7 @@ function resolveGoal(goals, { programId, schoolId, indicatorId, period }) {
   let best = null;
   let bestScore = -1;
   for (const g of goals) {
+    if (g.year !== year) continue;
     if (g.programId && g.programId !== programId) continue;
     if (g.schoolId && g.schoolId !== schoolId) continue;
     if (g.indicatorId && g.indicatorId !== indicatorId) continue;
@@ -126,19 +157,23 @@ function sortPeriods(a, b) {
 }
 
 /** Agrega por escola+programa: pontuação ponderada dos indicadores com meta. */
-function aggregate(scope, { period, indicatorOnly }) {
+function aggregate(scope, { year, period, indicatorOnly }) {
   const bySchool = new Map();
 
   for (const r of scope.results) {
+    if (year && r.year !== Number(year)) continue;
     if (period && r.period !== period) continue;
     const indicator = scope.indicatorById.get(r.indicatorId);
     if (!indicator) continue;
+    if (!scope.programSchoolSet.has(`${r.programId}:${r.schoolId}`)) continue;
 
     const pi = scope.programIndicatorMap.get(`${r.programId}:${r.indicatorId}`);
+    if (!pi) continue;
     const goalRecord = resolveGoal(scope.goals, {
       programId: r.programId,
       schoolId: r.schoolId,
       indicatorId: r.indicatorId,
+      year: r.year,
       period: r.period,
     });
 
@@ -184,12 +219,31 @@ function aggregate(scope, { period, indicatorOnly }) {
   return [...bySchool.values()].filter((a) => a.score !== null);
 }
 
+async function resolveRankingYear({ year, programId, indicatorId, schoolId }) {
+  const parsed = Number(year);
+  if (Number.isInteger(parsed)) return parsed;
+  const latest = await prisma.result.findFirst({
+    where: {
+      ...(programId && { programId }),
+      ...(indicatorId && { indicatorId }),
+      ...(schoolId && { schoolId }),
+      program: { deletedAt: null },
+      school: { deletedAt: null },
+      indicator: { deletedAt: null },
+    },
+    orderBy: { year: 'desc' },
+    select: { year: true },
+  });
+  return latest?.year ?? new Date().getFullYear();
+}
+
 /**
  * Ranking completo com evolução (posição e pontuação no período anterior).
  * Escopos: por programa (programId), por indicador (indicatorId) ou geral.
  */
 export async function computeRanking(params) {
-  const { programId, indicatorId, year, period, schoolId, limit } = params;
+  const { programId, indicatorId, period, schoolId, limit } = params;
+  const year = await resolveRankingYear(params);
   const scope = await loadScope({ programId, indicatorId, year, schoolId });
 
   // períodos disponíveis no escopo (p/ evolução)
@@ -215,6 +269,7 @@ export async function computeRanking(params) {
   const previous = idx > 0 ? periods[idx - 1] : null;
 
   const currentAggs = aggregate(scope, {
+    year: current.year,
     period: current.period,
     indicatorOnly: Boolean(indicatorId),
   });
@@ -247,7 +302,6 @@ export async function computeRanking(params) {
       schoolId: s.schoolId,
       schoolName: school?.name || '—',
       schoolInep: school?.inep || '—',
-      municipality: school?.municipality || '—',
       programsCount: s.programIds.length,
       score,
       classification: classify(score),
@@ -262,6 +316,7 @@ export async function computeRanking(params) {
   // evolução vs período anterior
   if (previous) {
     const prevAggs = aggregate(scope, {
+      year: previous.year,
       period: previous.period,
       indicatorOnly: Boolean(indicatorId),
     });
@@ -314,7 +369,7 @@ export async function evolutionSeries({ programId, indicatorId, year, schoolId }
 
   const series = [];
   for (const p of periods) {
-    const aggs = aggregate(scope, { period: p.period, indicatorOnly: Boolean(indicatorId) });
+    const aggs = aggregate(scope, { year: p.year, period: p.period, indicatorOnly: Boolean(indicatorId) });
     if (!aggs.length) continue;
     const bySchool = new Map();
     for (const a of aggs) {
@@ -359,7 +414,7 @@ export async function compareSchools({ schoolIds, programId, year }) {
     const school = scope.schoolById.get(id) || { name: '—', inep: '—' };
     const subScope = { ...scope, results: scope.results.filter((r) => r.schoolId === id) };
     const data = periods.map((p) => {
-      const aggs = aggregate(subScope, { period: p.period, indicatorOnly: false });
+      const aggs = aggregate(subScope, { year: p.year, period: p.period, indicatorOnly: false });
       if (!aggs.length) return { label: `${p.period}/${p.year}`, score: null, classification: null };
       const avg = aggs.reduce((acc, a) => acc + a.score * a.weights, 0) / aggs.reduce((acc, a) => acc + a.weights, 0);
       const score = Math.round(avg * 10) / 10;
@@ -388,7 +443,7 @@ export async function comparePrograms({ year, period }) {
     const series = periods
       .filter((p) => subScope.results.some((r) => r.period === p.period))
       .map((p) => {
-        const aggs = aggregate(subScope, { period: p.period, indicatorOnly: false });
+        const aggs = aggregate(subScope, { year: p.year, period: p.period, indicatorOnly: false });
         if (!aggs.length) return { label: `${p.period}/${p.year}`, score: null };
         const avg = aggs.reduce((acc, a) => acc + a.score * a.weights, 0) / aggs.reduce((acc, a) => acc + a.weights, 0);
         return { label: `${p.period}/${p.year}`, score: Math.round(avg * 10) / 10 };

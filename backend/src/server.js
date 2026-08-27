@@ -1,7 +1,8 @@
 import { createApp } from './app.js';
-import { env } from './config/env.js';
+import { assertRuntimeEnv, env } from './config/env.js';
 import { prisma } from './lib/prisma.js';
 
+assertRuntimeEnv();
 const app = createApp();
 
 const server = app.listen(env.port, '0.0.0.0', () => {

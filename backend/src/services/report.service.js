@@ -3,11 +3,10 @@ import { classificationLabel } from '../lib/constants.js';
 import {
   computeRanking,
   evolutionSeries,
-  comparePrograms,
   goalsStatus,
 } from './scoring.service.js';
 import { resultsForExport } from './result.service.js';
-import { listGoals } from './goal.service.js';
+import { listGoals, resolveGoalFromList } from './goal.service.js';
 import { HttpError } from '../lib/errors.js';
 
 /**
@@ -30,8 +29,16 @@ async function reportGeral(query) {
     include: { _count: { select: { schools: { where: { active: true } }, indicators: true, results: true } } },
     orderBy: { name: 'asc' },
   });
-  const performance = await comparePrograms({ year: year ?? new Date().getFullYear() });
-  const scoreByProgram = new Map(performance.programs.map((p) => [p.programId, p.currentScore]));
+  const scoreEntries = await Promise.all(
+    programs.map(async (program) => {
+      const ranking = await computeRanking({ programId: program.id, year: year ?? program.year });
+      const score = ranking.rows.length
+        ? Math.round((ranking.rows.reduce((sum, row) => sum + row.score, 0) / ranking.rows.length) * 10) / 10
+        : null;
+      return [program.id, score];
+    }),
+  );
+  const scoreByProgram = new Map(scoreEntries);
 
   return {
     title: 'Relatório Geral de Programas',
@@ -78,13 +85,14 @@ async function reportEscola(query) {
 
   const goals = await prisma.goal.findMany({
     where: { year: year ?? undefined },
-    select: { id: true, programId: true, schoolId: true, indicatorId: true, period: true, value: true },
+    select: { id: true, year: true, programId: true, schoolId: true, indicatorId: true, period: true, value: true },
   });
 
   const { attainment } = await import('./scoring.service.js');
   const rows = results.map((r) => {
     const candidates = goals.filter(
       (g) =>
+        g.year === r.year &&
         (!g.programId || g.programId === r.programId) &&
         (!g.schoolId || g.schoolId === r.schoolId) &&
         (!g.indicatorId || g.indicatorId === r.indicatorId) &&
@@ -107,7 +115,7 @@ async function reportEscola(query) {
 
   return {
     title: `Relatório da Escola — ${school.name}`,
-    subtitle: `INEP ${school.inep} · ${school.municipality}${year ? ` · ${year}` : ''}`,
+    subtitle: `INEP ${school.inep}${year ? ` · ${year}` : ''}`,
     columns: [
       { key: 'year', label: 'Ano', format: 'int' },
       { key: 'period', label: 'Período' },
@@ -148,7 +156,6 @@ async function reportPrograma(query) {
       { key: 'position', label: 'Posição', format: 'int' },
       { key: 'schoolName', label: 'Escola' },
       { key: 'schoolInep', label: 'INEP' },
-      { key: 'municipality', label: 'Município' },
       { key: 'score', label: 'Pontuação', format: 'score' },
       { key: 'classification', label: 'Classificação' },
       { key: 'classificationLabel', label: 'Conceito' },
@@ -167,28 +174,60 @@ async function reportIndicador(query) {
   const indicator = await prisma.indicator.findFirst({ where: { id: query.indicatorId, deletedAt: null } });
   if (!indicator) throw new HttpError(404, 'Indicador não encontrado', 'NOT_FOUND');
 
-  const results = await prisma.result.findMany({
-    where: { indicatorId: indicator.id, ...(query.year && { year: Number(query.year) }) },
-    include: { program: { select: { name: true } } },
-  });
+  const [results, goals, programIndicators] = await Promise.all([
+    prisma.result.findMany({
+      where: {
+        indicatorId: indicator.id,
+        ...(query.year && { year: Number(query.year) }),
+        program: { deletedAt: null },
+        school: { deletedAt: null },
+      },
+      include: { program: { select: { id: true, name: true } } },
+    }),
+    prisma.goal.findMany({
+      where: {
+        ...(query.year && { year: Number(query.year) }),
+        schoolId: null,
+        OR: [{ indicatorId: indicator.id }, { indicatorId: null }],
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        year: true,
+        programId: true,
+        schoolId: true,
+        indicatorId: true,
+        period: true,
+        value: true,
+      },
+    }),
+    prisma.programIndicator.findMany({
+      where: { indicatorId: indicator.id, active: true },
+      select: { programId: true, goal: true },
+    }),
+  ]);
 
   const grouped = new Map();
-  for (const r of results) {
-    const key = `${r.program.name}|${r.year}|${r.period}`;
-    if (!grouped.has(key)) grouped.set(key, { program: r.program.name, year: r.year, period: r.period, values: [] });
-    grouped.get(key).values.push(r.value);
+  for (const result of results) {
+    const key = `${result.programId}|${result.year}|${result.period}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        programId: result.programId,
+        program: result.program.name,
+        year: result.year,
+        period: result.period,
+        values: [],
+      });
+    }
+    grouped.get(key).values.push(result.value);
   }
 
-  const goalRecords = await prisma.goal.findMany({
-    where: { indicatorId: indicator.id, ...(query.year && { year: Number(query.year) }) },
-    select: { value: true, programId: true },
-  });
-  const goal = goalRecords[0]?.value ?? indicator.defaultGoal;
+  const programGoals = new Map(programIndicators.map((link) => [link.programId, link.goal]));
   const { attainment } = await import('./scoring.service.js');
 
   return {
     title: `Relatório do Indicador — ${indicator.name}`,
-    subtitle: `Código ${indicator.code} · Unidade: ${indicator.unit || '—'} · Meta de referência: ${goal ?? '—'}`,
+    subtitle: `Código ${indicator.code} · Unidade: ${indicator.unit || '—'} · metas resolvidas por programa, ano e período`,
     columns: [
       { key: 'program', label: 'Programa' },
       { key: 'year', label: 'Ano', format: 'int' },
@@ -197,18 +236,29 @@ async function reportIndicador(query) {
       { key: 'avg', label: 'Média', format: 'number' },
       { key: 'min', label: 'Mínimo', format: 'number' },
       { key: 'max', label: 'Máximo', format: 'number' },
+      { key: 'goal', label: 'Meta', format: 'number' },
       { key: 'pct', label: '% da Meta', format: 'percent' },
     ],
-    rows: [...grouped.values()].map((g) => {
-      const avg = g.values.reduce((a, b) => a + b, 0) / g.values.length;
+    rows: [...grouped.values()].map((group) => {
+      const avg = group.values.reduce((sum, value) => sum + value, 0) / group.values.length;
+      const goalRecord = resolveGoalFromList(
+        goals.filter((goal) => goal.year === group.year),
+        {
+          programId: group.programId,
+          indicatorId: indicator.id,
+          period: group.period,
+        },
+      );
+      const goal = goalRecord?.value ?? programGoals.get(group.programId) ?? indicator.defaultGoal;
       return {
-        program: g.program,
-        year: g.year,
-        period: g.period,
-        schools: g.values.length,
+        program: group.program,
+        year: group.year,
+        period: group.period,
+        schools: group.values.length,
         avg: Math.round(avg * 100) / 100,
-        min: Math.min(...g.values),
-        max: Math.max(...g.values),
+        min: Math.min(...group.values),
+        max: Math.max(...group.values),
+        goal,
         pct: attainment(avg, goal, indicator.polarity),
       };
     }),
@@ -253,7 +303,7 @@ async function reportMetas(query) {
     ...query,
     pageSize: 1,
     year: query.year,
-    period: query.period,
+    period: query.period && query.period !== 'todos' ? query.period : undefined,
   });
 
   return {
@@ -279,7 +329,7 @@ async function reportRanking(query) {
   const ranking = await computeRanking({
     programId: query.programId || undefined,
     indicatorId: query.indicatorId || undefined,
-    year: query.year ? Number(query.year) : new Date().getFullYear(),
+    year: query.year ? Number(query.year) : undefined,
     period: query.period && query.period !== 'todos' ? query.period : undefined,
   });
   return {
@@ -289,7 +339,6 @@ async function reportRanking(query) {
       { key: 'position', label: 'Posição', format: 'int' },
       { key: 'schoolName', label: 'Escola' },
       { key: 'schoolInep', label: 'INEP' },
-      { key: 'municipality', label: 'Município' },
       { key: 'programsCount', label: 'Programas', format: 'int' },
       { key: 'score', label: 'Pontuação', format: 'score' },
       { key: 'classification', label: 'Classif.' },
@@ -308,7 +357,7 @@ async function reportEvolucao(query) {
   });
   return {
     title: 'Relatório de Evolução Temporal',
-    subtitle: query.programId ? 'Programa específico' : 'Todas os programas',
+    subtitle: query.programId ? 'Programa específico' : 'Todos os programas',
     columns: [
       { key: 'label', label: 'Período' },
       { key: 'schoolsCount', label: 'Escolas', format: 'int' },

@@ -1,19 +1,23 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// O frontend chama a API por caminho relativo (/api) — o dev server
-// faz o proxy para o backend, mantendo cookies httpOnly na mesma origem.
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    allowedHosts: true, // aceita o host do preview público
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
+// O frontend chama a API por caminho relativo (/api). Em desenvolvimento o
+// Vite encaminha para o backend, mantendo os cookies httpOnly na mesma origem.
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+    plugins: [react()],
+    server: {
+      // localhost é mais seguro para trabalho local no VS Code. Use
+      // VITE_DEV_HOST=0.0.0.0 apenas quando realmente precisar expor na LAN.
+      host: env.VITE_DEV_HOST || 'localhost',
+      port: Number(env.VITE_DEV_PORT) || 5173,
+      proxy: {
+        '/api': {
+          target: env.VITE_API_PROXY || 'http://localhost:4000',
+          changeOrigin: true,
+        },
       },
     },
-  },
+  };
 });

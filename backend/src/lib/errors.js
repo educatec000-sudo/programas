@@ -46,7 +46,8 @@ export function errorHandler(err, req, res, _next) {
 
   // Prisma
   if (err?.code === 'P2002') {
-    const target = err.meta?.target?.join(', ') || 'campo único';
+    const rawTarget = err.meta?.target;
+    const target = Array.isArray(rawTarget) ? rawTarget.join(', ') : rawTarget || 'campo único';
     return res
       .status(409)
       .json({ error: { code: 'DUPLICATE', message: `Registro duplicado (${target})` } });

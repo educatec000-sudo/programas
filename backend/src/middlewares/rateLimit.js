@@ -27,7 +27,7 @@ export function originCheck(req, res, next) {
 
   const allowed = new Set(
     [
-      env.corsOrigin,
+      ...env.corsOrigins,
       req.headers.host ? `https://${req.headers.host}` : null,
       req.headers.host ? `http://${req.headers.host}` : null,
     ].filter(Boolean),

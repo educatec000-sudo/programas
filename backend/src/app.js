@@ -25,7 +25,14 @@ export function createApp() {
 
   app.use(
     cors({
-      origin: true, // proxy do frontend (dev) partilha da origem; origem validada abaixo
+      origin(origin, callback) {
+        // Chamadas server-to-server/cURL não enviam Origin. No navegador,
+        // somente origens explicitamente configuradas recebem CORS.
+        if (!origin || env.corsOrigins.includes(origin.replace(/\/$/, ''))) {
+          return callback(null, true);
+        }
+        return callback(null, false);
+      },
       credentials: true,
     }),
   );

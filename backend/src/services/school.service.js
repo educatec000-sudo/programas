@@ -6,7 +6,6 @@ import { parsePagination, buildPagination, normalizeSearch } from '../lib/pagina
 const SORTABLE = {
   name: 'name',
   inep: 'inep',
-  municipality: 'municipality',
   createdAt: 'createdAt',
   situation: 'situation',
 };
@@ -16,34 +15,41 @@ const technicianLinkInclude = {
 };
 
 export async function listSchools(query) {
-  const { page, pageSize, skip, take } = parsePagination(query);
-  const { search, municipality, zone, situation, programId, technicianId, hasTechnician, district, schoolType, hasCoordinates } = query;
+  // A tela de escolas carrega a relação completa para navegação por rolagem.
+  // O limite alto continua protegendo a API contra respostas sem controle.
+  const { page, pageSize, skip, take } = parsePagination(query, {
+    defaultPageSize: 500,
+    maxPageSize: 1000,
+  });
+  const { search, zone, situation, programId, technicianId, hasTechnician, district, schoolType, hasCoordinates } = query;
 
   // busca pelo termo original (acentos preservados — "GUAJARÁ", "João Silva")
   const ns = (search || '').trim();
   const where = {
     deletedAt: null,
-    ...(ns && {
-      OR: [
-        { name: { contains: ns, mode: 'insensitive' } },
-        { inep: { contains: ns } },
-        { municipality: { contains: ns, mode: 'insensitive' } },
-        { responsible: { contains: ns, mode: 'insensitive' } },
-        { address: { contains: ns, mode: 'insensitive' } },
-        { technicianLinks: { some: { technician: { name: { contains: ns, mode: 'insensitive' } } } } },
-      ],
-    }),
-    ...(municipality && { municipality: { equals: municipality, mode: 'insensitive' } }),
+    AND: [
+      ...(ns
+        ? [{
+            OR: [
+              { name: { contains: ns, mode: 'insensitive' } },
+              { inep: { contains: ns } },
+              { responsible: { contains: ns, mode: 'insensitive' } },
+              { address: { contains: ns, mode: 'insensitive' } },
+              { technicianLinks: { some: { technician: { active: true, name: { contains: ns, mode: 'insensitive' } } } } },
+            ],
+          }]
+        : []),
+      ...(hasCoordinates === 'false' ? [{ OR: [{ latitude: null }, { longitude: null }] }] : []),
+    ],
     ...(zone && { zone }),
     ...(situation && { situation }),
     ...(district && { district: { equals: district, mode: 'insensitive' } }),
     ...(schoolType && { schoolType: { equals: schoolType, mode: 'insensitive' } }),
     ...(hasCoordinates === 'true' && { latitude: { not: null }, longitude: { not: null } }),
-    ...(hasCoordinates === 'false' && { OR: [{ latitude: null }, { longitude: null }] }),
     ...(programId && { programs: { some: { programId, active: true } } }),
-    ...(technicianId && { technicianLinks: { some: { technicianId } } }),
-    ...(hasTechnician === 'true' && { technicianLinks: { some: {} } }),
-    ...(hasTechnician === 'false' && { technicianLinks: { none: {} } }),
+    ...(technicianId && { technicianLinks: { some: { technicianId, technician: { active: true } } } }),
+    ...(hasTechnician === 'true' && { technicianLinks: { some: { technician: { active: true } } } }),
+    ...(hasTechnician === 'false' && { technicianLinks: { none: { technician: { active: true } } } }),
   };
 
   const orderBy = { [SORTABLE[query.sort] || 'name']: query.dir === 'desc' ? 'desc' : 'asc' };
@@ -53,7 +59,11 @@ export async function listSchools(query) {
     prisma.school.findMany({
       where,
       include: {
-        technicianLinks: { include: technicianLinkInclude, orderBy: { technician: { name: 'asc' } } },
+        technicianLinks: {
+          where: { technician: { active: true } },
+          include: technicianLinkInclude,
+          orderBy: { technician: { name: 'asc' } },
+        },
         _count: { select: { programs: true, results: true } },
       },
       orderBy,
@@ -68,13 +78,11 @@ export async function listSchools(query) {
       inep: s.inep,
       name: s.name,
       schoolType: s.schoolType,
-      municipality: s.municipality,
       address: s.address,
       addressNumber: s.addressNumber,
       addressComplement: s.addressComplement,
       district: s.district,
       cep: s.cep,
-      uf: s.uf,
       zone: s.zone,
       adminDependency: s.adminDependency,
       situation: s.situation,
@@ -100,14 +108,29 @@ export async function listSchools(query) {
 
 /** Indicadores do cadastro de escolas (todos do banco). */
 export async function getSchoolsStats() {
-  const [total, ativas, paralisadas, urbana, rural, schoolsWithTechnicianRaw] = await Promise.all([
+  const [
+    total,
+    ativas,
+    inativas,
+    paralisadas,
+    urbana,
+    rural,
+    sede,
+    estradas,
+    ilhas,
+    schoolsWithTechnicianRaw,
+  ] = await Promise.all([
     prisma.school.count({ where: { deletedAt: null } }),
     prisma.school.count({ where: { deletedAt: null, situation: 'ATIVA' } }),
+    prisma.school.count({ where: { deletedAt: null, situation: 'INATIVA' } }),
     prisma.school.count({ where: { deletedAt: null, situation: 'PARALISADA' } }),
     prisma.school.count({ where: { deletedAt: null, zone: 'URBANA' } }),
     prisma.school.count({ where: { deletedAt: null, zone: 'RURAL' } }),
+    prisma.school.count({ where: { deletedAt: null, zone: 'SEDE' } }),
+    prisma.school.count({ where: { deletedAt: null, zone: 'ESTRADAS' } }),
+    prisma.school.count({ where: { deletedAt: null, zone: 'ILHAS' } }),
     prisma.schoolTechnician.findMany({
-      where: { school: { deletedAt: null } },
+      where: { school: { deletedAt: null }, technician: { active: true } },
       distinct: ['schoolId'],
       select: { schoolId: true },
     }),
@@ -117,10 +140,13 @@ export async function getSchoolsStats() {
   return {
     total,
     ativas,
-    inativas: total - ativas,
+    inativas,
     paralisadas,
     urbana,
     rural,
+    sede,
+    estradas,
+    ilhas,
     comTecnico,
     semTecnico: Math.max(0, total - comTecnico),
   };
@@ -136,6 +162,7 @@ export async function getSchool(id) {
         orderBy: { program: { name: 'asc' } },
       },
       technicianLinks: {
+        where: { technician: { active: true } },
         include: {
           technician: {
             select: {
@@ -233,7 +260,7 @@ export async function updateSchool(id, data, actor, ip) {
 }
 
 function pickChanged(before, after) {
-  const keys = ['inep', 'name', 'municipality', 'situation', 'zone', 'adminDependency', 'responsible', 'address', 'latitude', 'longitude'];
+  const keys = ['inep', 'name', 'situation', 'zone', 'adminDependency', 'responsible', 'address', 'latitude', 'longitude'];
   const out = {};
   for (const k of keys) if (before[k] !== after[k]) out[k] = before[k];
   return out;
@@ -297,25 +324,9 @@ export async function schoolHistory(id, query) {
   return { data: logs, pagination: buildPagination(total, page, pageSize) };
 }
 
-export async function listMunicipalities() {
-  const rows = await prisma.school.findMany({
-    where: { deletedAt: null },
-    select: { municipality: true },
-    distinct: ['municipality'],
-    orderBy: { municipality: 'asc' },
-  });
-  return rows.map((r) => r.municipality);
-}
-
-/** Opções de filtro da tela de Escolas (municípios, bairros, tipos). */
+/** Opções de filtro da tela de Escolas (bairros e tipos). */
 export async function listFilterOptions() {
-  const [municipalities, districts, schoolTypes] = await Promise.all([
-    prisma.school.findMany({
-      where: { deletedAt: null },
-      select: { municipality: true },
-      distinct: ['municipality'],
-      orderBy: { municipality: 'asc' },
-    }),
+  const [districts, schoolTypes] = await Promise.all([
     prisma.school.findMany({
       where: { deletedAt: null, district: { not: null } },
       select: { district: true },
@@ -332,7 +343,6 @@ export async function listFilterOptions() {
     }),
   ]);
   return {
-    municipalities: municipalities.map((r) => r.municipality),
     districts: districts.map((r) => r.district),
     schoolTypes: schoolTypes.map((r) => r.schoolType),
   };

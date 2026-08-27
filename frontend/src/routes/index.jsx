@@ -1,39 +1,49 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout.jsx';
 import ProtectedRoute from '../components/ProtectedRoute.jsx';
+import { LoadingBlock } from '../components/ui.jsx';
 
-import Login from '../pages/Login.jsx';
-import ForgotPassword from '../pages/ForgotPassword.jsx';
-import ResetPassword from '../pages/ResetPassword.jsx';
-import Dashboard from '../pages/Dashboard.jsx';
-import Schools from '../pages/Schools.jsx';
-import SchoolDetail from '../pages/SchoolDetail.jsx';
-import Programs from '../pages/Programs.jsx';
-import ProgramDetail from '../pages/ProgramDetail.jsx';
-import Indicators from '../pages/Indicators.jsx';
-import Results from '../pages/Results.jsx';
-import Goals from '../pages/Goals.jsx';
-import TechnicianSchools from '../pages/TechnicianSchools.jsx';
-import Rankings from '../pages/Rankings.jsx';
-import Analytics from '../pages/Analytics.jsx';
-import Reports from '../pages/Reports.jsx';
-import Imports from '../pages/Imports.jsx';
-import Users from '../pages/Users.jsx';
-import Roles from '../pages/Roles.jsx';
-import Audit from '../pages/Audit.jsx';
-import Profile from '../pages/Profile.jsx';
-import Notifications from '../pages/Notifications.jsx';
+const Login = lazy(() => import('../pages/Login.jsx'));
+const ForgotPassword = lazy(() => import('../pages/ForgotPassword.jsx'));
+const ResetPassword = lazy(() => import('../pages/ResetPassword.jsx'));
+const Dashboard = lazy(() => import('../pages/Dashboard.jsx'));
+const Schools = lazy(() => import('../pages/Schools.jsx'));
+const SchoolDetail = lazy(() => import('../pages/SchoolDetail.jsx'));
+const Programs = lazy(() => import('../pages/Programs.jsx'));
+const ProgramDetail = lazy(() => import('../pages/ProgramDetail.jsx'));
+const Indicators = lazy(() => import('../pages/Indicators.jsx'));
+const Results = lazy(() => import('../pages/Results.jsx'));
+const Goals = lazy(() => import('../pages/Goals.jsx'));
+const TechnicianSchools = lazy(() => import('../pages/TechnicianSchools.jsx'));
+const Rankings = lazy(() => import('../pages/Rankings.jsx'));
+const Analytics = lazy(() => import('../pages/Analytics.jsx'));
+const Reports = lazy(() => import('../pages/Reports.jsx'));
+const Imports = lazy(() => import('../pages/Imports.jsx'));
+const Users = lazy(() => import('../pages/Users.jsx'));
+const Roles = lazy(() => import('../pages/Roles.jsx'));
+const Audit = lazy(() => import('../pages/Audit.jsx'));
+const Profile = lazy(() => import('../pages/Profile.jsx'));
+const Notifications = lazy(() => import('../pages/Notifications.jsx'));
+
+function page(Component, permission) {
+  const content = (
+    <Suspense fallback={<LoadingBlock label="Carregando página..." />}>
+      <Component />
+    </Suspense>
+  );
+  return permission
+    ? <ProtectedRoute permission={permission}>{content}</ProtectedRoute>
+    : content;
+}
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* públicas */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/esqueci-senha" element={<ForgotPassword />} />
-      <Route path="/redefinir-senha" element={<ResetPassword />} />
+      <Route path="/login" element={page(Login)} />
+      <Route path="/esqueci-senha" element={page(ForgotPassword)} />
+      <Route path="/redefinir-senha" element={page(ResetPassword)} />
 
-      {/* protegidas */}
       <Route
         element={
           <ProtectedRoute>
@@ -41,25 +51,24 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<ProtectedRoute permission="dashboard:read"><Dashboard /></ProtectedRoute>} />
-        <Route path="/escolas" element={<ProtectedRoute permission="schools:read"><Schools /></ProtectedRoute>} />
-        <Route path="/escolas/:id" element={<ProtectedRoute permission="schools:read"><SchoolDetail /></ProtectedRoute>} />
-        <Route path="/programas" element={<ProtectedRoute permission="programs:read"><Programs /></ProtectedRoute>} />
-        <Route path="/programas/:id" element={<ProtectedRoute permission="programs:read"><ProgramDetail /></ProtectedRoute>} />
-        <Route path="/indicadores" element={<ProtectedRoute permission="indicators:read"><Indicators /></ProtectedRoute>} />
-        <Route path="/resultados" element={<ProtectedRoute permission="results:read"><Results /></ProtectedRoute>} />
-        {/* Metas fora do sidebar, mas rota preservada (usada pelos detalhes de programa) */}
-        <Route path="/metas" element={<ProtectedRoute permission="goals:read"><Goals /></ProtectedRoute>} />
-        <Route path="/tecnicos-escola" element={<ProtectedRoute permission="technicians:read"><TechnicianSchools /></ProtectedRoute>} />
-        <Route path="/rankings" element={<ProtectedRoute permission="rankings:read"><Rankings /></ProtectedRoute>} />
-        <Route path="/analises" element={<ProtectedRoute permission="analytics:read"><Analytics /></ProtectedRoute>} />
-        <Route path="/relatorios" element={<ProtectedRoute permission="reports:read"><Reports /></ProtectedRoute>} />
-        <Route path="/importacoes" element={<ProtectedRoute permission="imports:read"><Imports /></ProtectedRoute>} />
-        <Route path="/usuarios" element={<ProtectedRoute permission="users:read"><Users /></ProtectedRoute>} />
-        <Route path="/perfis" element={<ProtectedRoute permission="roles:read"><Roles /></ProtectedRoute>} />
-        <Route path="/auditoria" element={<ProtectedRoute permission="audit:read"><Audit /></ProtectedRoute>} />
-        <Route path="/perfil" element={<Profile />} />
-        <Route path="/notificacoes" element={<Notifications />} />
+        <Route path="/" element={page(Dashboard, 'dashboard:read')} />
+        <Route path="/escolas" element={page(Schools, 'schools:read')} />
+        <Route path="/escolas/:id" element={page(SchoolDetail, 'schools:read')} />
+        <Route path="/programas" element={page(Programs, 'programs:read')} />
+        <Route path="/programas/:id" element={page(ProgramDetail, 'programs:read')} />
+        <Route path="/indicadores" element={page(Indicators, 'indicators:read')} />
+        <Route path="/resultados" element={page(Results, 'results:read')} />
+        <Route path="/metas" element={page(Goals, 'goals:read')} />
+        <Route path="/tecnicos-escola" element={page(TechnicianSchools, 'technicians:read')} />
+        <Route path="/rankings" element={page(Rankings, 'rankings:read')} />
+        <Route path="/analises" element={page(Analytics, 'analytics:read')} />
+        <Route path="/relatorios" element={page(Reports, 'reports:read')} />
+        <Route path="/importacoes" element={page(Imports, 'imports:read')} />
+        <Route path="/usuarios" element={page(Users, 'users:read')} />
+        <Route path="/perfis" element={page(Roles, 'roles:read')} />
+        <Route path="/auditoria" element={page(Audit, 'audit:read')} />
+        <Route path="/perfil" element={page(Profile)} />
+        <Route path="/notificacoes" element={page(Notifications)} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -2,6 +2,7 @@ import * as documentService from '../services/document.service.js';
 import { wrap } from '../lib/wrap.js';
 import { getClientIp } from '../lib/auth.js';
 import { z } from 'zod';
+import fs from 'node:fs/promises';
 
 const createSchema = z.object({
   title: z.string().trim().min(2, 'título obrigatório').max(200),
@@ -19,12 +20,22 @@ export const list = wrap(async (req, res) => {
 });
 
 export const create = wrap(async (req, res) => {
-  const data = createSchema.parse({
-    ...req.body,
-    ...(req.file ? {} : {}),
-  });
-  const document = await documentService.createDocument({ ...data, file: req.file }, req.user, getClientIp(req));
-  res.status(201).json(document);
+  try {
+    const data = createSchema.parse(req.body);
+    const document = await documentService.createDocument(
+      { ...data, file: req.file },
+      req.user,
+      getClientIp(req),
+    );
+    res.status(201).json(document);
+  } catch (error) {
+    // O Multer grava antes da validação/consulta ao banco. Se qualquer etapa da
+    // criação falhar, remova o arquivo para não acumular uploads órfãos.
+    if (req.file?.path) {
+      await fs.rm(req.file.path, { force: true }).catch(() => {});
+    }
+    throw error;
+  }
 });
 
 export const download = wrap(async (req, res) => {

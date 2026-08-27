@@ -8,8 +8,7 @@ export const list = wrap(async (req, res) => {
 });
 
 export const lookup = wrap(async (req, res) => {
-  const { programId, schoolId, indicatorId, year, period } = req.query;
-  res.json(await goalService.lookupGoal({ programId, schoolId, indicatorId, year: Number(year), period }));
+  res.json(await goalService.lookupGoal(req.data.query));
 });
 
 export const create = wrap(async (req, res) => {

@@ -103,7 +103,7 @@ export async function listEvaluations(query) {
     prisma.evaluation.findMany({
       where,
       include: {
-        school: { select: { id: true, inep: true, name: true, municipality: true } },
+        school: { select: { id: true, inep: true, name: true } },
         program: { select: { id: true, code: true, name: true } },
         consolidatedBy: { select: { name: true } },
       },

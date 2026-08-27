@@ -37,7 +37,7 @@ export const programsStrategy = {
 
   buildRow(row) {
     const errors = [];
-    const code = str(pickField(row.raw, this.aliases.code));
+    const code = str(pickField(row.raw, this.aliases.code)).toUpperCase();
     const name = str(pickField(row.raw, this.aliases.name));
     const year = toNumber(pickField(row.raw, this.aliases.year));
 
@@ -77,15 +77,16 @@ export const programsStrategy = {
     let updated = 0;
     await prisma.$transaction(async (tx) => {
       for (const row of validRows) {
-        const d = row.data;
-        const code = d.code;
-        delete d.code;
-        delete d.name; // nome não é alterado em atualização via importação
-        if (ctx.byCode.has(code.toLowerCase())) {
-          await tx.program.update({ where: { code }, data: d });
+        // Nunca mutar row.data: o staging é reutilizado na resposta/auditoria.
+        const { code, name, ...fields } = row.data;
+        const existing = ctx.byCode.get(code.toLowerCase());
+        if (existing) {
+          // O nome cadastrado é preservado em atualizações por planilha.
+          await tx.program.update({ where: { id: existing.id }, data: fields });
           updated++;
         } else {
-          await tx.program.create({ data: { code, name: row.data.name, ...d } });
+          const createdProgram = await tx.program.create({ data: { code, name, ...fields } });
+          ctx.byCode.set(code.toLowerCase(), createdProgram);
           created++;
         }
       }

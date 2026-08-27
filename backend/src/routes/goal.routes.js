@@ -18,8 +18,16 @@ const listQuery = paginationQuery.extend({
   period: z.string().max(30).optional(),
 });
 
+const lookupQuery = z.object({
+  programId: z.string().uuid().optional(),
+  schoolId: z.string().uuid().optional(),
+  indicatorId: z.string().uuid().optional(),
+  year: z.coerce.number().int().min(2000).max(2100),
+  period: z.string().trim().max(30).optional(),
+});
+
 router.get('/', requirePermission('goals:read'), validate({ query: listQuery }), controller.list);
-router.get('/lookup', requirePermission('goals:read'), controller.lookup);
+router.get('/lookup', requirePermission('goals:read'), validate({ query: lookupQuery }), controller.lookup);
 router.post('/', requirePermission('goals:write'), validate({ body: createGoalSchema }), controller.create);
 router.put('/:id', requirePermission('goals:write'), validate({ body: updateGoalSchema }), controller.update);
 router.delete('/:id', requirePermission('goals:delete'), controller.remove);

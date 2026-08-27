@@ -23,8 +23,8 @@ const coord = (min, max) =>
   );
 
 export const schoolBody = {
-  // INEP é o identificador principal, mas opcional — sem ele, a deduplicação
-  // usa Nome + Município (importação) e o cadastro manual continua válido
+  // INEP é o identificador principal, mas opcional — sem ele, a importação
+  // usa o nome normalizado e o cadastro manual continua válido
   inep: z.preprocess(
     (v) => (v === '' || v === null || v === undefined ? null : v),
     z
@@ -36,7 +36,6 @@ export const schoolBody = {
   ),
   name: z.string().trim().min(3, 'nome muito curto').max(200),
   schoolType: optionalStr(120),
-  municipality: z.string().trim().min(2, 'informe o município').max(120),
   address: optionalStr(200),
   addressNumber: optionalStr(20),
   addressComplement: optionalStr(120),
@@ -45,11 +44,7 @@ export const schoolBody = {
     (v) => (v === '' || v === null || v === undefined ? null : String(v).replace(/\D/g, '')),
     z.string().regex(/^\d{8}$/, 'CEP deve ter 8 dígitos').nullable().optional(),
   ),
-  uf: z.preprocess(
-    (v) => (v === '' || v === null || v === undefined ? null : String(v).toUpperCase().trim()),
-    z.string().length(2, 'UF deve ter 2 letras (ex.: PA)').nullable().optional(),
-  ),
-  zone: z.enum(['URBANA', 'RURAL']).nullable().optional(),
+  zone: z.enum(['URBANA', 'RURAL', 'SEDE', 'ESTRADAS', 'ILHAS']).nullable().optional(),
   adminDependency: z.enum(['FEDERAL', 'ESTADUAL', 'MUNICIPAL', 'PRIVADA']).nullable().optional(),
   situation: z.enum(['ATIVA', 'PARALISADA', 'INATIVA']).optional().default('ATIVA'),
   phone: optionalStr(30),
