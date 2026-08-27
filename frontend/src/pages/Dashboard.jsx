@@ -8,6 +8,7 @@ import { StatCard, Badge } from '../components/ui.jsx';
 import { EvolutionChart, ComparisonBarChart, ClassificationDonut } from '../components/charts.jsx';
 import { CLASSIFICATION_INFO, fmt, fmtInt, yearsRange } from '../utils/format.js';
 import { Icon } from '../components/icons.jsx';
+import SchoolMap from '../components/SchoolMap.jsx';
 
 export default function Dashboard() {
   const [year, setYear] = useState('');
@@ -44,6 +45,7 @@ export default function Dashboard() {
             <StatCard icon={Icon.goal()} label="Metas atingidas" value={fmtInt(data.kpis.goalsMet)} hint={`${data.kpis.goalsNotMet} não atingidas`} tone={data.kpis.goalsMet >= data.kpis.goalsNotMet ? 'green' : 'red'} />
           </div>
 
+          
           <div className="chart-grid" style={{ marginBottom: 16 }}>
             <EvolutionChart
               title="Evolução da pontuação média"
@@ -92,7 +94,10 @@ export default function Dashboard() {
                 <Link to="/rankings" style={{ fontSize: 13 }}>Ver ranking completo →</Link>
               </div>
             </div>
+            
           </div>
+          <SchoolMap schools={data.map?.schools || []} />
+
         </>
       )}
     </>

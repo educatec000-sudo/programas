@@ -25,6 +25,7 @@ export async function getDashboard({ year } = {}) {
     evolution,
     distribution,
     topSchools,
+    mapSchools,
   ] = await Promise.all([
     prisma.program.count({ where: { deletedAt: null, status: 'EM_EXECUCAO' } }),
     prisma.program.count({ where: { deletedAt: null } }),
@@ -42,6 +43,25 @@ export async function getDashboard({ year } = {}) {
     evolutionSeries({ year: targetYear }),
     classificationDistribution({ year: targetYear }),
     computeRanking({ year: targetYear, limit: 5 }),
+    prisma.school.findMany({
+      where: {
+        deletedAt: null,
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: {
+        id: true,
+        inep: true,
+        name: true,
+        address: true,
+        responsible: true,
+        zone: true,
+        latitude: true,
+        longitude: true,
+      },
+      orderBy: { name: 'asc' },
+      take: 1000,
+    }),
   ]);
 
   return {
@@ -57,6 +77,10 @@ export async function getDashboard({ year } = {}) {
       goalsNotMet: goalsData.totals.notMet,
     },
     year: targetYear,
+    map: {
+      schools: mapSchools,
+      total: mapSchools.length,
+    },
     charts: {
       performanceByProgram: performance.programs.slice(0, 8).map((p) => ({
         name: p.code,
