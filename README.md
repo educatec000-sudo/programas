@@ -21,6 +21,22 @@ Supabase PostgreSQL existente
 
 A Vercel hospeda somente a interface. O Render hospeda somente a API. O banco permanece no Supabase; nenhum banco adicional é criado.
 
+## Módulo Estatística
+
+O menu **Estatística** organiza Dashboard, Programas, Escolas, Avaliações, Resultados, Rankings, Relatórios e Importação de dados. Programas específicos, inclusive Alfabetiza Pará ou SisPAE quando cadastrados pelo usuário, são registros comuns de `Program`; não existem telas ou regras condicionais pelo nome do programa.
+
+A estrutura existente foi reaproveitada:
+
+- `Program` identifica o programa, órgão, ano/período e status;
+- `ProgramSchool` vincula uma mesma escola a diferentes programas;
+- `Indicator` mantém o catálogo tecnológico de critérios;
+- `ProgramIndicator` configura critério, meta e peso dentro de cada programa, sem propagação automática;
+- `Result` separa cada resultado por programa, escola, critério, ano e período;
+- `Evaluation` armazena consolidações por programa e escola;
+- rankings, gráficos e relatórios avaliativos exigem um programa e não produzem nota geral misturando programas.
+
+Nesta etapa, conforme a definição funcional escolhida, os resultados permanecem agregados por escola, sem dimensão de turma. A pontuação genérica usa somente meta, peso e polaridade configurados no programa; não presume metodologia oficial pelo nome do programa.
+
 ## Requisitos
 
 Para trabalhar diretamente no VS Code:

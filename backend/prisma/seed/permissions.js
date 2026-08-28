@@ -11,11 +11,11 @@ export const PERMISSIONS = [
   ['schools:export', 'Exportar escolas'],
 
   ['programs:read', 'Consultar programas'],
-  ['programs:write', 'Cadastrar/editar programas'],
+  ['programs:write', 'Cadastrar/editar programas e vincular escolas/critérios'],
   ['programs:delete', 'Excluir programas'],
 
   ['indicators:read', 'Consultar indicadores'],
-  ['indicators:write', 'Cadastrar/editar indicadores'],
+  ['indicators:write', 'Cadastrar/editar critérios de avaliação'],
   ['indicators:delete', 'Excluir indicadores'],
 
   ['results:read', 'Consultar resultados'],
@@ -29,8 +29,8 @@ export const PERMISSIONS = [
   ['goals:write', 'Cadastrar/editar metas'],
   ['goals:delete', 'Excluir metas'],
 
-  ['rankings:read', 'Consultar rankings'],
-  ['evaluations:write', 'Consolidar avaliações'],
+  ['rankings:read', 'Consultar rankings e avaliações por programa'],
+  ['evaluations:write', 'Consolidar avaliações por programa'],
   ['analytics:read', 'Acessar análises e gráficos'],
   ['reports:read', 'Gerar relatórios e exportações'],
 
