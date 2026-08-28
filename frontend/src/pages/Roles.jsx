@@ -8,7 +8,7 @@ import { Button, Badge, LoadingBlock, Modal, Field, Input, Select } from '../com
 import { Icon } from '../components/icons.jsx';
 
 const RESOURCE_LABELS = {
-  dashboard: 'Dashboard', schools: 'Escolas', programs: 'Programas', indicators: 'Indicadores',
+  dashboard: 'Dashboard', schools: 'Escolas', programs: 'Programas', indicators: 'Critérios de avaliação',
   results: 'Resultados', goals: 'Metas', rankings: 'Rankings', evaluations: 'Avaliações',
   analytics: 'Análises', reports: 'Relatórios', imports: 'Importações', technicians: 'Técnicos por Escola',
   users: 'Usuários', roles: 'Perfis', audit: 'Auditoria', documents: 'Documentos',

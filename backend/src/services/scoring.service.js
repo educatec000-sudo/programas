@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import { ATTAINMENT_CAP, classify, periodOrder } from '../lib/constants.js';
+import { HttpError } from '../lib/errors.js';
 
 /**
  * Núcleo de cálculo do CPE:
@@ -21,6 +22,14 @@ export function attainment(value, goal, polarity = 'MAIOR_MELHOR') {
     pct = (v / g) * 100;
   }
   return Math.max(0, Math.min(ATTAINMENT_CAP, Math.round(pct * 10) / 10));
+}
+
+/** Meta e peso efetivos vêm exclusivamente do vínculo critério-programa. */
+export function programIndicatorConfig(link) {
+  return {
+    weight: link.weight ?? 1,
+    goal: link.goal ?? null,
+  };
 }
 
 /** Carrega tudo o que é preciso para calcular pontuações de um escopo. */
@@ -51,7 +60,10 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
       },
     }),
     prisma.goal.findMany({
-      where: { ...(hasYear && { year: parsedYear }) },
+      where: {
+        ...(hasYear && { year: parsedYear }),
+        programId: programId || { not: null },
+      },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -76,7 +88,6 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
         indicatorId: true,
         weight: true,
         goal: true,
-        indicator: { select: { weight: true, defaultGoal: true, polarity: true } },
       },
     }),
     prisma.programSchool.findMany({
@@ -89,7 +100,7 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
     }),
     prisma.indicator.findMany({
       where: { deletedAt: null },
-      select: { id: true, code: true, name: true, unit: true, polarity: true, weight: true, defaultGoal: true },
+      select: { id: true, code: true, name: true, unit: true, polarity: true },
     }),
     prisma.school.findMany({
       where: { deletedAt: null },
@@ -108,10 +119,7 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
   // peso/meta efetivos do indicador dentro de cada programa
   const programIndicatorMap = new Map();
   for (const pi of programIndicators) {
-    programIndicatorMap.set(`${pi.programId}:${pi.indicatorId}`, {
-      weight: pi.weight ?? pi.indicator.weight ?? 1,
-      goal: pi.goal ?? pi.indicator.defaultGoal ?? null,
-    });
+    programIndicatorMap.set(`${pi.programId}:${pi.indicatorId}`, programIndicatorConfig(pi));
   }
 
   const programSchoolSet = new Set(
@@ -139,7 +147,9 @@ function resolveGoal(goals, { programId, schoolId, indicatorId, year, period }) 
   let bestScore = -1;
   for (const g of goals) {
     if (g.year !== year) continue;
-    if (g.programId && g.programId !== programId) continue;
+    // Avaliações são isoladas por programa. Metas sem programId não entram
+    // automaticamente no cálculo de outro programa.
+    if (g.programId !== programId) continue;
     if (g.schoolId && g.schoolId !== schoolId) continue;
     if (g.indicatorId && g.indicatorId !== indicatorId) continue;
     if (g.period && g.period !== period) continue;
@@ -177,14 +187,12 @@ function aggregate(scope, { year, period, indicatorOnly }) {
       period: r.period,
     });
 
-    const goalValue = goalRecord
-      ? goalRecord.value
-      : pi?.goal ?? indicator.defaultGoal ?? null;
+    const goalValue = goalRecord ? goalRecord.value : pi?.goal ?? null;
 
     const pct = attainment(r.value, goalValue, indicator.polarity);
     if (pct === null) continue; // sem meta não pontua
 
-    const weight = indicatorOnly ? 1 : pi?.weight ?? indicator.weight ?? 1;
+    const weight = indicatorOnly ? 1 : pi.weight;
     const key = `${r.schoolId}::${r.programId}`;
     if (!bySchool.has(key)) {
       bySchool.set(key, {
@@ -243,6 +251,13 @@ async function resolveRankingYear({ year, programId, indicatorId, schoolId }) {
  */
 export async function computeRanking(params) {
   const { programId, indicatorId, period, schoolId, limit } = params;
+  if (!programId) {
+    throw new HttpError(
+      422,
+      'Selecione um programa. Rankings e avaliações não combinam resultados de programas diferentes.',
+      'PROGRAM_REQUIRED',
+    );
+  }
   const year = await resolveRankingYear(params);
   const scope = await loadScope({ programId, indicatorId, year, schoolId });
 
@@ -274,7 +289,7 @@ export async function computeRanking(params) {
     indicatorOnly: Boolean(indicatorId),
   });
 
-  // agrupa por escola (quando ranking geral soma todos os programas)
+  // O escopo contém um único programa; nunca mistura notas entre programas.
   const bySchool = new Map();
   for (const agg of currentAggs) {
     if (!bySchool.has(agg.schoolId)) {

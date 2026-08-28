@@ -9,32 +9,23 @@ export default function Sidebar() {
 
   const sections = [
     {
-      label: null,
-      items: [{ to: '/', label: 'Dashboard', icon: Icon.dashboard(), permission: 'dashboard:read', end: true }],
+      label: 'Estatística',
+      items: [
+        { to: '/', label: 'Dashboard', icon: Icon.dashboard(), permission: 'dashboard:read', end: true },
+        { to: '/programas', label: 'Programas', icon: Icon.program(), permission: 'programs:read' },
+        { to: '/escolas', label: 'Escolas', icon: Icon.school(), permission: 'schools:read' },
+        { to: '/avaliacoes', label: 'Avaliações', icon: Icon.check(), permission: 'rankings:read' },
+        { to: '/resultados', label: 'Resultados', icon: Icon.result(), permission: 'results:read' },
+        { to: '/rankings', label: 'Rankings', icon: Icon.trophy(), permission: 'rankings:read' },
+        { to: '/relatorios', label: 'Relatórios', icon: Icon.report(), permission: 'reports:read' },
+        { to: '/importacoes', label: 'Importação de dados', icon: Icon.upload(), permission: 'imports:read' },
+      ],
     },
     {
-      label: 'Gestão',
+      label: 'Gestão operacional',
       items: [
-        { to: '/escolas', label: 'Escolas', icon: Icon.school(), permission: 'schools:read' },
-        { to: '/programas', label: 'Programas', icon: Icon.program(), permission: 'programs:read' },
-        { to: '/indicadores', label: 'Indicadores', icon: Icon.indicator(), permission: 'indicators:read' },
-        { to: '/resultados', label: 'Resultados', icon: Icon.result(), permission: 'results:read' },
-        // Metas deixou de ser menu independente (segue usada internamente
-        // por pontuação/rankings/avaliações e pelos detalhes de programa)
         { to: '/tecnicos-escola', label: 'Técnicos por Escola', icon: Icon.users(), permission: 'technicians:read' },
       ],
-    },
-    {
-      label: 'Análises',
-      items: [
-        { to: '/rankings', label: 'Rankings', icon: Icon.trophy(), permission: 'rankings:read' },
-        { to: '/analises', label: 'Análises', icon: Icon.analytics(), permission: 'analytics:read' },
-        { to: '/relatorios', label: 'Relatórios', icon: Icon.report(), permission: 'reports:read' },
-      ],
-    },
-    {
-      label: 'Operação',
-      items: [{ to: '/importacoes', label: 'Importações', icon: Icon.upload(), permission: 'imports:read' }],
     },
     {
       label: 'Administração',

@@ -8,6 +8,7 @@ import {
 } from '../services/scoring.service.js';
 import { wrap } from '../lib/wrap.js';
 import { z } from 'zod';
+import { HttpError } from '../lib/errors.js';
 
 const query = z.object({
   programId: z.string().uuid().optional(),
@@ -18,8 +19,19 @@ const query = z.object({
   period: z.string().optional(),
 });
 
+function requireProgram(params) {
+  if (!params.programId) {
+    throw new HttpError(
+      422,
+      'Selecione um programa. Análises avaliativas não combinam programas diferentes.',
+      'PROGRAM_REQUIRED',
+    );
+  }
+  return params;
+}
+
 export const overview = wrap(async (req, res) => {
-  const params = query.parse(req.query);
+  const params = requireProgram(query.parse(req.query));
   const [evolution, distribution, goals] = await Promise.all([
     evolutionSeries(params),
     classificationDistribution(params),
@@ -29,17 +41,17 @@ export const overview = wrap(async (req, res) => {
 });
 
 export const evolution = wrap(async (req, res) => {
-  const params = query.parse(req.query);
+  const params = requireProgram(query.parse(req.query));
   res.json(await evolutionSeries(params));
 });
 
 export const distribution = wrap(async (req, res) => {
-  const params = query.parse(req.query);
+  const params = requireProgram(query.parse(req.query));
   res.json(await classificationDistribution(params));
 });
 
 export const compareSchoolsEndpoint = wrap(async (req, res) => {
-  const parsed = query.partial({ year: true }).parse(req.query);
+  const parsed = requireProgram(query.partial({ year: true }).parse(req.query));
   const schoolIds = (parsed.schoolIds || parsed.schoolId || '')
     .split(',')
     .map((s) => s.trim())
@@ -55,11 +67,13 @@ export const compareProgramsEndpoint = wrap(async (req, res) => {
 });
 
 export const goals = wrap(async (req, res) => {
-  const params = query.parse(req.query);
+  const params = requireProgram(query.parse(req.query));
   res.json(await goalsStatus(params));
 });
 
 export const topSchools = wrap(async (req, res) => {
-  const params = query.extend({ limit: z.coerce.number().int().min(1).max(50).optional() }).parse(req.query);
+  const params = requireProgram(
+    query.extend({ limit: z.coerce.number().int().min(1).max(50).optional() }).parse(req.query),
+  );
   res.json(await computeRanking(params));
 });

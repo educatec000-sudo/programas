@@ -195,7 +195,17 @@ export default function SchoolDetail() {
             { key: 'name', label: 'Programa', render: (p) => <strong>{p.program.name}</strong> },
             { key: 'year', label: 'Ano', render: (p) => p.program.year },
             { key: 'status', label: 'Status', render: (p) => { const info = PROGRAM_STATUS[p.program.status]; return <Badge cls={info?.cls}>{info?.label}</Badge>; } },
-            { key: 'open', label: '', align: 'right', render: (p) => <Link to={`/programas/${p.program.id}`} className="btn btn-secondary btn-sm">Abrir</Link> },
+            {
+              key: 'open', label: '', align: 'right',
+              render: (p) => (
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                  {can('rankings:read') && can('results:read') && (
+                    <Link to={`/programas/${p.program.id}/escolas/${school.id}`} className="btn btn-primary btn-sm">Ver avaliação</Link>
+                  )}
+                  <Link to={`/programas/${p.program.id}`} className="btn btn-secondary btn-sm">Abrir programa</Link>
+                </div>
+              ),
+            },
           ]}
           rows={school.programs}
           rowKey={(p) => `${p.program.id}-${p.joinedAt}`}

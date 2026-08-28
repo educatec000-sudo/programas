@@ -1,38 +1,45 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi.js';
-import { rankingsApi, programsApi, indicatorsApi } from '../services/resources.js';
+import { rankingsApi, programsApi } from '../services/resources.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
-import { Button, Field, Select, LoadingBlock, Badge } from '../components/ui.jsx';
+import { Alert, Button, Field, Select, LoadingBlock, Badge } from '../components/ui.jsx';
 import { ComparisonBarChart } from '../components/charts.jsx';
 import { CLASSIFICATION_INFO, fmt, PERIODS, yearsRange } from '../utils/format.js';
 
 export default function Rankings() {
   const { can } = useAuth();
   const { success, error } = useToast();
+  const [searchParams] = useSearchParams();
 
-  const [programId, setProgramId] = useState('');
+  const [programId, setProgramId] = useState(searchParams.get('programId') || '');
   const [indicatorId, setIndicatorId] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [period, setPeriod] = useState('');
 
-  const { data, loading } = useApi(
-    () => rankingsApi.get({ programId: programId || undefined, indicatorId: indicatorId || undefined, year, period: period || undefined }),
+  const { data: programs } = useApi(() => programsApi.list({ pageSize: 1000 }), []);
+  const { data: program } = useApi(
+    () => (programId ? programsApi.get(programId) : Promise.resolve(null)),
+    [programId],
+  );
+  const { data, loading, refresh } = useApi(
+    () => programId
+      ? rankingsApi.get({ programId, indicatorId: indicatorId || undefined, year, period: period || undefined })
+      : Promise.resolve(null),
     [programId, indicatorId, year, period],
   );
-  const { data: programs } = useApi(() => programsApi.list({ pageSize: 200 }), []);
-  const { data: indicators } = useApi(() => indicatorsApi.list({ pageSize: 200 }), []);
 
   const [busy, setBusy] = useState(false);
   const consolidate = async () => {
     if (!programId || !data?.period) return;
     setBusy(true);
     try {
-      const res = await rankingsApi.consolidate({ programId, year, period: data.period });
-      success(`Avaliação consolidada: ${res.consolidated} escolas (${res.period}/${res.year}).`);
+      const result = await rankingsApi.consolidate({ programId, year, period: data.period });
+      success(`Avaliação consolidada: ${result.consolidated} escolas (${result.period}/${result.year}).`);
+      refresh();
     } catch (err) {
       error(err.message);
     } finally {
@@ -41,108 +48,101 @@ export default function Rankings() {
   };
 
   const columns = [
-    { key: 'position', label: '#', width: 60, align: 'center', render: (r) => <strong style={{ fontSize: 15 }}>{r.position}</strong> },
+    { key: 'position', label: '#', width: 60, align: 'center', render: (row) => <strong style={{ fontSize: 15 }}>{row.position}</strong> },
     {
       key: 'schoolName', label: 'Escola',
-      render: (r) => (
+      render: (row) => (
         <div>
-          <strong>{r.schoolName}</strong>
-          <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>INEP {r.schoolInep}</div>
+          <strong>{row.schoolName}</strong>
+          <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>INEP {row.schoolInep}</div>
         </div>
       ),
     },
-    { key: 'programsCount', label: 'Programas', align: 'center', render: (r) => (programId ? 1 : r.programsCount) },
     { key: 'resultsCount', label: 'Resultados', align: 'center' },
-    { key: 'score', label: 'Pontuação', align: 'right', render: (r) => <strong style={{ fontSize: 14.5 }}>{fmt(r.score)}%</strong> },
+    { key: 'score', label: 'Pontuação', align: 'right', render: (row) => <strong style={{ fontSize: 14.5 }}>{fmt(row.score)}%</strong> },
     {
       key: 'classification', label: 'Classificação',
-      render: (r) => {
-        const info = CLASSIFICATION_INFO[r.classification];
-        return <Badge cls={info?.cls} title={info?.label}>{r.classification} · {info?.label}</Badge>;
+      render: (row) => {
+        const info = CLASSIFICATION_INFO[row.classification];
+        return <Badge cls={info?.cls} title={info?.label}>{row.classification} · {info?.label}</Badge>;
       },
     },
-    { key: 'previousScore', label: 'Pont. anterior', align: 'right', render: (r) => fmt(r.previousScore) },
+    { key: 'previousScore', label: 'Pont. anterior', align: 'right', render: (row) => fmt(row.previousScore) },
     {
       key: 'evolution', label: 'Evolução', align: 'right',
-      render: (r) =>
-        r.scoreDiff === null || r.scoreDiff === undefined ? (
-          '—'
-        ) : (
-          <span className={r.scoreDiff >= 0 ? 'pos-up' : 'pos-down'}>
-            {r.scoreDiff >= 0 ? '▲' : '▼'} {fmt(Math.abs(r.scoreDiff))} p.p.
-          </span>
-        ),
-    },
-    {
-      key: 'posDiff', label: 'Posição', align: 'center',
-      render: (r) =>
-        r.positionDiff === null || r.positionDiff === undefined ? (
-          '—'
-        ) : (
-          <span className={r.positionDiff >= 0 ? 'pos-up' : 'pos-down'}>
-            {r.positionDiff >= 0 ? '↑' : '↓'} {Math.abs(r.positionDiff)}
-          </span>
-        ),
+      render: (row) => row.scoreDiff == null ? '—' : (
+        <span className={row.scoreDiff >= 0 ? 'pos-up' : 'pos-down'}>
+          {row.scoreDiff >= 0 ? '▲' : '▼'} {fmt(Math.abs(row.scoreDiff))} p.p.
+        </span>
+      ),
     },
     {
       key: 'open', label: '', align: 'right',
-      render: (r) => <Link to={`/escolas/${r.schoolId}`} className="btn btn-ghost btn-sm">Ver escola →</Link>,
+      render: (row) => (
+        <Link
+          to={`/programas/${programId}/escolas/${row.schoolId}?year=${year}&period=${encodeURIComponent(data?.period || period)}`}
+          className="btn btn-ghost btn-sm"
+        >
+          Ver avaliação
+        </Link>
+      ),
     },
   ];
 
   return (
     <>
       <PageHeader
-        title="Rankings"
-        subtitle="Pontuação ponderada por indicador, classificação e evolução entre períodos"
-        actions={
-          can('evaluations:write') && programId && data?.period ? (
-            <Button variant="success" onClick={consolidate} disabled={busy}>📸 Consolidar avaliação</Button>
-          ) : null
-        }
+        title="Rankings por programa"
+        subtitle="Cada ranking utiliza somente critérios, escolas e resultados do programa selecionado"
+        actions={can('evaluations:write') && programId && data?.period ? (
+          <Button variant="success" onClick={consolidate} disabled={busy}>📸 Consolidar avaliação</Button>
+        ) : null}
       />
 
       <div className="filter-bar">
-        <Field label="Programa">
-          <Select value={programId} onChange={(e) => setProgramId(e.target.value)}>
-            <option value="">Geral (todos os programas)</option>
-            {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+        <Field label="Programa" required>
+          <Select value={programId} onChange={(event) => { setProgramId(event.target.value); setIndicatorId(''); setPeriod(''); }}>
+            <option value="">Selecione um programa...</option>
+            {(programs?.data || []).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
           </Select>
         </Field>
-        <Field label="Indicador">
-          <Select value={indicatorId} onChange={(e) => setIndicatorId(e.target.value)}>
-            <option value="">Todos (pontuação ponderada)</option>
-            {(indicators?.data || []).map((i) => <option key={i.id} value={i.id}>{i.code} — {i.name}</option>)}
+        <Field label="Critério">
+          <Select value={indicatorId} onChange={(event) => setIndicatorId(event.target.value)} disabled={!programId}>
+            <option value="">Todos os critérios do programa</option>
+            {(program?.indicators || []).map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.code} — {criterion.name}</option>)}
           </Select>
         </Field>
         <Field label="Ano">
-          <Select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
+          <Select value={year} onChange={(event) => setYear(Number(event.target.value))}>
+            {yearsRange(2023).map((item) => <option key={item} value={item}>{item}</option>)}
           </Select>
         </Field>
         <Field label="Período">
-          <Select value={period} onChange={(e) => setPeriod(e.target.value)}>
+          <Select value={period} onChange={(event) => setPeriod(event.target.value)} disabled={!programId}>
             <option value="">Mais recente com dados</option>
-            {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+            {PERIODS.map((item) => <option key={item} value={item}>{item}</option>)}
           </Select>
         </Field>
       </div>
 
-      {loading ? (
+      {!programId ? (
+        <Alert type="info">Selecione um programa. Não existe ranking geral que misture resultados de programas diferentes.</Alert>
+      ) : loading ? (
         <LoadingBlock />
       ) : !data ? null : (
         <>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Badge cls="badge-blue">Programa: {program?.name || '—'}</Badge>
             <Badge cls="badge-blue">Período: {data.period || '—'}/{data.year}</Badge>
             {data.previousPeriod && <Badge cls="badge-gray">Comparando com: {data.previousPeriod.period}/{data.previousPeriod.year}</Badge>}
-            <Badge cls="badge-gray">{data.rows.length} escolas pontuadas</Badge>
+            <Badge cls="badge-gray">{data.rows.length} escolas avaliadas</Badge>
           </div>
 
           <div style={{ marginBottom: 16 }}>
             <ComparisonBarChart
-              title="Top 10 escolas no período"
-              subtitle="Percentual de atingimento das metas"
-              data={data.rows.slice(0, 10).map((r) => ({ name: r.schoolName.split(' ').slice(0, 3).join(' '), score: r.score }))}
+              title={`Top 10 — ${program?.name || 'programa'}`}
+              subtitle="Percentual de atingimento das metas configuradas neste programa"
+              data={data.rows.slice(0, 10).map((row) => ({ name: row.schoolName.split(' ').slice(0, 3).join(' '), score: row.score }))}
             />
           </div>
 
@@ -150,7 +150,7 @@ export default function Rankings() {
             columns={columns}
             rows={data.rows}
             emptyTitle="Sem pontuação no período selecionado"
-            emptyHint="É necessário ter resultados lançados e metas cadastradas para os indicadores."
+            emptyHint="Configure metas específicas do programa e lance resultados para seus critérios."
             emptyIcon="🏆"
           />
         </>

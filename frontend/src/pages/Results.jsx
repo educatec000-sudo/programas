@@ -32,13 +32,21 @@ export default function Results() {
   const { data: programs } = useApi(() => programsApi.list({ pageSize: 200 }), []);
   const { data: schools } = useApi(() => schoolsApi.list({ pageSize: 200 }), []);
   const { data: indicators } = useApi(() => indicatorsApi.list({ pageSize: 200 }), []);
+  const { data: filterProgram } = useApi(
+    () => (filters.programId ? programsApi.get(filters.programId) : Promise.resolve(null)),
+    [filters.programId],
+  );
 
   // ---- lançamento individual ----
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({
-    programId: '', schoolId: '', indicatorId: '', year: new Date().getFullYear(),
+    programId: params.get('programId') || '', schoolId: '', indicatorId: '', year: new Date().getFullYear(),
     period: '1º Semestre', value: '', notes: '',
   });
+  const { data: formProgram } = useApi(
+    () => (form.programId ? programsApi.get(form.programId) : Promise.resolve(null)),
+    [form.programId],
+  );
   const [overwrite, setOverwrite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -148,7 +156,7 @@ export default function Results() {
     { key: 'period', label: 'Período' },
     { key: 'school', label: 'Escola', render: (r) => <strong>{r.school.name}</strong> },
     { key: 'program', label: 'Programa', render: (r) => r.program.name },
-    { key: 'indicator', label: 'Indicador', render: (r) => r.indicator.name },
+    { key: 'indicator', label: 'Critério', render: (r) => r.indicator.name },
     { key: 'value', label: 'Valor', align: 'right', render: (r) => <strong>{fmt(r.value, 2)}</strong> },
     { key: 'unit', label: 'Unid.', render: (r) => r.indicator.unit || '—' },
     { key: 'source', label: 'Origem', render: (r) => <Badge cls={r.source === 'IMPORTACAO' ? 'badge-cyan' : 'badge-gray'}>{r.source === 'IMPORTACAO' ? 'Import.' : 'Manual'}</Badge> },
@@ -169,7 +177,7 @@ export default function Results() {
     <>
       <PageHeader
         title="Resultados"
-        subtitle="Lançamento individual e em lote — Programa → Escola → Indicador → Período → Resultado"
+        subtitle="Lançamento individual e em lote — Programa → Ano → Escola → Critério → Resultado"
         actions={
           <>
             {can('results:read') && (
@@ -187,21 +195,21 @@ export default function Results() {
 
       <div className="filter-bar">
         <Field label="Programa">
-          <Select value={filters.programId} onChange={setF('programId')}>
-            <option value="">Todos</option>
+          <Select value={filters.programId} onChange={(event) => { setFilters((current) => ({ ...current, programId: event.target.value, schoolId: '', indicatorId: '' })); setPage(1); }}>
+            <option value="">Todos, exibidos separadamente</option>
             {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </Select>
         </Field>
         <Field label="Escola">
-          <Select value={filters.schoolId} onChange={setF('schoolId')}>
-            <option value="">Todas</option>
-            {(schools?.data || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          <Select value={filters.schoolId} onChange={setF('schoolId')} disabled={!filters.programId}>
+            <option value="">Todas as participantes</option>
+            {(filterProgram?.schools || []).map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
           </Select>
         </Field>
-        <Field label="Indicador">
-          <Select value={filters.indicatorId} onChange={setF('indicatorId')}>
-            <option value="">Todos</option>
-            {(indicators?.data || []).map((i) => <option key={i.id} value={i.id}>{i.code} — {i.name}</option>)}
+        <Field label="Critério">
+          <Select value={filters.indicatorId} onChange={setF('indicatorId')} disabled={!filters.programId}>
+            <option value="">Todos os critérios do programa</option>
+            {(filterProgram?.indicators || []).map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.code} — {criterion.name}</option>)}
           </Select>
         </Field>
         <Field label="Ano">
@@ -245,21 +253,21 @@ export default function Results() {
         <form onSubmit={submit}>
           <div className="form-grid">
             <Field label="Programa" required>
-              <Select value={form.programId} onChange={(e) => setForm((f) => ({ ...f, programId: e.target.value }))} required>
+              <Select value={form.programId} onChange={(e) => setForm((f) => ({ ...f, programId: e.target.value, schoolId: '', indicatorId: '' }))} required>
                 <option value="">Selecione...</option>
                 {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
               </Select>
             </Field>
             <Field label="Escola" required>
-              <Select value={form.schoolId} onChange={(e) => setForm((f) => ({ ...f, schoolId: e.target.value }))} required>
-                <option value="">Selecione...</option>
-                {(schools?.data || []).map((s) => <option key={s.id} value={s.id}>{s.inep} — {s.name}</option>)}
+              <Select value={form.schoolId} onChange={(e) => setForm((f) => ({ ...f, schoolId: e.target.value }))} required disabled={!form.programId}>
+                <option value="">Selecione uma escola participante...</option>
+                {(formProgram?.schools || []).filter((school) => school.linkActive).map((school) => <option key={school.id} value={school.id}>{school.inep} — {school.name}</option>)}
               </Select>
             </Field>
-            <Field label="Indicador" required>
-              <Select value={form.indicatorId} onChange={(e) => setForm((f) => ({ ...f, indicatorId: e.target.value }))} required>
-                <option value="">Selecione...</option>
-                {(indicators?.data || []).map((i) => <option key={i.id} value={i.id}>{i.code} — {i.name}</option>)}
+            <Field label="Critério do programa" required>
+              <Select value={form.indicatorId} onChange={(e) => setForm((f) => ({ ...f, indicatorId: e.target.value }))} required disabled={!form.programId}>
+                <option value="">Selecione um critério...</option>
+                {(formProgram?.indicators || []).filter((criterion) => criterion.active).map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.code} — {criterion.name}</option>)}
               </Select>
             </Field>
             <Field label="Ano" required>

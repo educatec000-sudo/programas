@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { attainment } from '../src/services/scoring.service.js';
+import {
+  attainment,
+  computeRanking,
+  programIndicatorConfig,
+} from '../src/services/scoring.service.js';
 import { resolveGoalFromList } from '../src/services/goal.service.js';
 import { durationToMs } from '../src/lib/auth.js';
 import { normalizeCoordinate } from '../src/modules/imports/coordinates.js';
@@ -11,6 +15,7 @@ import { parseSpreadsheet, toNumber } from '../src/modules/imports/parser.js';
 import { autoMapColumns } from '../src/modules/imports/schoolFields.js';
 import { schoolsStrategy } from '../src/modules/imports/schools.strategy.js';
 import { createGoalSchema } from '../src/validations/result.validation.js';
+import { createProgramCriterionSchema } from '../src/validations/program.validation.js';
 
 test('calcula atingimento respeitando a polaridade e o teto', () => {
   assert.equal(attainment(50, 100, 'MAIOR_MELHOR'), 50);
@@ -20,6 +25,41 @@ test('calcula atingimento respeitando a polaridade e o teto', () => {
   assert.equal(attainment(0, 10, 'MENOR_MELHOR'), 200);
   assert.equal(attainment(-1, 10, 'MENOR_MELHOR'), null);
   assert.equal(attainment(1, 0, 'MAIOR_MELHOR'), null);
+});
+
+test('não herda meta nem peso globais quando o programa não os configurou', () => {
+  const config = programIndicatorConfig({
+    weight: null,
+    goal: null,
+    indicator: { weight: 99, defaultGoal: 100 },
+  });
+  assert.deepEqual(config, { weight: 1, goal: null });
+});
+
+test('recusa ranking sem programa para não misturar avaliações', async () => {
+  await assert.rejects(
+    () => computeRanking({ year: 2026 }),
+    (error) => error.code === 'PROGRAM_REQUIRED' && error.status === 422,
+  );
+});
+
+test('valida criação de critério específico no contexto do programa', () => {
+  const parsed = createProgramCriterionSchema.safeParse({
+    code: 'FLUENCIA',
+    name: 'Fluência leitora',
+    description: '',
+    categoryId: null,
+    unit: '%',
+    polarity: 'MAIOR_MELHOR',
+    weight: 2,
+    target: 80,
+    minValue: 0,
+    maxValue: 100,
+    periodLabel: 'Anual',
+  });
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.data.code, 'FLUENCIA');
+  assert.equal(parsed.data.target, 80);
 });
 
 test('resolve a meta mais específica', () => {

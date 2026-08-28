@@ -27,7 +27,7 @@ export const programsStrategy = {
   },
   headers: ['Código', 'Nome', 'Descrição', 'Objetivo', 'Órgão Responsável', 'Ano', 'Período', 'Status', 'Meta Global'],
   examples: [
-    ['PRG-2026-01', 'Alfabetiza Pará', 'Programa de alfabetização', 'Alfabetizar todas as crianças até os 7 anos', 'SEDUC', 2026, 'Anual', 'EM EXECUCAO', 90],
+    ['PRG-2026-01', 'Nome do programa', 'Descrição do programa', 'Objetivo cadastrado pelo órgão responsável', 'Órgão responsável', 2026, 'Anual', 'EM EXECUCAO', 90],
   ],
 
   async loadContext() {

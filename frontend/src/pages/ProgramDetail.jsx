@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi.js';
-import { programsApi, indicatorsApi, schoolsApi, rankingsApi, analyticsApi, resultsApi, goalsApi } from '../services/resources.js';
+import { programsApi, indicatorsApi, schoolsApi, rankingsApi, analyticsApi, resultsApi, goalsApi, reportsApi } from '../services/resources.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
@@ -12,9 +12,10 @@ import { PROGRAM_STATUS, CLASSIFICATION_INFO, SCHOOL_ZONE, fmt, fmtDateTime, PER
 
 export default function ProgramDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { can } = useAuth();
   const { toast, success, error } = useToast();
-  const [tab, setTab] = useState('informacoes');
+  const [tab, setTab] = useState(searchParams.get('tab') || 'resumo');
 
   const { data: program, loading, refresh } = useApi(() => programsApi.get(id), [id]);
 
@@ -24,12 +25,20 @@ export default function ProgramDetail() {
   const activeYear = year || program?.year || new Date().getFullYear();
 
   const { data: ranking, loading: rankingLoading } = useApi(
-    () => (tab === 'ranking' || tab === 'analises' ? rankingsApi.get({ programId: id, year: activeYear, period: period || undefined }) : Promise.resolve(null)),
+    () => ((tab === 'ranking' || tab === 'graficos') && can('rankings:read') ? rankingsApi.get({ programId: id, year: activeYear, period: period || undefined }) : Promise.resolve(null)),
     [id, activeYear, period, tab],
   );
   const { data: evolution } = useApi(
-    () => (tab === 'analises' ? analyticsApi.evolution({ programId: id, year: activeYear }) : Promise.resolve(null)),
+    () => (tab === 'graficos' && can('analytics:read') ? analyticsApi.evolution({ programId: id, year: activeYear }) : Promise.resolve(null)),
     [id, activeYear, tab],
+  );
+  const { data: evaluations, loading: evaluationsLoading } = useApi(
+    () => (tab === 'avaliacoes' && can('rankings:read') ? rankingsApi.evaluations({ programId: id }) : Promise.resolve(null)),
+    [id, tab],
+  );
+  const { data: history, loading: historyLoading } = useApi(
+    () => (tab === 'historico' ? programsApi.history(id, { page: 1, pageSize: 100 }) : Promise.resolve(null)),
+    [id, tab],
   );
 
   // modais
@@ -48,7 +57,7 @@ export default function ProgramDetail() {
     <>
       <PageHeader
         title={program.name}
-        subtitle={`${program.code} · ${program.year} · ${program.organ || '—'} · ${program.indicators.length} indicadores · ${program.schools.length} escolas`}
+        subtitle={`${program.code} · ${program.year} · ${program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`}
         actions={
           <>
             <Badge cls={statusInfo?.cls} >{statusInfo?.label}</Badge>
@@ -61,17 +70,19 @@ export default function ProgramDetail() {
         active={tab}
         onChange={setTab}
         tabs={[
-          { key: 'informacoes', label: 'Informações' },
+          { key: 'resumo', label: 'Visão geral' },
           { key: 'escolas', label: 'Escolas participantes', count: program.schools.length },
-          { key: 'indicadores', label: 'Indicadores', count: program.indicators.length },
-          { key: 'resultados', label: 'Resultados' },
-          { key: 'metas', label: 'Metas' },
-          { key: 'ranking', label: 'Ranking' },
-          { key: 'analises', label: 'Análises' },
-        ]}
+          can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators.length } : null,
+          can('rankings:read') ? { key: 'avaliacoes', label: 'Avaliações', count: program.evaluationsCount } : null,
+          can('results:read') ? { key: 'resultados', label: 'Resultados' } : null,
+          can('rankings:read') ? { key: 'ranking', label: 'Ranking' } : null,
+          can('analytics:read') ? { key: 'graficos', label: 'Gráficos' } : null,
+          { key: 'historico', label: 'Histórico' },
+          can('reports:read') ? { key: 'relatorios', label: 'Relatórios' } : null,
+        ].filter(Boolean)}
       />
 
-      {(tab === 'ranking' || tab === 'analises') && (
+      {(tab === 'ranking' || tab === 'graficos') && (
         <div className="filter-bar">
           <Field label="Ano">
             <Select value={year} onChange={(e) => setYear(e.target.value)}>
@@ -91,7 +102,7 @@ export default function ProgramDetail() {
         </div>
       )}
 
-      {tab === 'informacoes' && <InfoTab program={program} />}
+      {tab === 'resumo' && <InfoTab program={program} />}
 
       {tab === 'escolas' && (
         <SchoolsTab
@@ -105,7 +116,7 @@ export default function ProgramDetail() {
         />
       )}
 
-      {tab === 'indicadores' && (
+      {tab === 'criterios' && (
         <IndicatorsTab
           program={program}
           can={can}
@@ -117,12 +128,12 @@ export default function ProgramDetail() {
         />
       )}
 
-      {tab === 'resultados' && (
-        <ResultsTab program={program} can={can} modalOpen={resultModal} setModalOpen={setResultModal} success={success} error={error} />
+      {tab === 'avaliacoes' && (
+        <EvaluationsTab program={program} evaluations={evaluations} loading={evaluationsLoading} />
       )}
 
-      {tab === 'metas' && (
-        <GoalsTab program={program} can={can} modalOpen={goalModal} setModalOpen={setGoalModal} success={success} error={error} />
+      {tab === 'resultados' && (
+        <ResultsTab program={program} can={can} modalOpen={resultModal} setModalOpen={setResultModal} success={success} error={error} />
       )}
 
       {tab === 'ranking' && (
@@ -138,25 +149,31 @@ export default function ProgramDetail() {
         />
       )}
 
-      {tab === 'analises' && (
+      {tab === 'graficos' && (
         <>
           {rankingLoading || !ranking ? (
             <LoadingBlock />
           ) : (
             <div className="chart-grid">
               <EvolutionChart
-                title="Evolução do programa"
-                subtitle="Pontuação média das escolas por período"
+                title={`Evolução — ${program.name}`}
+                subtitle="Pontuação média das escolas por período, sem combinar outros programas"
                 data={evolution || []}
               />
               <ClassificationDonut
-                title="Classificação das escolas"
+                title={`Classificação — ${program.name}`}
                 subtitle={`${ranking.period || '—'}/${ranking.year}`}
                 distribution={ranking.rows.reduce((acc, r) => ({ ...acc, [r.classification]: (acc[r.classification] || 0) + 1 }), {})}
               />
             </div>
           )}
         </>
+      )}
+
+      {tab === 'historico' && <HistoryTab history={history} loading={historyLoading} />}
+
+      {tab === 'relatorios' && (
+        <ReportsTab program={program} year={activeYear} period={period || ranking?.period} toast={toast} error={error} />
       )}
     </>
   );
@@ -179,10 +196,11 @@ function InfoTab({ program }) {
           <dt>Ano</dt><dd>{program.year}</dd>
           <dt>Período</dt><dd>{program.periodLabel || '—'}</dd>
           <dt>Órgão</dt><dd>{program.organ || '—'}</dd>
-          <dt>Meta global</dt><dd>{program.globalGoal != null ? `${fmt(program.globalGoal)}%` : '—'}</dd>
+          <dt>Referência geral (não usada na pontuação)</dt><dd>{program.globalGoal != null ? `${fmt(program.globalGoal)}%` : '—'}</dd>
           <dt>Escolas</dt><dd>{program.schools.length}</dd>
-          <dt>Indicadores</dt><dd>{program.indicators.length}</dd>
+          <dt>Critérios de avaliação</dt><dd>{program.indicators.length}</dd>
           <dt>Resultados</dt><dd>{program.resultsCount}</dd>
+          <dt>Avaliações consolidadas</dt><dd>{program.evaluationsCount}</dd>
           <dt>Metas cadastradas</dt><dd>{program.goalsCount}</dd>
           <dt>Criado em</dt><dd>{fmtDateTime(program.createdAt)}</dd>
         </dl>
@@ -247,7 +265,12 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
           {
             key: 'actions', label: '', align: 'right',
             render: (s) => (
-              <div onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
+                {can('rankings:read') && can('results:read') && (
+                  <Link to={`/programas/${program.id}/escolas/${s.id}`} className="btn btn-secondary btn-sm">
+                    Ver avaliação
+                  </Link>
+                )}
                 {can('programs:write') && (
                   <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(s)} title="Desvincilar">🗑</Button>
                 )}
@@ -308,13 +331,18 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
   );
 }
 
-function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setModalOpen, success, error }) {
+function IndicatorsTab({ program, can, refresh, modalOpen, setModalOpen, success, error }) {
   const { data: allIndicators } = useApi(() => indicatorsApi.list({ pageSize: 200, status: 'ATIVO' }), []);
   const [selected, setSelected] = useState([]);
   const [weight, setWeight] = useState('');
   const [goal, setGoal] = useState('');
   const [busy, setBusy] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [criterionForm, setCriterionForm] = useState({
+    code: '', name: '', description: '', unit: '%', polarity: 'MAIOR_MELHOR',
+    weight: 1, target: '', minValue: '', maxValue: '', periodLabel: '',
+  });
 
   const linkedIds = new Set(program.indicators.map((i) => i.id));
   const available = (allIndicators?.data || []).filter((i) => !linkedIds.has(i.id));
@@ -329,12 +357,38 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
         goal: goal === '' ? null : Number(goal),
       }));
       const res = await programsApi.addIndicators(program.id, items);
-      success(`${res.added} indicador(es) vinculado(s).`);
+      success(`${res.added} critério(s) vinculado(s).`);
       setModalOpen(false);
       setSelected([]);
       refresh();
     } catch (err) {
       error(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createCriterion = async () => {
+    setBusy(true);
+    try {
+      const nullableNumber = (value) => (value === '' ? null : Number(value));
+      await programsApi.createCriterion(program.id, {
+        ...criterionForm,
+        weight: Number(criterionForm.weight),
+        target: nullableNumber(criterionForm.target),
+        minValue: nullableNumber(criterionForm.minValue),
+        maxValue: nullableNumber(criterionForm.maxValue),
+        categoryId: null,
+      });
+      success('Critério criado e vinculado somente a este programa.');
+      setCreateOpen(false);
+      setCriterionForm({
+        code: '', name: '', description: '', unit: '%', polarity: 'MAIOR_MELHOR',
+        weight: 1, target: '', minValue: '', maxValue: '', periodLabel: '',
+      });
+      refresh();
+    } catch (err) {
+      error(err.details?.map((detail) => `${detail.field}: ${detail.message}`).join(' · ') || err.message);
     } finally {
       setBusy(false);
     }
@@ -347,7 +401,7 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
         weight: editItem.weight === '' ? null : Number(editItem.weight),
         goal: editItem.goal === '' ? null : Number(editItem.goal),
       });
-      success('Indicador atualizado no programa.');
+      success('Critério atualizado no programa.');
       setEditItem(null);
       refresh();
     } catch (err) {
@@ -360,7 +414,7 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
   const removeIndicator = async (indicator) => {
     try {
       await programsApi.removeIndicator(program.id, indicator.id);
-      success('Indicador removido do programa.');
+      success('Critério removido do programa.');
       refresh();
     } catch (err) {
       error(err.message);
@@ -369,15 +423,20 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
 
   return (
     <>
-      {can('programs:write') && (
-        <div style={{ marginBottom: 12, textAlign: 'right' }}>
-          <Button onClick={() => setModalOpen(true)}>+ Vincular indicadores</Button>
+      {(can('programs:write') || can('indicators:write')) && (
+        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          {can('programs:write') && (
+            <Button variant="secondary" onClick={() => setModalOpen(true)}>Vincular critério existente</Button>
+          )}
+          {can('programs:write') && can('indicators:write') && (
+            <Button onClick={() => setCreateOpen(true)}>+ Novo critério deste programa</Button>
+          )}
         </div>
       )}
       <DataTable
         columns={[
           { key: 'code', label: 'Código', render: (i) => <span className="mono">{i.code}</span> },
-          { key: 'name', label: 'Indicador', render: (i) => <strong>{i.name}</strong> },
+          { key: 'name', label: 'Critério', render: (i) => <strong>{i.name}</strong> },
           { key: 'categoryName', label: 'Categoria' },
           { key: 'polarity', label: 'Polaridade', render: (i) => (i.polarity === 'MENOR_MELHOR' ? <Badge cls="badge-yellow">Menor é melhor</Badge> : <Badge cls="badge-blue">Maior é melhor</Badge>) },
           { key: 'unit', label: 'Unidade' },
@@ -394,14 +453,15 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
           },
         ]}
         rows={program.indicators}
-        emptyTitle="Nenhum indicador vinculado"
+        emptyTitle="Nenhum critério configurado"
+        emptyHint="Crie um critério neste programa ou vincule um critério existente."
         emptyIcon="📊"
       />
 
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Vincular indicadores"
+        title="Vincular critérios existentes"
         size="lg"
         footer={
           <>
@@ -412,10 +472,10 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
       >
         <div className="form-grid" style={{ marginBottom: 12 }}>
           <Field label="Peso padrão (opcional)" hint="Aplicado a todos os selecionados">
-            <Input type="number" step="0.1" min="0" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="usa peso do indicador" />
+            <Input type="number" step="0.1" min="0" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="padrão 1; não herda do catálogo" />
           </Field>
-          <Field label="Meta padrão (opcional)" hint="Aplicada a todos os selecionados">
-            <Input type="number" step="0.1" min="0" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="usa meta do indicador" />
+          <Field label="Meta do programa (opcional)" hint="Sem meta, o critério não entra na pontuação">
+            <Input type="number" step="0.1" min="0" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="configure a meta deste programa" />
           </Field>
         </div>
         <div style={{ maxHeight: 380, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 9 }}>
@@ -429,12 +489,66 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
               />
               <div>
                 <div style={{ fontWeight: 600 }}>{i.code} — {i.name}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{i.category?.name} · peso {i.weight} · meta {fmt(i.defaultGoal, 2)}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{i.category?.name || 'Sem categoria'} · {i.unit || 'sem unidade'} · meta e peso não são herdados do catálogo</div>
               </div>
             </label>
           ))}
-          {!available.length && <div className="table-empty">Todos os indicadores ativos já estão vinculados.</div>}
+          {!available.length && <div className="table-empty">Todos os critérios ativos já estão vinculados.</div>}
         </div>
+      </Modal>
+
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title={`Novo critério — ${program.name}`}
+        size="lg"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCreateOpen(false)} disabled={busy}>Cancelar</Button>
+            <Button onClick={createCriterion} disabled={busy || !criterionForm.code || !criterionForm.name}>
+              {busy ? 'Salvando...' : 'Criar critério'}
+            </Button>
+          </>
+        }
+      >
+        <div className="alert alert-info" style={{ marginBottom: 14 }}>
+          O critério será criado e vinculado somente a este programa. Meta, peso e polaridade devem seguir a metodologia definida pelo responsável do programa.
+        </div>
+        <div className="form-grid">
+          <Field label="Código" required>
+            <Input value={criterionForm.code} onChange={(e) => setCriterionForm((form) => ({ ...form, code: e.target.value }))} placeholder="Ex.: FLUENCIA" />
+          </Field>
+          <Field label="Nome" required>
+            <Input value={criterionForm.name} onChange={(e) => setCriterionForm((form) => ({ ...form, name: e.target.value }))} />
+          </Field>
+          <Field label="Unidade">
+            <Input value={criterionForm.unit} onChange={(e) => setCriterionForm((form) => ({ ...form, unit: e.target.value }))} placeholder="%, pontos, alunos..." />
+          </Field>
+          <Field label="Polaridade" hint="Como o resultado deve ser comparado à meta">
+            <Select value={criterionForm.polarity} onChange={(e) => setCriterionForm((form) => ({ ...form, polarity: e.target.value }))}>
+              <option value="MAIOR_MELHOR">Maior é melhor</option>
+              <option value="MENOR_MELHOR">Menor é melhor</option>
+            </Select>
+          </Field>
+          <Field label="Meta do programa">
+            <Input type="number" step="0.01" min="0" value={criterionForm.target} onChange={(e) => setCriterionForm((form) => ({ ...form, target: e.target.value }))} />
+          </Field>
+          <Field label="Peso no programa">
+            <Input type="number" step="0.1" min="0" value={criterionForm.weight} onChange={(e) => setCriterionForm((form) => ({ ...form, weight: e.target.value }))} />
+          </Field>
+          <Field label="Valor mínimo">
+            <Input type="number" step="0.01" value={criterionForm.minValue} onChange={(e) => setCriterionForm((form) => ({ ...form, minValue: e.target.value }))} />
+          </Field>
+          <Field label="Valor máximo">
+            <Input type="number" step="0.01" value={criterionForm.maxValue} onChange={(e) => setCriterionForm((form) => ({ ...form, maxValue: e.target.value }))} />
+          </Field>
+          <Field label="Periodicidade">
+            <Input value={criterionForm.periodLabel} onChange={(e) => setCriterionForm((form) => ({ ...form, periodLabel: e.target.value }))} placeholder="Anual, semestral..." />
+          </Field>
+        </div>
+        <Field label="Descrição">
+          <Input value={criterionForm.description} onChange={(e) => setCriterionForm((form) => ({ ...form, description: e.target.value }))} />
+        </Field>
       </Modal>
 
       <Modal
@@ -457,6 +571,112 @@ function IndicatorsTab({ program, can, refresh, modalOpen, setModalModal, setMod
         </Field>
       </Modal>
     </>
+  );
+}
+
+function EvaluationsTab({ program, evaluations, loading }) {
+  return (
+    <DataTable
+      columns={[
+        { key: 'school', label: 'Escola', render: (row) => <strong>{row.school.name}</strong> },
+        { key: 'year', label: 'Ano' },
+        { key: 'period', label: 'Período' },
+        { key: 'score', label: 'Pontuação', align: 'right', render: (row) => `${fmt(row.score)}%` },
+        {
+          key: 'classification', label: 'Classificação',
+          render: (row) => {
+            const info = CLASSIFICATION_INFO[row.classification];
+            return <Badge cls={info?.cls}>{row.classification} · {info?.label}</Badge>;
+          },
+        },
+        { key: 'position', label: 'Posição', align: 'center' },
+        { key: 'consolidatedAt', label: 'Consolidada em', render: (row) => fmtDateTime(row.consolidatedAt) },
+        {
+          key: 'open', label: '', align: 'right',
+          render: (row) => (
+            <Link
+              to={`/programas/${program.id}/escolas/${row.school.id}?year=${row.year}&period=${encodeURIComponent(row.period)}`}
+              className="btn btn-secondary btn-sm"
+            >
+              Abrir avaliação
+            </Link>
+          ),
+        },
+      ]}
+      rows={evaluations?.data || []}
+      loading={loading}
+      emptyTitle="Nenhuma avaliação consolidada neste programa"
+      emptyHint="Use a aba Ranking para consolidar um período após configurar critérios, metas e resultados."
+      emptyIcon="📝"
+    />
+  );
+}
+
+function HistoryTab({ history, loading }) {
+  if (loading) return <LoadingBlock label="Carregando histórico..." />;
+  return (
+    <div className="card card-pad">
+      <div className="card-title">Histórico do programa</div>
+      <div className="card-subtitle">Cadastro, vínculos, critérios e consolidações registrados pela auditoria.</div>
+      <ul className="timeline">
+        {(history?.data || []).map((entry) => (
+          <li key={entry.id}>
+            <div className="when" style={{ minWidth: 145 }}>{fmtDateTime(entry.createdAt)}</div>
+            <div>
+              <strong>{entry.action}</strong>
+              <span style={{ color: 'var(--text-2)' }}>
+                {entry.userName ? ` · ${entry.userName}` : ''}
+                {entry.metadata?.operation ? ` · ${entry.metadata.operation}` : ''}
+              </span>
+            </div>
+          </li>
+        ))}
+        {!history?.data?.length && <li style={{ color: 'var(--text-3)' }}>Sem registros para este programa.</li>}
+      </ul>
+    </div>
+  );
+}
+
+function ReportsTab({ program, year, period, toast, error }) {
+  const [busy, setBusy] = useState('');
+  const generate = async (type) => {
+    setBusy(type);
+    try {
+      const filename = await reportsApi.generate(type, {
+        programId: program.id,
+        year,
+        ...(period && { period }),
+        format: 'pdf',
+      });
+      toast(`Relatório gerado: ${filename}`, { type: 'success', title: 'Download iniciado' });
+    } catch (err) {
+      error(err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const reports = [
+    ['programa', '📋', 'Relatório do programa', 'Ranking e desempenho das escolas neste programa.'],
+    ['resultados', '🧾', 'Resultados', 'Lançamentos pertencentes somente a este programa.'],
+    ['metas', '🎯', 'Metas x resultados', 'Atingimento dos critérios configurados no programa.'],
+    ['ranking', '🏆', 'Ranking', 'Classificação das escolas apenas neste programa.'],
+    ['evolucao', '📉', 'Evolução', 'Evolução temporal do programa selecionado.'],
+  ];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14 }}>
+      {reports.map(([type, icon, title, description]) => (
+        <div key={type} className="card card-pad">
+          <div style={{ fontSize: 24 }}>{icon}</div>
+          <div className="card-title" style={{ marginTop: 6 }}>{title}</div>
+          <div className="card-subtitle" style={{ minHeight: 36 }}>{description}</div>
+          <Button size="sm" onClick={() => generate(type)} disabled={Boolean(busy)}>
+            {busy === type ? 'Gerando...' : 'Baixar PDF'}
+          </Button>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -599,6 +819,17 @@ function RankingTab({ program, ranking, loading, can, year, period, success, err
                   {r.positionDiff >= 0 ? '↑' : '↓'} {Math.abs(r.positionDiff)}
                 </span>
               ),
+          },
+          {
+            key: 'open', label: '', align: 'right',
+            render: (r) => (
+              <Link
+                to={`/programas/${program.id}/escolas/${r.schoolId}?year=${year}&period=${encodeURIComponent(ranking.period || period || '')}`}
+                className="btn btn-ghost btn-sm"
+              >
+                Ver avaliação
+              </Link>
+            ),
           },
         ]}
         rows={ranking.rows}

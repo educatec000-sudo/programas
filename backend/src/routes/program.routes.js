@@ -9,6 +9,9 @@ import {
   updateProgramSchoolSchema,
   addProgramIndicatorsSchema,
   updateProgramIndicatorSchema,
+  createProgramCriterionSchema,
+  programSchoolParamsSchema,
+  programEvaluationQuerySchema,
 } from '../validations/program.validation.js';
 import { paginationQuery } from '../validations/common.validation.js';
 import { z } from 'zod';
@@ -26,6 +29,22 @@ router.post('/', requirePermission('programs:write'), validate({ body: createPro
 router.get('/:id', requirePermission('programs:read'), controller.get);
 router.put('/:id', requirePermission('programs:write'), validate({ body: updateProgramSchema }), controller.update);
 router.delete('/:id', requirePermission('programs:delete'), controller.remove);
+router.get('/:id/history', requirePermission('programs:read'), validate({ query: paginationQuery }), controller.history);
+router.get(
+  '/:id/schools/:schoolId/evaluation',
+  requirePermission('programs:read'),
+  requirePermission('results:read'),
+  requirePermission('rankings:read'),
+  validate({ params: programSchoolParamsSchema, query: programEvaluationQuerySchema }),
+  controller.schoolEvaluation,
+);
+router.post(
+  '/:id/criteria',
+  requirePermission('programs:write'),
+  requirePermission('indicators:write'),
+  validate({ body: createProgramCriterionSchema }),
+  controller.createCriterion,
+);
 
 router.post(
   '/:id/schools',

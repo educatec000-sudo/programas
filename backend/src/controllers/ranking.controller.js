@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { PERIODS } from '../lib/constants.js';
 
 const rankingQuerySchema = z.object({
-  programId: z.string().uuid().optional(),
+  programId: z.string().uuid({ message: 'Selecione um programa' }),
   indicatorId: z.string().uuid().optional(),
   schoolId: z.string().uuid().optional(),
   year: z.coerce.number().int().min(2000).max(2100),

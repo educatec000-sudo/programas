@@ -98,7 +98,15 @@ export default function Programs() {
 
   const columns = [
     { key: 'code', label: 'Código', render: (p) => <span className="mono">{p.code}</span> },
-    { key: 'name', label: 'Programa', render: (p) => <strong>{p.name}</strong> },
+    {
+      key: 'name', label: 'Programa',
+      render: (p) => (
+        <div>
+          <strong>{p.name}</strong>
+          {p.description && <div style={{ fontSize: 11.5, color: 'var(--text-3)', maxWidth: 360 }}>{p.description}</div>}
+        </div>
+      ),
+    },
     { key: 'organ', label: 'Órgão' },
     { key: 'year', label: 'Ano' },
     {
@@ -126,7 +134,7 @@ export default function Programs() {
     <>
       <PageHeader
         title="Programas"
-        subtitle="Programas educacionais, escolas participantes e indicadores"
+        subtitle="Centro de organização: critérios, escolas, avaliações, resultados, rankings e relatórios por programa"
         actions={can('programs:write') && <Button onClick={openCreate}>+ Novo programa</Button>}
       />
 
@@ -197,7 +205,7 @@ export default function Programs() {
                 {Object.entries(PROGRAM_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </Select>
             </Field>
-            <Field label="Meta global (%)" hint="Percentual de atingimento esperado pelo programa">
+            <Field label="Referência geral (%)" hint="Campo informativo; não substitui as metas dos critérios nem entra automaticamente na pontuação">
               <Input type="number" step="0.1" min="0" value={form.globalGoal} onChange={set('globalGoal')} />
             </Field>
           </div>

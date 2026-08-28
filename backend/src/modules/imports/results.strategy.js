@@ -21,17 +21,17 @@ function normalizePeriod(value) {
 
 export const resultsStrategy = {
   type: 'RESULTADOS',
-  label: 'Resultados',
+  label: 'Resultados por programa',
   aliases: {
     program: ['programa', 'codigoprograma', 'programacodigo', 'codprograma'],
     school: ['inep', 'escola', 'codigoinep', 'codigoescola', 'inepescola'],
-    indicator: ['indicador', 'codigoindicador', 'indicadorcodigo', 'codindicador'],
+    indicator: ['criterio', 'codigocriterio', 'indicador', 'codigoindicador', 'indicadorcodigo', 'codindicador'],
     year: ['ano', 'anobase'],
     period: ['periodo'],
     value: ['resultado', 'valor', 'valorresultado', 'resultadovalor'],
     notes: ['observacao', 'obs', 'notas'],
   },
-  headers: ['Programa (código)', 'INEP Escola', 'Indicador (código)', 'Ano', 'Período', 'Resultado', 'Observação'],
+  headers: ['Programa (código)', 'INEP Escola', 'Critério (código)', 'Ano', 'Período', 'Resultado', 'Observação'],
   examples: [
     ['PRG-2025-01', '15012345', 'IND-001', 2025, '1º Semestre', 87.5, ''],
   ],
@@ -101,14 +101,14 @@ export const resultsStrategy = {
     else if (!school) errors.push({ field: 'inep', message: `Escola com INEP ${inep} não encontrada` });
 
     const indicator = indicatorKey ? ctx.indicatorByCode.get(indicatorKey) : undefined;
-    if (!indicatorKey) errors.push({ field: 'indicador', message: 'Indicador é obrigatório' });
-    else if (!indicator) errors.push({ field: 'indicador', message: `Indicador ativo não encontrado: "${indicatorKey}"` });
+    if (!indicatorKey) errors.push({ field: 'criterio', message: 'Critério é obrigatório' });
+    else if (!indicator) errors.push({ field: 'criterio', message: `Critério ativo não encontrado: "${indicatorKey}"` });
 
     if (program && school && !ctx.schoolLinks.has(`${program.id}|${school.id}`)) {
       errors.push({ field: 'inep', message: `A escola ${school.name} não está ativa no programa ${program.code}` });
     }
     if (program && indicator && !ctx.indicatorLinks.has(`${program.id}|${indicator.id}`)) {
-      errors.push({ field: 'indicador', message: `O indicador ${indicator.code} não está ativo no programa ${program.code}` });
+      errors.push({ field: 'criterio', message: `O critério ${indicator.code} não está ativo no programa ${program.code}` });
     }
 
     if (!year || year < 2000 || year > 2100) errors.push({ field: 'ano', message: 'Ano inválido' });

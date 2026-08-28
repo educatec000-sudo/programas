@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useApi } from '../hooks/useApi.js';
-import { analyticsApi, programsApi, indicatorsApi, schoolsApi } from '../services/resources.js';
+import { analyticsApi, programsApi } from '../services/resources.js';
 import PageHeader from '../components/PageHeader.jsx';
-import { LoadingBlock, Field, Select, StatCard } from '../components/ui.jsx';
+import { Alert, LoadingBlock, Field, Select, StatCard } from '../components/ui.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { EvolutionChart, ClassificationDonut, ComparisonBarChart, MultiLineChart, CHART_COLORS } from '../components/charts.jsx';
 import { fmt, fmtInt, yearsRange, PERIODS, CLASSIFICATION_INFO } from '../utils/format.js';
@@ -15,19 +15,23 @@ export default function Analytics() {
   const [compareProgramYear, setCompareProgramYear] = useState(new Date().getFullYear());
 
   const { data: overview, loading } = useApi(
-    () => analyticsApi.overview({ programId: programId || undefined, indicatorId: indicatorId || undefined, year }),
+    () => programId
+      ? analyticsApi.overview({ programId, indicatorId: indicatorId || undefined, year })
+      : Promise.resolve(null),
     [programId, indicatorId, year],
   );
 
-  const { data: programs } = useApi(() => programsApi.list({ pageSize: 200 }), []);
-  const { data: indicators } = useApi(() => indicatorsApi.list({ pageSize: 200 }), []);
-  const { data: schools } = useApi(() => schoolsApi.list({ pageSize: 200 }), []);
+  const { data: programs } = useApi(() => programsApi.list({ pageSize: 1000 }), []);
+  const { data: program } = useApi(
+    () => (programId ? programsApi.get(programId) : Promise.resolve(null)),
+    [programId],
+  );
 
   const [selectedSchools, setSelectedSchools] = useState([]);
   const { data: comparison } = useApi(
     () =>
-      selectedSchools.length
-        ? analyticsApi.compareSchools({ schoolIds: selectedSchools.join(','), programId: programId || undefined, year })
+      selectedSchools.length && programId
+        ? analyticsApi.compareSchools({ schoolIds: selectedSchools.join(','), programId, year })
         : Promise.resolve(null),
     [selectedSchools.join(','), programId, year],
   );
@@ -44,20 +48,20 @@ export default function Analytics() {
     <>
       <PageHeader
         title="Análises"
-        subtitle="Desempenho de escolas e programas, metas, evolução e comparações"
+        subtitle="Desempenho, metas e evolução sempre calculados dentro do programa selecionado"
       />
 
       <div className="filter-bar">
         <Field label="Programa">
-          <Select value={programId} onChange={(e) => setProgramId(e.target.value)}>
-            <option value="">Todos os programas</option>
+          <Select value={programId} onChange={(e) => { setProgramId(e.target.value); setIndicatorId(''); setSelectedSchools([]); }}>
+            <option value="">Selecione um programa...</option>
             {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </Select>
         </Field>
         <Field label="Indicador">
-          <Select value={indicatorId} onChange={(e) => setIndicatorId(e.target.value)}>
-            <option value="">Todos os indicadores</option>
-            {(indicators?.data || []).map((i) => <option key={i.id} value={i.id}>{i.code}</option>)}
+          <Select value={indicatorId} onChange={(e) => setIndicatorId(e.target.value)} disabled={!programId}>
+            <option value="">Todos os critérios do programa</option>
+            {(program?.indicators || []).map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.code}</option>)}
           </Select>
         </Field>
         <Field label="Ano">
@@ -67,7 +71,9 @@ export default function Analytics() {
         </Field>
       </div>
 
-      {loading || !overview ? (
+      {!programId ? (
+        <Alert type="info">Selecione um programa. As análises avaliativas não combinam resultados de programas diferentes.</Alert>
+      ) : loading || !overview ? (
         <LoadingBlock label="Processando análises..." />
       ) : (
         <>
@@ -121,7 +127,7 @@ export default function Analytics() {
             <div className="card-title">Comparação entre escolas</div>
             <div className="card-subtitle">Selecione até 6 escolas para comparar a evolução da pontuação</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}>
-              {(schools?.data || []).slice(0, 24).map((s) => (
+              {(program?.schools || []).filter((school) => school.linkActive).slice(0, 24).map((s) => (
                 <button
                   key={s.id}
                   className={`pill ${selectedSchools.includes(s.id) ? 'active' : ''}`}
@@ -154,7 +160,7 @@ export default function Analytics() {
             <div className="card-header-row">
               <div>
                 <div className="card-title">Comparação entre programas</div>
-                <div className="card-subtitle">Pontuação média das escolas — período mais recente de cada programa</div>
+                <div className="card-subtitle">Cada programa é calculado isoladamente; esta comparação não cria nota geral</div>
               </div>
               <Select value={compareProgramYear} onChange={(e) => setCompareProgramYear(Number(e.target.value))} style={{ width: 110 }}>
                 {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}

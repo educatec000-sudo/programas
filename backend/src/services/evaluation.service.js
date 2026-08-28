@@ -93,6 +93,8 @@ export async function consolidate({ programId, year, period }, actor, ip) {
 export async function listEvaluations(query) {
   const { programId, schoolId, year, period } = query;
   const where = {
+    program: { deletedAt: null },
+    school: { deletedAt: null },
     ...(programId && { programId }),
     ...(schoolId && { schoolId }),
     ...(year && { year: Number(year) }),

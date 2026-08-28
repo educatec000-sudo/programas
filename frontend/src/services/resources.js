@@ -53,6 +53,10 @@ export const techniciansApi = {
 export const programsApi = {
   ...crud('/programs'),
   getWithTab: (id) => request(`/programs/${id}`),
+  history: (id, params) => request(`/programs/${id}/history`, { params }),
+  schoolEvaluation: (id, schoolId, params) =>
+    request(`/programs/${id}/schools/${schoolId}/evaluation`, { params }),
+  createCriterion: (id, body) => request(`/programs/${id}/criteria`, { method: 'POST', body }),
   addSchools: (id, schoolIds) => request(`/programs/${id}/schools`, { method: 'POST', body: { schoolIds } }),
   updateSchoolLink: (id, schoolId, active) =>
     request(`/programs/${id}/schools/${schoolId}`, { method: 'PUT', body: { active } }),

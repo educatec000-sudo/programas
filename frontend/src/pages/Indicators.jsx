@@ -144,16 +144,16 @@ export default function Indicators() {
   return (
     <>
       <PageHeader
-        title="Indicadores"
-        subtitle="Indicadores configuráveis com categoria, unidade, polaridade, peso e metas"
-        actions={can('indicators:write') && <Button onClick={openCreate}>+ Novo indicador</Button>}
+        title="Catálogo de critérios"
+        subtitle="Definições reutilizáveis; meta e peso efetivos são configurados dentro de cada programa"
+        actions={can('indicators:write') && <Button onClick={openCreate}>+ Novo critério no catálogo</Button>}
       />
 
       <Tabs
         active={tab}
         onChange={setTab}
         tabs={[
-          { key: 'indicadores', label: 'Indicadores' },
+          { key: 'indicadores', label: 'Critérios' },
           { key: 'categorias', label: 'Categorias', count: categories?.length },
         ]}
       />

@@ -11,8 +11,8 @@ import { IMPORT_STATUS, ROW_STATUS, fmtDateTime } from '../utils/format.js';
 const TYPES = [
   { key: 'ESCOLAS', label: 'Escolas', icon: '🏫', desc: 'INEP, nome, município, endereço... (aceita colunas do Censo Escolar)' },
   { key: 'PROGRAMAS', label: 'Programas', icon: '📋', desc: 'Código, nome, ano, status, meta global...' },
-  { key: 'INDICADORES', label: 'Indicadores', icon: '📊', desc: 'Código, nome, categoria, polaridade, peso, meta...' },
-  { key: 'RESULTADOS', label: 'Resultados', icon: '📈', desc: 'Programa, INEP, indicador, ano, período e valor' },
+  { key: 'INDICADORES', label: 'Catálogo de critérios', icon: '📊', desc: 'Código, nome, categoria, polaridade, peso e referência; o vínculo é feito dentro do programa' },
+  { key: 'RESULTADOS', label: 'Resultados', icon: '📈', desc: 'Programa, ano, escola, critério, período e valor; vínculos são validados antes da gravação' },
 ];
 
 export default function Imports() {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { uuid, emptyToNull, periodEnum } from './common.validation.js';
+import { createIndicatorSchema } from './indicator.validation.js';
 
 export const createProgramSchema = z.object({
   code: z.string().trim().min(2).max(40).transform((value) => value.toUpperCase()),
@@ -39,4 +40,24 @@ export const updateProgramIndicatorSchema = z.object({
   weight: z.coerce.number().min(0).max(1000).nullable().optional(),
   goal: z.coerce.number().min(0).max(100000).nullable().optional(),
   active: z.boolean().optional(),
+});
+
+/**
+ * Cria um critério no catálogo compartilhado e o vincula somente ao programa
+ * informado. Nada é propagado automaticamente para outros programas.
+ */
+export const createProgramCriterionSchema = createIndicatorSchema
+  .omit({ defaultGoal: true, status: true })
+  .extend({
+    target: z.coerce.number().min(0).max(100000).nullable().optional(),
+  });
+
+export const programSchoolParamsSchema = z.object({
+  id: uuid,
+  schoolId: uuid,
+});
+
+export const programEvaluationQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  period: periodEnum.optional(),
 });

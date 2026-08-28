@@ -24,6 +24,31 @@ export const remove = wrap(async (req, res) => {
   res.json({ message: 'Programa removido (exclusão lógica)' });
 });
 
+export const history = wrap(async (req, res) => {
+  res.json(await programService.listProgramHistory(parseIdParams(req), req.data.query));
+});
+
+export const schoolEvaluation = wrap(async (req, res) => {
+  res.json(
+    await programService.getSchoolProgramEvaluation(
+      parseIdParams(req),
+      req.params.schoolId,
+      req.data.query,
+    ),
+  );
+});
+
+export const createCriterion = wrap(async (req, res) => {
+  res.status(201).json(
+    await programService.createProgramCriterion(
+      parseIdParams(req),
+      req.data.body,
+      req.user,
+      getClientIp(req),
+    ),
+  );
+});
+
 export const addSchools = wrap(async (req, res) => {
   res.json(await programService.addSchools(parseIdParams(req), req.data.body.schoolIds, req.user, getClientIp(req)));
 });

@@ -12,6 +12,8 @@ const Schools = lazy(() => import('../pages/Schools.jsx'));
 const SchoolDetail = lazy(() => import('../pages/SchoolDetail.jsx'));
 const Programs = lazy(() => import('../pages/Programs.jsx'));
 const ProgramDetail = lazy(() => import('../pages/ProgramDetail.jsx'));
+const ProgramSchoolEvaluation = lazy(() => import('../pages/ProgramSchoolEvaluation.jsx'));
+const Evaluations = lazy(() => import('../pages/Evaluations.jsx'));
 const Indicators = lazy(() => import('../pages/Indicators.jsx'));
 const Results = lazy(() => import('../pages/Results.jsx'));
 const Goals = lazy(() => import('../pages/Goals.jsx'));
@@ -56,6 +58,8 @@ export default function AppRoutes() {
         <Route path="/escolas/:id" element={page(SchoolDetail, 'schools:read')} />
         <Route path="/programas" element={page(Programs, 'programs:read')} />
         <Route path="/programas/:id" element={page(ProgramDetail, 'programs:read')} />
+        <Route path="/programas/:id/escolas/:schoolId" element={page(ProgramSchoolEvaluation, 'rankings:read')} />
+        <Route path="/avaliacoes" element={page(Evaluations, 'rankings:read')} />
         <Route path="/indicadores" element={page(Indicators, 'indicators:read')} />
         <Route path="/resultados" element={page(Results, 'results:read')} />
         <Route path="/metas" element={page(Goals, 'goals:read')} />

@@ -7,12 +7,23 @@ import {
   goalsStatus,
 } from './scoring.service.js';
 
-/** Dashboard inicial — KPIs + gráficos, tudo do PostgreSQL. */
-export async function getDashboard({ year } = {}) {
-  const latestYearRow = await prisma.result.findFirst({ orderBy: { year: 'desc' }, select: { year: true } });
+/**
+ * Dashboard estatístico. Contagens gerais podem abranger a plataforma, mas
+ * pontuação, classificação, evolução e ranking sempre exigem um único programa.
+ */
+export async function getDashboard({ year, programId } = {}) {
+  const latestYearRow = await prisma.result.findFirst({
+    where: programId ? { programId } : undefined,
+    orderBy: { year: 'desc' },
+    select: { year: true },
+  });
   const targetYear = year ? Number(year) : latestYearRow?.year ?? new Date().getFullYear();
+  const emptyGoals = { totals: { met: 0, notMet: 0, schools: 0 } };
+  const emptyRanking = { rows: [] };
+  const emptyDistribution = { distribution: {} };
 
   const [
+    selectedProgram,
     programsActive,
     programsTotal,
     schoolsTotal,
@@ -27,27 +38,46 @@ export async function getDashboard({ year } = {}) {
     topSchools,
     mapSchools,
   ] = await Promise.all([
+    programId
+      ? prisma.program.findFirst({
+          where: { id: programId, deletedAt: null },
+          select: { id: true, code: true, name: true, year: true },
+        })
+      : Promise.resolve(null),
     prisma.program.count({ where: { deletedAt: null, status: 'EM_EXECUCAO' } }),
     prisma.program.count({ where: { deletedAt: null } }),
     prisma.school.count({ where: { deletedAt: null } }),
-    prisma.indicator.count({ where: { deletedAt: null, status: 'ATIVO' } }),
-    prisma.result.count(),
-    prisma.result.count({ where: { year: targetYear } }),
+    programId
+      ? prisma.programIndicator.count({
+          where: { programId, active: true, indicator: { deletedAt: null, status: 'ATIVO' } },
+        })
+      : prisma.indicator.count({ where: { deletedAt: null, status: 'ATIVO' } }),
+    prisma.result.count({ where: programId ? { programId } : undefined }),
+    prisma.result.count({ where: { year: targetYear, ...(programId && { programId }) } }),
     prisma.programSchool.findMany({
-      where: { active: true, program: { deletedAt: null } },
+      where: {
+        active: true,
+        program: { deletedAt: null },
+        ...(programId && { programId }),
+      },
       distinct: ['schoolId'],
       select: { schoolId: true },
     }),
-    goalsStatus({ year: targetYear }),
+    programId ? goalsStatus({ programId, year: targetYear }) : Promise.resolve(emptyGoals),
     comparePrograms({ year: targetYear }),
-    evolutionSeries({ year: targetYear }),
-    classificationDistribution({ year: targetYear }),
-    computeRanking({ year: targetYear, limit: 5 }),
+    programId ? evolutionSeries({ programId, year: targetYear }) : Promise.resolve([]),
+    programId
+      ? classificationDistribution({ programId, year: targetYear })
+      : Promise.resolve(emptyDistribution),
+    programId
+      ? computeRanking({ programId, year: targetYear, limit: 5 })
+      : Promise.resolve(emptyRanking),
     prisma.school.findMany({
       where: {
         deletedAt: null,
         latitude: { not: null },
         longitude: { not: null },
+        ...(programId && { programs: { some: { programId, active: true } } }),
       },
       select: {
         id: true,
@@ -65,6 +95,7 @@ export async function getDashboard({ year } = {}) {
   ]);
 
   return {
+    selectedProgram,
     kpis: {
       programsActive,
       programsTotal,
@@ -82,22 +113,28 @@ export async function getDashboard({ year } = {}) {
       total: mapSchools.length,
     },
     charts: {
-      performanceByProgram: performance.programs.slice(0, 8).map((p) => ({
-        name: p.code,
-        fullName: p.programName,
-        score: p.currentScore,
-        schools: p.schoolsCount,
+      performanceByProgram: performance.programs.slice(0, 8).map((program) => ({
+        id: program.programId,
+        name: program.code,
+        fullName: program.programName,
+        score: program.currentScore,
+        schools: program.schoolsCount,
       })),
-      evolution: evolution.map((e) => ({ label: e.label, score: e.avgScore, schools: e.schoolsCount })),
+      evolution: evolution.map((entry) => ({
+        label: entry.label,
+        score: entry.avgScore,
+        schools: entry.schoolsCount,
+      })),
       distribution: Object.entries(distribution.distribution).map(([classification, count]) => ({
         classification,
         count,
       })),
-      topSchools: topSchools.rows.map((r) => ({
-        position: r.position,
-        name: r.schoolName,
-        score: r.score,
-        classification: r.classification,
+      topSchools: topSchools.rows.map((row) => ({
+        schoolId: row.schoolId,
+        position: row.position,
+        name: row.schoolName,
+        score: row.score,
+        classification: row.classification,
       })),
     },
   };
