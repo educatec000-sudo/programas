@@ -37,7 +37,7 @@ A infraestrutura central existente continua compartilhada:
 
 As telas compartilhadas são infraestrutura administrativa, não uma definição obrigatória do instrumento de cada programa. O ponto de extensão para ambientes próprios fica em `frontend/src/programs/registry.js`, identificado pelo código estável e pelo ciclo do programa — não por condicionais sobre o nome exibido. Novos campos e regras não devem ser inferidos nem cadastrados livremente: serão implementados a partir da documentação oficial. A futura coleta pública por link seguro também depende da definição do instrumento; nenhum status de envio é simulado a partir dos resultados atuais.
 
-O primeiro programa de referência para essa evolução será o **RAIAR 2026**, após o recebimento e a análise de sua documentação oficial. Até essa análise, nenhuma pergunta, pontuação, classificação ou fórmula do RAIAR deve ser presumida.
+O primeiro programa de referência para essa evolução será o **Pacto pela Alfabetização 2026**, após o recebimento e a análise completa de sua documentação oficial. Até essa análise, nenhuma pergunta, pontuação, classificação ou fórmula do programa deve ser presumida.
 
 ## Requisitos
 
