@@ -21,21 +21,23 @@ Supabase PostgreSQL existente
 
 A Vercel hospeda somente a interface. O Render hospeda somente a API. O banco permanece no Supabase; nenhum banco adicional é criado.
 
-## Módulo Estatística
+## Programas educacionais
 
-O menu **Estatística** organiza Dashboard, Programas, Escolas, Avaliações, Resultados, Rankings, Relatórios e Importação de dados. Programas específicos, inclusive Alfabetiza Pará ou SisPAE quando cadastrados pelo usuário, são registros comuns de `Program`; não existem telas ou regras condicionais pelo nome do programa.
+A aba **Programas** permanece no menu Estatística e funciona como o catálogo visual dos programas implementados no CPE. A tela apresenta cards obtidos dos registros reais de `Program`, com ciclo, descrição, status, escolas vinculadas e cobertura dos resultados já existentes.
 
-A estrutura existente foi reaproveitada:
+O usuário final não possui, nessa tela, um construtor para criar programas, campos, critérios ou fórmulas. Cada programa deve ser incorporado durante o desenvolvimento, após análise das planilhas e dos documentos oficiais fornecidos pelo responsável. A implementação pode definir formulários, perguntas, validações, cálculos, classificações, gráficos e relatórios próprios.
 
-- `Program` identifica o programa, órgão, ano/período e status;
-- `ProgramSchool` vincula uma mesma escola a diferentes programas;
-- `Indicator` mantém o catálogo tecnológico de critérios;
-- `ProgramIndicator` configura critério, meta e peso dentro de cada programa, sem propagação automática;
-- `Result` separa cada resultado por programa, escola, critério, ano e período;
-- `Evaluation` armazena consolidações por programa e escola;
-- rankings, gráficos e relatórios avaliativos exigem um programa e não produzem nota geral misturando programas.
+A infraestrutura central existente continua compartilhada:
 
-Nesta etapa, conforme a definição funcional escolhida, os resultados permanecem agregados por escola, sem dimensão de turma. A pontuação genérica usa somente meta, peso e polaridade configurados no programa; não presume metodologia oficial pelo nome do programa.
+- `Program` identifica o programa implementado e seu ciclo;
+- `ProgramSchool` vincula escolas do cadastro único aos programas;
+- `Indicator` e `ProgramIndicator` podem armazenar indicadores oficiais quando forem adequados ao instrumento;
+- `Result` e `Evaluation` preservam resultados e consolidações separados por programa;
+- usuários, RBAC, auditoria, importações e relatórios permanecem serviços centrais do CPE.
+
+As telas compartilhadas são infraestrutura administrativa, não uma definição obrigatória do instrumento de cada programa. O ponto de extensão para ambientes próprios fica em `frontend/src/programs/registry.js`, identificado pelo código estável e pelo ciclo do programa — não por condicionais sobre o nome exibido. Novos campos e regras não devem ser inferidos nem cadastrados livremente: serão implementados a partir da documentação oficial. A futura coleta pública por link seguro também depende da definição do instrumento; nenhum status de envio é simulado a partir dos resultados atuais.
+
+O primeiro programa de referência para essa evolução será o **RAIAR 2026**, após o recebimento e a análise de sua documentação oficial. Até essa análise, nenhuma pergunta, pontuação, classificação ou fórmula do RAIAR deve ser presumida.
 
 ## Requisitos
 

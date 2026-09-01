@@ -310,8 +310,8 @@ model ProgramIndicator {
   indicatorId String
   program     Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   indicator   Indicator @relation(fields: [indicatorId], references: [id], onDelete: Cascade)
-  weight      Float? // sobrepeso do indicador no programa (padrão: indicator.weight)
-  goal        Float? // meta específica no programa (padrão: indicator.defaultGoal)
+  weight      Float? // peso definido pela implementação do programa; null usa 1 no motor compartilhado
+  goal        Float? // meta definida pela implementação do programa; sem herança automática do catálogo
   active      Boolean   @default(true)
   addedAt     DateTime  @default(now())
 

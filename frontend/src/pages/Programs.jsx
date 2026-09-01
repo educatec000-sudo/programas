@@ -1,233 +1,181 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi, useDebounce } from '../hooks/useApi.js';
 import { programsApi } from '../services/resources.js';
-import { useAuth } from '../contexts/AuthContext.jsx';
-import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import DataTable from '../components/DataTable.jsx';
-import { Button, Field, Input, Select, Textarea, Modal, Badge, ConfirmDialog } from '../components/ui.jsx';
+import { Badge, Field, Input, Select, LoadingBlock } from '../components/ui.jsx';
 import { PROGRAM_STATUS, yearsRange } from '../utils/format.js';
+import { getProgramImplementation } from '../programs/registry.js';
 
-const emptyForm = {
-  code: '', name: '', description: '', objective: '', organ: '',
-  year: new Date().getFullYear(), periodLabel: 'Anual', status: 'EM_EXECUCAO', globalGoal: '',
-};
+function coverageLabel(program) {
+  if (!program.schoolsCount) return 'Sem escolas vinculadas';
+  if (program.dataCoveragePercent === 100) return 'Dados registrados para todas as escolas';
+  if (program.schoolsWithDataCount) return 'Dados parcialmente registrados';
+  return 'Nenhum resultado registrado';
+}
+
+function ProgramCard({ program, onOpen }) {
+  const status = PROGRAM_STATUS[program.status];
+  const percentage = program.dataCoveragePercent || 0;
+  const implementation = getProgramImplementation(program);
+
+  return (
+    <article
+      className="program-card"
+      role="link"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      <div className={`program-card-accent program-card-accent-${program.status.toLowerCase()}`} />
+      <div className="program-card-header">
+        <div>
+          <div className="program-card-code">{program.code}</div>
+          <h2>{program.name}</h2>
+          <div className="program-card-cycle">
+            {program.year}{program.periodLabel ? ` · ${program.periodLabel}` : ''}
+          </div>
+        </div>
+        <Badge cls={status?.cls}>{status?.label || program.status}</Badge>
+      </div>
+
+      <p className="program-card-description">
+        {program.description || program.objective || 'Programa educacional implementado no CPE.'}
+      </p>
+
+      <div className="program-card-metrics">
+        <div>
+          <strong>{program.schoolsCount}</strong>
+          <span>Escolas vinculadas</span>
+        </div>
+        <div>
+          <strong>{program.schoolsWithDataCount}</strong>
+          <span>Com dados</span>
+        </div>
+        <div>
+          <strong>{program.pendingSchoolsCount}</strong>
+          <span>Sem dados</span>
+        </div>
+      </div>
+
+      <div className="program-card-progress-block">
+        <div className="program-card-progress-label">
+          <span>{coverageLabel(program)}</span>
+          <strong>{percentage}%</strong>
+        </div>
+        <div className="program-card-progress" aria-label={`Cobertura de dados: ${percentage}%`}>
+          <span style={{ width: `${percentage}%` }} />
+        </div>
+      </div>
+
+      <div className="program-card-footer">
+        <div>
+          <span className="program-card-footnote">Cobertura calculada pelos resultados já existentes</span>
+          <span className="program-card-collection-note">
+            {implementation
+              ? 'Ambiente específico implementado a partir da documentação oficial.'
+              : 'Infraestrutura compartilhada atual; coleta por link ainda não disponível.'}
+          </span>
+        </div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={(event) => { event.stopPropagation(); onOpen(); }}>
+          Acessar programa →
+        </button>
+      </div>
+    </article>
+  );
+}
 
 export default function Programs() {
   const navigate = useNavigate();
-  const { can } = useAuth();
-  const { success, error } = useToast();
-
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search);
   const [year, setYear] = useState('');
   const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
 
-  const { data, loading, refresh } = useApi(
-    () => programsApi.list({ search: debouncedSearch, year, status, page, pageSize: 15 }),
-    [debouncedSearch, year, status, page],
+  const { data, loading } = useApi(
+    () => programsApi.list({ search: debouncedSearch, year, status, includeCoverage: true, page: 1, pageSize: 1000, sort: 'code', dir: 'asc' }),
+    [debouncedSearch, year, status],
   );
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-
-  const openCreate = () => {
-    setForm(emptyForm);
-    setEditing(null);
-    setFormError(null);
-    setModalOpen(true);
-  };
-
-  const openEdit = async (program) => {
-    const full = await programsApi.get(program.id);
-    setForm({
-      code: full.code, name: full.name, description: full.description || '',
-      objective: full.objective || '', organ: full.organ || '', year: full.year,
-      periodLabel: full.periodLabel || '', status: full.status,
-      globalGoal: full.globalGoal ?? '',
-    });
-    setEditing(program.id);
-    setFormError(null);
-    setModalOpen(true);
-  };
-
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    setFormError(null);
-    const payload = { ...form, globalGoal: form.globalGoal === '' ? null : Number(form.globalGoal), year: Number(form.year) };
-    try {
-      if (editing) {
-        await programsApi.update(editing, payload);
-        success('Programa atualizado.');
-      } else {
-        await programsApi.create(payload);
-        success('Programa criado.');
-      }
-      setModalOpen(false);
-      refresh();
-    } catch (err) {
-      setFormError(err.details?.map((d) => `${d.field}: ${d.message}`).join(' · ') || err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTarget) return;
-    setBusy(true);
-    try {
-      await programsApi.remove(deleteTarget.id);
-      success('Programa removido (exclusão lógica).');
-      setDeleteTarget(null);
-      refresh();
-    } catch (err) {
-      error(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const columns = [
-    { key: 'code', label: 'Código', render: (p) => <span className="mono">{p.code}</span> },
-    {
-      key: 'name', label: 'Programa',
-      render: (p) => (
-        <div>
-          <strong>{p.name}</strong>
-          {p.description && <div style={{ fontSize: 11.5, color: 'var(--text-3)', maxWidth: 360 }}>{p.description}</div>}
-        </div>
-      ),
-    },
-    { key: 'organ', label: 'Órgão' },
-    { key: 'year', label: 'Ano' },
-    {
-      key: 'status', label: 'Status',
-      render: (p) => { const info = PROGRAM_STATUS[p.status]; return <Badge cls={info?.cls}>{info?.label}</Badge>; },
-    },
-    { key: 'schoolsCount', label: 'Escolas', align: 'center' },
-    { key: 'indicatorsCount', label: 'Indicadores', align: 'center' },
-    { key: 'resultsCount', label: 'Resultados', align: 'center' },
-    {
-      key: 'actions', label: '', align: 'right',
-      render: (p) => (
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
-          {can('programs:write') && <Button size="sm" variant="secondary" onClick={() => openEdit(p)}>Editar</Button>}
-          {can('programs:delete') && (
-            <Button size="sm" variant="ghost" title="Excluir" onClick={() => setDeleteTarget(p)}>🗑</Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={() => navigate(`/programas/${p.id}`)}>Abrir →</Button>
-        </div>
-      ),
-    },
-  ];
+  const programs = data?.data || [];
+  const summary = useMemo(() => programs.reduce(
+    (totals, program) => ({
+      schools: totals.schools + program.schoolsCount,
+      withData: totals.withData + program.schoolsWithDataCount,
+      pending: totals.pending + program.pendingSchoolsCount,
+    }),
+    { schools: 0, withData: 0, pending: 0 },
+  ), [programs]);
 
   return (
     <>
       <PageHeader
-        title="Programas"
-        subtitle="Centro de organização: critérios, escolas, avaliações, resultados, rankings e relatórios por programa"
-        actions={can('programs:write') && <Button onClick={openCreate}>+ Novo programa</Button>}
+        title="Programas Educacionais"
+        subtitle="Acesse os programas implementados no CPE e acompanhe seus dados sem criar estruturas ou regras manualmente"
       />
+
+      <div className="stats-grid program-dashboard-summary">
+        <div className="stat-card">
+          <div className="stat-icon blue">▦</div>
+          <div><div className="stat-value">{data?.pagination?.total || 0}</div><div className="stat-label">Programas disponíveis</div></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon purple">⌂</div>
+          <div><div className="stat-value">{summary.schools}</div><div className="stat-label">Vínculos com escolas</div></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon green">✓</div>
+          <div><div className="stat-value">{summary.withData}</div><div className="stat-label">Escolas com dados</div></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon orange">◷</div>
+          <div><div className="stat-value">{summary.pending}</div><div className="stat-label">Escolas sem dados</div></div>
+        </div>
+      </div>
 
       <div className="filter-bar">
         <div className="field grow">
-          <label>Buscar</label>
-          <Input placeholder="Nome, código ou órgão..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+          <label>Buscar programa</label>
+          <Input placeholder="Nome, código ou órgão..." value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
-        <Field label="Ano">
-          <Select value={year} onChange={(e) => { setYear(e.target.value); setPage(1); }}>
+        <Field label="Ano/ciclo">
+          <Select value={year} onChange={(event) => setYear(event.target.value)}>
             <option value="">Todos</option>
-            {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
+            {yearsRange(2023).map((item) => <option key={item} value={item}>{item}</option>)}
           </Select>
         </Field>
-        <Field label="Status">
-          <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+        <Field label="Status do programa">
+          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">Todos</option>
-            {Object.entries(PROGRAM_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            {Object.entries(PROGRAM_STATUS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
           </Select>
         </Field>
       </div>
 
-      <DataTable
-        columns={columns}
-        rows={data?.data || []}
-        loading={loading}
-        pagination={data?.pagination}
-        onPageChange={setPage}
-        onRowClick={(p) => navigate(`/programas/${p.id}`)}
-        emptyTitle="Nenhum programa encontrado"
-        emptyIcon="📋"
-      />
-
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editing ? 'Editar programa' : 'Novo programa'}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={busy}>Cancelar</Button>
-            <Button onClick={submit} disabled={busy}>{busy ? 'Salvando...' : 'Salvar'}</Button>
-          </>
-        }
-      >
-        {formError && <div className="alert alert-error" style={{ marginBottom: 14 }}>{formError}</div>}
-        <form onSubmit={submit}>
-          <div className="form-grid">
-            <Field label="Código" required hint="Ex.: PRG-2026-01">
-              <Input value={form.code} onChange={set('code')} required />
-            </Field>
-            <Field label="Nome" required>
-              <Input value={form.name} onChange={set('name')} required minLength={3} />
-            </Field>
-            <Field label="Órgão responsável">
-              <Input value={form.organ} onChange={set('organ')} placeholder="SEDUC, SEMED..." />
-            </Field>
-            <Field label="Ano" required>
-              <Select value={form.year} onChange={set('year')}>
-                {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
-              </Select>
-            </Field>
-            <Field label="Período de vigência">
-              <Input value={form.periodLabel} onChange={set('periodLabel')} placeholder="Anual, 2025-2026..." />
-            </Field>
-            <Field label="Status">
-              <Select value={form.status} onChange={set('status')}>
-                {Object.entries(PROGRAM_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-              </Select>
-            </Field>
-            <Field label="Referência geral (%)" hint="Campo informativo; não substitui as metas dos critérios nem entra automaticamente na pontuação">
-              <Input type="number" step="0.1" min="0" value={form.globalGoal} onChange={set('globalGoal')} />
-            </Field>
-          </div>
-          <Field label="Objetivo">
-            <Textarea value={form.objective} onChange={set('objective')} />
-          </Field>
-          <Field label="Descrição">
-            <Textarea value={form.description} onChange={set('description')} />
-          </Field>
-        </form>
-      </Modal>
-
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-        title="Excluir programa"
-        message={`Remover "${deleteTarget?.name}"? A exclusão é lógica e o histórico permanece preservado.`}
-        danger
-        confirmLabel="Excluir"
-        busy={busy}
-      />
+      {loading ? (
+        <LoadingBlock label="Carregando programas..." />
+      ) : programs.length ? (
+        <div className="program-card-grid">
+          {programs.map((program) => (
+            <ProgramCard
+              key={program.id}
+              program={program}
+              onOpen={() => navigate(`/programas/${program.id}`)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="card card-pad table-empty">
+          <div className="empty-icon">▦</div>
+          <strong>Nenhum programa implementado encontrado</strong>
+          <span>Ajuste os filtros ou aguarde a incorporação de um programa oficial ao CPE.</span>
+        </div>
+      )}
     </>
   );
 }

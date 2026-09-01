@@ -6,6 +6,17 @@ import { periodOrder } from '../lib/constants.js';
 import { attainment } from './scoring.service.js';
 import { resolveGoalFromList } from './goal.service.js';
 
+/** Conta escolas com algum resultado, considerando somente vínculos ativos. */
+export function countSchoolsWithData(activeLinks, resultGroups) {
+  const activeLinkSet = new Set(activeLinks.map((link) => `${link.programId}:${link.schoolId}`));
+  const counts = new Map();
+  for (const group of resultGroups) {
+    if (!activeLinkSet.has(`${group.programId}:${group.schoolId}`)) continue;
+    counts.set(group.programId, (counts.get(group.programId) || 0) + 1);
+  }
+  return counts;
+}
+
 export async function listPrograms(query) {
   const { page, pageSize, skip, take } = parsePagination(query);
   const { search, year, status } = query;
@@ -40,23 +51,52 @@ export async function listPrograms(query) {
     }),
   ]);
 
+  const includeCoverage = Boolean(query.includeCoverage);
+  const programIds = programs.map((program) => program.id);
+  const [activeLinks, resultGroups] = includeCoverage && programIds.length
+    ? await Promise.all([
+        prisma.programSchool.findMany({
+          where: { programId: { in: programIds }, active: true, school: { deletedAt: null } },
+          select: { programId: true, schoolId: true },
+        }),
+        prisma.result.groupBy({
+          by: ['programId', 'schoolId'],
+          where: { programId: { in: programIds }, school: { deletedAt: null } },
+        }),
+      ])
+    : [[], []];
+
+  const schoolsWithData = countSchoolsWithData(activeLinks, resultGroups);
+
   return {
-    data: programs.map((p) => ({
-      id: p.id,
-      code: p.code,
-      name: p.name,
-      description: p.description,
-      objective: p.objective,
-      organ: p.organ,
-      year: p.year,
-      periodLabel: p.periodLabel,
-      status: p.status,
-      globalGoal: p.globalGoal,
-      schoolsCount: p._count.schools,
-      indicatorsCount: p._count.indicators,
-      resultsCount: p._count.results,
-      createdAt: p.createdAt,
-    })),
+    data: programs.map((p) => {
+      const schoolsWithDataCount = includeCoverage ? schoolsWithData.get(p.id) || 0 : null;
+      const pendingSchoolsCount = includeCoverage
+        ? Math.max(0, p._count.schools - schoolsWithDataCount)
+        : null;
+      const dataCoveragePercent = includeCoverage && p._count.schools
+        ? Math.round((schoolsWithDataCount / p._count.schools) * 100)
+        : includeCoverage ? 0 : null;
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        description: p.description,
+        objective: p.objective,
+        organ: p.organ,
+        year: p.year,
+        periodLabel: p.periodLabel,
+        status: p.status,
+        globalGoal: p.globalGoal,
+        schoolsCount: p._count.schools,
+        schoolsWithDataCount,
+        pendingSchoolsCount,
+        dataCoveragePercent,
+        indicatorsCount: p._count.indicators,
+        resultsCount: p._count.results,
+        createdAt: p.createdAt,
+      };
+    }),
     pagination: buildPagination(total, page, pageSize),
   };
 }

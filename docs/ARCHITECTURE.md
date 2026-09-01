@@ -68,14 +68,22 @@ Request→ authenticate: verifica JWT + sessão não revogada no banco + usuári
 Logout → revoga a sessão (invalida imediatamente o access token também)
 ```
 
-## 4. Motor de pontuação e ranking
+## 4. Programas, instrumentos e cálculos
 
-1. Para cada resultado busca-se a **meta aplicável** por especificidade
-   (indicador 8 pts > programa 4 > escola 2 > período 1).
-2. Atingimento (%) com **polaridade** (`MENOR_MELHOR` invertido) e teto de 200%.
-3. Pontuação da escola = média **ponderada pelos pesos** dos indicadores no programa.
-4. Classificação A–E; evolução por comparação com o período anterior (pontos e posição).
-5. `Evaluation` fotografa o ranking consolidado por programa/ano/período.
+A aba **Programas** é um dashboard de acesso aos programas implementados; não é um construtor para o usuário final. Os cards vêm dos registros reais de `Program` e apresentam metadados e cobertura dos resultados existentes. A ausência de um modelo de coleta pública é exibida explicitamente e não é convertida em um status de envio fictício.
+
+`Program`, `ProgramSchool`, `Indicator`, `ProgramIndicator`, `Result` e `Evaluation` formam a infraestrutura compartilhada. Eles não obrigam programas diferentes a possuir o mesmo formulário, critérios ou fórmula. Cada instrumento oficial pode registrar um módulo próprio, por código estável e ciclo, no ponto de extensão `frontend/src/programs/registry.js`.
+
+O motor atual de atingimento ponderado permanece disponível somente para programas cuja documentação seja compatível com esse método:
+
+1. ranking e avaliação exigem um único programa;
+2. metas precisam pertencer ao programa selecionado;
+3. peso e meta do catálogo global não são herdados automaticamente;
+4. `Evaluation` preserva a consolidação por programa, escola, ano e período.
+
+Quando a documentação oficial definir outra metodologia, ela deve ser implementada em um serviço próprio do programa, com testes baseados no documento — nunca por suposição, pelo nome exibido ou por uma fórmula universal.
+
+A coleta pública por link seguro ainda não possui tabelas próprias no schema atual. Token, rascunho, envio, reabertura e evidências só serão modelados após a análise do primeiro instrumento oficial, evitando criar estruturas inadequadas antes de conhecer seus requisitos.
 
 ## 5. Pipeline de importação
 

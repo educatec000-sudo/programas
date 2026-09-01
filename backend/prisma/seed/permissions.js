@@ -11,11 +11,11 @@ export const PERMISSIONS = [
   ['schools:export', 'Exportar escolas'],
 
   ['programs:read', 'Consultar programas'],
-  ['programs:write', 'Cadastrar/editar programas e vincular escolas/critérios'],
+  ['programs:write', 'Administrar metadados técnicos e vínculos de programas implementados'],
   ['programs:delete', 'Excluir programas'],
 
   ['indicators:read', 'Consultar indicadores'],
-  ['indicators:write', 'Cadastrar/editar critérios de avaliação'],
+  ['indicators:write', 'Manter o catálogo técnico de indicadores implementados'],
   ['indicators:delete', 'Excluir indicadores'],
 
   ['results:read', 'Consultar resultados'],

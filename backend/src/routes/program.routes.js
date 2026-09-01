@@ -22,6 +22,7 @@ router.use(authenticate);
 const listQuery = paginationQuery.extend({
   year: z.coerce.number().int().optional(),
   status: z.enum(['PLANEJAMENTO', 'EM_EXECUCAO', 'CONCLUIDO', 'SUSPENSO', 'CANCELADO']).optional(),
+  includeCoverage: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
 });
 
 router.get('/', requirePermission('programs:read'), validate({ query: listQuery }), controller.list);

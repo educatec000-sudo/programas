@@ -10,9 +10,15 @@ import { IMPORT_STATUS, ROW_STATUS, fmtDateTime } from '../utils/format.js';
 
 const TYPES = [
   { key: 'ESCOLAS', label: 'Escolas', icon: '🏫', desc: 'INEP, nome, município, endereço... (aceita colunas do Censo Escolar)' },
-  { key: 'PROGRAMAS', label: 'Programas', icon: '📋', desc: 'Código, nome, ano, status, meta global...' },
-  { key: 'INDICADORES', label: 'Catálogo de critérios', icon: '📊', desc: 'Código, nome, categoria, polaridade, peso e referência; o vínculo é feito dentro do programa' },
-  { key: 'RESULTADOS', label: 'Resultados', icon: '📈', desc: 'Programa, ano, escola, critério, período e valor; vínculos são validados antes da gravação' },
+  { key: 'RESULTADOS', label: 'Resultados', icon: '📈', desc: 'Dados de programas já implementados; programa, escola e campos oficiais são validados antes da gravação' },
+];
+
+// Tipos antigos continuam identificados no histórico, mas não são oferecidos
+// como construtores de programas ou instrumentos na interface do usuário final.
+const HISTORY_TYPES = [
+  ...TYPES,
+  { key: 'PROGRAMAS', label: 'Programas (histórico)' },
+  { key: 'INDICADORES', label: 'Indicadores (histórico)' },
 ];
 
 export default function Imports() {
@@ -148,7 +154,7 @@ export default function Imports() {
               <label>Tipo</label>
               <select className="select" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
                 <option value="">Todos</option>
-                {TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                {HISTORY_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
               </select>
             </div>
             <div className="field" style={{ marginBottom: 0 }}>

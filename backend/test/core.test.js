@@ -16,6 +16,7 @@ import { autoMapColumns } from '../src/modules/imports/schoolFields.js';
 import { schoolsStrategy } from '../src/modules/imports/schools.strategy.js';
 import { createGoalSchema } from '../src/validations/result.validation.js';
 import { createProgramCriterionSchema } from '../src/validations/program.validation.js';
+import { countSchoolsWithData } from '../src/services/program.service.js';
 
 test('calcula atingimento respeitando a polaridade e o teto', () => {
   assert.equal(attainment(50, 100, 'MAIOR_MELHOR'), 50);
@@ -34,6 +35,24 @@ test('não herda meta nem peso globais quando o programa não os configurou', ()
     indicator: { weight: 99, defaultGoal: 100 },
   });
   assert.deepEqual(config, { weight: 1, goal: null });
+});
+
+test('calcula cobertura dos cards somente para escolas vinculadas e ativas', () => {
+  const counts = countSchoolsWithData(
+    [
+      { programId: 'p1', schoolId: 's1' },
+      { programId: 'p1', schoolId: 's2' },
+      { programId: 'p2', schoolId: 's3' },
+    ],
+    [
+      { programId: 'p1', schoolId: 's1' },
+      { programId: 'p1', schoolId: 's2' },
+      { programId: 'p1', schoolId: 's9' },
+      { programId: 'p2', schoolId: 's3' },
+    ],
+  );
+  assert.equal(counts.get('p1'), 2);
+  assert.equal(counts.get('p2'), 1);
 });
 
 test('recusa ranking sem programa para não misturar avaliações', async () => {

@@ -4,7 +4,7 @@ import { getClientIp } from '../lib/auth.js';
 import { parseIdParams } from '../middlewares/validate.js';
 
 export const list = wrap(async (req, res) => {
-  res.json(await programService.listPrograms(req.query));
+  res.json(await programService.listPrograms(req.data.query));
 });
 
 export const get = wrap(async (req, res) => {
