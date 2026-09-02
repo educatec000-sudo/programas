@@ -43,6 +43,8 @@ School ──< ProgramSchool >── Program
                               └─< Result ──(único por programa+escola+indicador+ano+período)
 
 Program + School ──< Evaluation  (snapshot consolidado do ranking)
+Program + School ──< ProgramCollectionLink (token público armazenado somente como hash)
+Program + School ──< PactoClass ──< PactoAssessment ──< PactoAssessmentComponent ──< PactoSkillResult
 
 ImportJob ──< ImportError        (staging da importação)
 Notification, Document           (apoio)
@@ -70,7 +72,7 @@ Logout → revoga a sessão (invalida imediatamente o access token também)
 
 ## 4. Programas, instrumentos e cálculos
 
-A aba **Programas** é um dashboard de acesso aos programas implementados; não é um construtor para o usuário final. Os cards vêm dos registros reais de `Program` e apresentam metadados e cobertura dos resultados existentes. A ausência de um modelo de coleta pública é exibida explicitamente e não é convertida em um status de envio fictício.
+A aba **Programas** é um dashboard de acesso aos programas implementados; não é um construtor para o usuário final. Os cards vêm dos registros reais de `Program` e apresentam metadados e cobertura dos resultados existentes. Quando um programa possui coleta própria, os envios específicos também alimentam a cobertura sem serem convertidos em resultados genéricos.
 
 `Program`, `ProgramSchool`, `Indicator`, `ProgramIndicator`, `Result` e `Evaluation` formam a infraestrutura compartilhada. Eles não obrigam programas diferentes a possuir o mesmo formulário, critérios ou fórmula. Cada instrumento oficial pode registrar um módulo próprio, por código estável e ciclo, no ponto de extensão `frontend/src/programs/registry.js`.
 
@@ -83,7 +85,7 @@ O motor atual de atingimento ponderado permanece disponível somente para progra
 
 Quando a documentação oficial definir outra metodologia, ela deve ser implementada em um serviço próprio do programa, com testes baseados no documento — nunca por suposição, pelo nome exibido ou por uma fórmula universal.
 
-A coleta pública por link seguro ainda não possui tabelas próprias no schema atual. Token, rascunho, envio, reabertura e evidências só serão modelados após a análise do primeiro instrumento oficial, evitando criar estruturas inadequadas antes de conhecer seus requisitos.
+O Pacto pela Alfabetização 2026 implementa a primeira coleta pública específica. `ProgramCollectionLink` guarda apenas o hash do token, validade, revogação e último acesso; `PactoClass`, `PactoAssessment`, `PactoAssessmentComponent` e `PactoSkillResult` representam turmas, etapas A0-A3 e distribuições de proficiência. O envio é validado no backend e auditado. O token não concede sessão administrativa e um novo link revoga os anteriores da mesma escola/programa.
 
 ## 5. Pipeline de importação
 

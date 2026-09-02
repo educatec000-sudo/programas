@@ -15,6 +15,7 @@ import {
 } from '../validations/program.validation.js';
 import { paginationQuery } from '../validations/common.validation.js';
 import { z } from 'zod';
+import pactoAdminRoutes from '../programs/pacto/admin.routes.js';
 
 const router = Router();
 router.use(authenticate);
@@ -31,6 +32,7 @@ router.get('/:id', requirePermission('programs:read'), controller.get);
 router.put('/:id', requirePermission('programs:write'), validate({ body: updateProgramSchema }), controller.update);
 router.delete('/:id', requirePermission('programs:delete'), controller.remove);
 router.get('/:id/history', requirePermission('programs:read'), validate({ query: paginationQuery }), controller.history);
+router.use('/:id/pacto', pactoAdminRoutes);
 router.get(
   '/:id/schools/:schoolId/evaluation',
   requirePermission('programs:read'),

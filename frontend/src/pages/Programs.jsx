@@ -75,7 +75,9 @@ function ProgramCard({ program, onOpen }) {
 
       <div className="program-card-footer">
         <div>
-          <span className="program-card-footnote">Cobertura calculada pelos resultados já existentes</span>
+          <span className="program-card-footnote">
+            {implementation ? 'Cobertura calculada pelos envios oficiais da coleta' : 'Cobertura calculada pelos resultados já existentes'}
+          </span>
           <span className="program-card-collection-note">
             {implementation
               ? 'Ambiente específico implementado a partir da documentação oficial.'

@@ -8,6 +8,7 @@ import { EvolutionChart, ComparisonBarChart, ClassificationDonut } from '../comp
 import { CLASSIFICATION_INFO, fmt, fmtInt, yearsRange } from '../utils/format.js';
 import { Icon } from '../components/icons.jsx';
 import SchoolMap from '../components/SchoolMap.jsx';
+import { supportsSharedFeature } from '../programs/registry.js';
 
 export default function Dashboard() {
   const [year, setYear] = useState('');
@@ -29,7 +30,7 @@ export default function Dashboard() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <Select value={programId} onChange={(event) => setProgramId(event.target.value)} style={{ minWidth: 240 }}>
               <option value="">Visão gerencial — sem nota geral</option>
-              {(programs?.data || []).map((program) => (
+              {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'graficos')).map((program) => (
                 <option key={program.id} value={program.id}>{program.code} — {program.name}</option>
               ))}
             </Select>

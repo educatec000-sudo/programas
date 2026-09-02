@@ -1,20 +1,22 @@
 import { prisma } from '../lib/prisma.js';
-import { notFound, conflict } from '../lib/errors.js';
+import { notFound, conflict, HttpError } from '../lib/errors.js';
 import { audit, AuditAction } from '../lib/audit.js';
 import { parsePagination, buildPagination } from '../lib/pagination.js';
 import { periodOrder } from '../lib/constants.js';
 import { attainment } from './scoring.service.js';
 import { resolveGoalFromList } from './goal.service.js';
+import { PACTO_PROGRAM_CODE } from '../programs/pacto/config.js';
 
-/** Conta escolas com algum resultado, considerando somente vínculos ativos. */
+/** Conta escolas com algum dado oficial (resultado ou envio específico), considerando somente vínculos ativos. */
 export function countSchoolsWithData(activeLinks, resultGroups) {
   const activeLinkSet = new Set(activeLinks.map((link) => `${link.programId}:${link.schoolId}`));
-  const counts = new Map();
+  const schoolsByProgram = new Map();
   for (const group of resultGroups) {
     if (!activeLinkSet.has(`${group.programId}:${group.schoolId}`)) continue;
-    counts.set(group.programId, (counts.get(group.programId) || 0) + 1);
+    if (!schoolsByProgram.has(group.programId)) schoolsByProgram.set(group.programId, new Set());
+    schoolsByProgram.get(group.programId).add(group.schoolId);
   }
-  return counts;
+  return new Map([...schoolsByProgram].map(([programId, schoolIds]) => [programId, schoolIds.size]));
 }
 
 export async function listPrograms(query) {
@@ -53,7 +55,7 @@ export async function listPrograms(query) {
 
   const includeCoverage = Boolean(query.includeCoverage);
   const programIds = programs.map((program) => program.id);
-  const [activeLinks, resultGroups] = includeCoverage && programIds.length
+  const [activeLinks, resultGroups, pactoSubmissions] = includeCoverage && programIds.length
     ? await Promise.all([
         prisma.programSchool.findMany({
           where: { programId: { in: programIds }, active: true, school: { deletedAt: null } },
@@ -63,10 +65,18 @@ export async function listPrograms(query) {
           by: ['programId', 'schoolId'],
           where: { programId: { in: programIds }, school: { deletedAt: null } },
         }),
+        prisma.pactoAssessment.findMany({
+          where: { status: 'ENVIADO', class: { programId: { in: programIds }, active: true } },
+          select: { class: { select: { programId: true, schoolId: true } } },
+        }),
       ])
-    : [[], []];
+    : [[], [], []];
 
-  const schoolsWithData = countSchoolsWithData(activeLinks, resultGroups);
+  const coverageGroups = [
+    ...resultGroups,
+    ...pactoSubmissions.map((item) => item.class),
+  ];
+  const schoolsWithData = countSchoolsWithData(activeLinks, coverageGroups);
 
   return {
     data: programs.map((p) => {
@@ -307,6 +317,13 @@ export async function getSchoolProgramEvaluation(programId, schoolId, query = {}
   });
   if (!link || link.program.deletedAt || link.school.deletedAt) {
     throw notFound('Escola ou programa não encontrado');
+  }
+  if (link.program.code === PACTO_PROGRAM_CODE) {
+    throw new HttpError(
+      422,
+      'O Pacto usa a revisão de envios na área específica do programa.',
+      'PROGRAM_EVALUATION_UNAVAILABLE',
+    );
   }
 
   const year = Number(query.year || link.program.year);

@@ -7,6 +7,7 @@ import { LoadingBlock } from '../components/ui.jsx';
 const Login = lazy(() => import('../pages/Login.jsx'));
 const ForgotPassword = lazy(() => import('../pages/ForgotPassword.jsx'));
 const ResetPassword = lazy(() => import('../pages/ResetPassword.jsx'));
+const PactoCollection = lazy(() => import('../pages/PactoCollection.jsx'));
 const Dashboard = lazy(() => import('../pages/Dashboard.jsx'));
 const Schools = lazy(() => import('../pages/Schools.jsx'));
 const SchoolDetail = lazy(() => import('../pages/SchoolDetail.jsx'));
@@ -43,6 +44,7 @@ export default function AppRoutes() {
       <Route path="/login" element={page(Login)} />
       <Route path="/esqueci-senha" element={page(ForgotPassword)} />
       <Route path="/redefinir-senha" element={page(ResetPassword)} />
+      <Route path="/coleta/pacto/:token" element={page(PactoCollection)} />
 
       <Route
         element={

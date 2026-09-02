@@ -35,9 +35,11 @@ A infraestrutura central existente continua compartilhada:
 - `Result` e `Evaluation` preservam resultados e consolidações separados por programa;
 - usuários, RBAC, auditoria, importações e relatórios permanecem serviços centrais do CPE.
 
-As telas compartilhadas são infraestrutura administrativa, não uma definição obrigatória do instrumento de cada programa. O ponto de extensão para ambientes próprios fica em `frontend/src/programs/registry.js`, identificado pelo código estável e pelo ciclo do programa — não por condicionais sobre o nome exibido. Novos campos e regras não devem ser inferidos nem cadastrados livremente: serão implementados a partir da documentação oficial. A futura coleta pública por link seguro também depende da definição do instrumento; nenhum status de envio é simulado a partir dos resultados atuais.
+As telas compartilhadas são infraestrutura administrativa, não uma definição obrigatória do instrumento de cada programa. O ponto de extensão para ambientes próprios fica em `frontend/src/programs/registry.js`, identificado pelo código estável e pelo ciclo do programa — não por condicionais sobre o nome exibido. Novos campos e regras não são inferidos nem cadastrados livremente: são implementados a partir da documentação oficial.
 
-O primeiro programa de referência para essa evolução será o **Pacto pela Alfabetização 2026**, após o recebimento e a análise completa de sua documentação oficial. Até essa análise, nenhuma pergunta, pontuação, classificação ou fórmula do programa deve ser presumida.
+O primeiro ambiente específico é o **Pacto pela Alfabetização 2026** (`PACTO-ALFABETIZACAO-2026`). Ele possui coleta por link exclusivo de escola, turmas, rascunhos e envios independentes A0/A1/A2/A3, reabertura administrativa, percentuais derivados, consolidação e exportação CSV. A soma dos três níveis de cada habilidade deve fechar com os alunos avaliados; avaliados acima de matriculados geram alerta sem bloquear. Como a documentação recebida ainda não define nota geral ou fórmula de ordenação, rankings do Pacto permanecem desativados até a entrega da regra oficial.
+
+O ambiente é ativado somente para um registro real de `Program` com código exatamente `PACTO-ALFABETIZACAO-2026` e ano `2026`. A migration não cria programas nem vínculos com escolas: antes da liberação, o administrador responsável deve conferir ou cadastrar esse registro e vincular as escolas reais pelos fluxos administrativos existentes.
 
 ## Requisitos
 

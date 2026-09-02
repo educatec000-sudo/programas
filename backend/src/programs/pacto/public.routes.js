@@ -1,0 +1,48 @@
+import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+import { validate } from '../../middlewares/validate.js';
+import * as controller from './controller.js';
+import {
+  assessmentPayloadSchema,
+  publicClassParamsSchema,
+  publicClassSchema,
+  publicTokenParamsSchema,
+  updateClassSchema,
+} from './validation.js';
+
+const collectionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: { code: 'RATE_LIMIT', message: 'Muitas solicitações. Aguarde um momento e tente novamente.' },
+  },
+});
+
+const router = Router();
+router.use(collectionLimiter);
+
+router.get('/:token', validate({ params: publicTokenParamsSchema }), controller.publicBootstrap);
+router.post(
+  '/:token/classes',
+  validate({ params: publicTokenParamsSchema, body: publicClassSchema }),
+  controller.createPublicClass,
+);
+router.put(
+  '/:token/classes/:classId',
+  validate({ params: publicClassParamsSchema, body: updateClassSchema }),
+  controller.updatePublicClass,
+);
+router.put(
+  '/:token/assessments/draft',
+  validate({ params: publicTokenParamsSchema, body: assessmentPayloadSchema }),
+  controller.saveDraft,
+);
+router.post(
+  '/:token/assessments/submit',
+  validate({ params: publicTokenParamsSchema, body: assessmentPayloadSchema }),
+  controller.submitAssessment,
+);
+
+export default router;

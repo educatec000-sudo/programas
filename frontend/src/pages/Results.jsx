@@ -8,6 +8,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { Button, Field, Input, Select, Modal, Badge, Alert } from '../components/ui.jsx';
 import { fmt, fmtDateTime, PERIODS, yearsRange } from '../utils/format.js';
+import { supportsSharedFeature } from '../programs/registry.js';
 
 export default function Results() {
   const { can } = useAuth();
@@ -95,7 +96,9 @@ export default function Results() {
     const rows = parseBatch();
     if (!rows.length) { error('Cole ao menos uma linha no padrão informado.'); return; }
 
-    const programMap = new Map((programs?.data || []).map((p) => [p.code.toLowerCase(), p.id]));
+    const programMap = new Map(
+      (programs?.data || []).filter((item) => supportsSharedFeature(item, 'resultados')).map((p) => [p.code.toLowerCase(), p.id]),
+    );
     const schoolMap = new Map((schools?.data || []).map((s) => [s.inep, s.id]));
     const indicatorMap = new Map((indicators?.data || []).map((i) => [i.code.toLowerCase(), i.id]));
 
@@ -197,7 +200,7 @@ export default function Results() {
         <Field label="Programa">
           <Select value={filters.programId} onChange={(event) => { setFilters((current) => ({ ...current, programId: event.target.value, schoolId: '', indicatorId: '' })); setPage(1); }}>
             <option value="">Todos, exibidos separadamente</option>
-            {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+            {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'resultados')).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </Select>
         </Field>
         <Field label="Escola">
@@ -255,7 +258,7 @@ export default function Results() {
             <Field label="Programa" required>
               <Select value={form.programId} onChange={(e) => setForm((f) => ({ ...f, programId: e.target.value, schoolId: '', indicatorId: '' }))} required>
                 <option value="">Selecione...</option>
-                {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+                {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'resultados')).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
               </Select>
             </Field>
             <Field label="Escola" required>

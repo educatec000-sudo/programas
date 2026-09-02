@@ -7,6 +7,7 @@ import DataTable from '../components/DataTable.jsx';
 import { EvolutionChart, ClassificationDonut, ComparisonBarChart, MultiLineChart, CHART_COLORS } from '../components/charts.jsx';
 import { fmt, fmtInt, yearsRange, PERIODS, CLASSIFICATION_INFO } from '../utils/format.js';
 import { Icon } from '../components/icons.jsx';
+import { supportsSharedFeature } from '../programs/registry.js';
 
 export default function Analytics() {
   const [programId, setProgramId] = useState('');
@@ -55,7 +56,7 @@ export default function Analytics() {
         <Field label="Programa">
           <Select value={programId} onChange={(e) => { setProgramId(e.target.value); setIndicatorId(''); setSelectedSchools([]); }}>
             <option value="">Selecione um programa...</option>
-            {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+            {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'graficos')).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </Select>
         </Field>
         <Field label="Indicador">

@@ -2,6 +2,8 @@ import { prisma } from '../../lib/prisma.js';
 import { pickField, toNumber } from './parser.js';
 import { str } from './base.js';
 import { IMPORT_ROW_STATUS, PERIODS } from '../../lib/constants.js';
+import { HttpError } from '../../lib/errors.js';
+import { PACTO_PROGRAM_CODE } from '../../programs/pacto/config.js';
 
 const PERIOD_ALIASES = (() => {
   const map = new Map();
@@ -95,6 +97,12 @@ export const resultsStrategy = {
     const program = programKey ? ctx.programByCode.get(programKey) : undefined;
     if (!programKey) errors.push({ field: 'programa', message: 'Programa é obrigatório' });
     else if (!program) errors.push({ field: 'programa', message: `Programa não encontrado: "${programKey}"` });
+    else if (program.code === PACTO_PROGRAM_CODE) {
+      errors.push({
+        field: 'programa',
+        message: 'O Pacto usa a coleta específica por turma e não aceita importação de resultados genéricos',
+      });
+    }
 
     const school = inep ? ctx.schoolByInep.get(inep) : undefined;
     if (!inep) errors.push({ field: 'inep', message: 'INEP da escola é obrigatório' });
@@ -148,6 +156,21 @@ export const resultsStrategy = {
   },
 
   async apply(validRows, ctx, { actor } = {}) {
+    const programIds = [...new Set(validRows.map((row) => row.data.programId))];
+    const pactoProgram = programIds.length
+      ? await prisma.program.findFirst({
+          where: { id: { in: programIds }, code: PACTO_PROGRAM_CODE, deletedAt: null },
+          select: { id: true },
+        })
+      : null;
+    if (pactoProgram) {
+      throw new HttpError(
+        422,
+        'O Pacto usa a coleta específica por turma e não aceita importação de resultados genéricos',
+        'PROGRAM_COLLECTION_REQUIRED',
+      );
+    }
+
     let created = 0;
     let updated = 0;
     await prisma.$transaction(async (tx) => {

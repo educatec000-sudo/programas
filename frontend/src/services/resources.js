@@ -67,6 +67,38 @@ export const programsApi = {
   removeIndicator: (id, indicatorId) => request(`/programs/${id}/indicators/${indicatorId}`, { method: 'DELETE' }),
 };
 
+export const pactoAdminApi = {
+  overview: (programId) => request(`/programs/${programId}/pacto/overview`),
+  exportReport: (programId) => download(`/programs/${programId}/pacto/report.csv`, {
+    fallbackName: 'pacto-alfabetizacao-2026.csv',
+  }),
+  generateLink: (programId, schoolId, expiresAt) =>
+    request(`/programs/${programId}/pacto/schools/${schoolId}/link`, {
+      method: 'POST',
+      body: { expiresAt },
+    }),
+  revokeLink: (programId, schoolId) =>
+    request(`/programs/${programId}/pacto/schools/${schoolId}/link`, { method: 'DELETE' }),
+  createClass: (programId, body) =>
+    request(`/programs/${programId}/pacto/classes`, { method: 'POST', body }),
+  updateClass: (programId, classId, body) =>
+    request(`/programs/${programId}/pacto/classes/${classId}`, { method: 'PUT', body }),
+  reopenAssessment: (programId, assessmentId) =>
+    request(`/programs/${programId}/pacto/assessments/${assessmentId}/reopen`, { method: 'POST' }),
+};
+
+export const pactoPublicApi = {
+  bootstrap: (token) => request(`/public/pacto/${encodeURIComponent(token)}`),
+  createClass: (token, body) =>
+    request(`/public/pacto/${encodeURIComponent(token)}/classes`, { method: 'POST', body }),
+  updateClass: (token, classId, body) =>
+    request(`/public/pacto/${encodeURIComponent(token)}/classes/${classId}`, { method: 'PUT', body }),
+  saveDraft: (token, body) =>
+    request(`/public/pacto/${encodeURIComponent(token)}/assessments/draft`, { method: 'PUT', body }),
+  submit: (token, body) =>
+    request(`/public/pacto/${encodeURIComponent(token)}/assessments/submit`, { method: 'POST', body }),
+};
+
 export const indicatorsApi = {
   ...crud('/indicators'),
   categories: () => request('/indicators/categories'),

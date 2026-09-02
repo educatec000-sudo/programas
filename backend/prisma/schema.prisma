@@ -71,18 +71,20 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  sessions          Session[]
-  passwordResets    PasswordResetToken[]
-  loginAudits       LoginAttempt[]
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  importJobs        ImportJob[]
-  resultsCreated    Result[]             @relation("ResultCreatedBy")
-  resultsUpdated    Result[]             @relation("ResultUpdatedBy")
-  goalsCreated      Goal[]
-  documents         Document[]
-  evaluations       Evaluation[]
-  technicianSchools SchoolTechnician[]
+  sessions                 Session[]
+  passwordResets           PasswordResetToken[]
+  loginAudits              LoginAttempt[]
+  auditLogs                AuditLog[]
+  notifications            Notification[]
+  importJobs               ImportJob[]
+  resultsCreated           Result[]                @relation("ResultCreatedBy")
+  resultsUpdated           Result[]                @relation("ResultUpdatedBy")
+  goalsCreated             Goal[]
+  documents                Document[]
+  evaluations              Evaluation[]
+  technicianSchools        SchoolTechnician[]
+  collectionLinksCreated   ProgramCollectionLink[] @relation("CollectionLinkCreatedBy")
+  pactoAssessmentsReopened PactoAssessment[]       @relation("PactoAssessmentReopenedBy")
 
   @@index([roleId])
   @@index([active])
@@ -183,6 +185,8 @@ model School {
   goals           Goal[]
   evaluations     Evaluation[]
   technicianLinks SchoolTechnician[]
+  collectionLinks ProgramCollectionLink[]
+  pactoClasses    PactoClass[]
 
   @@index([name])
   @@index([district])
@@ -236,11 +240,13 @@ model Program {
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
-  schools     ProgramSchool[]
-  indicators  ProgramIndicator[]
-  results     Result[]
-  goals       Goal[]
-  evaluations Evaluation[]
+  schools         ProgramSchool[]
+  indicators      ProgramIndicator[]
+  results         Result[]
+  goals           Goal[]
+  evaluations     Evaluation[]
+  collectionLinks ProgramCollectionLink[]
+  pactoClasses    PactoClass[]
 
   @@index([year, status])
   @@index([name])
@@ -411,6 +417,138 @@ model Evaluation {
   @@unique([programId, schoolId, year, period])
   @@index([programId, year, period])
   @@index([schoolId])
+}
+
+// ---------------------------- COLETA PÚBLICA / PACTO 2026 ----------------------------
+
+/**
+ * Token opaco para coleta sem conta administrativa. Somente o hash é salvo.
+ * Um novo link revoga os links ativos anteriores da mesma escola/programa.
+ */
+model ProgramCollectionLink {
+  id             String    @id @default(uuid())
+  programId      String
+  schoolId       String
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  lastAccessedAt DateTime?
+  createdById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school    School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("CollectionLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([programId, schoolId, revokedAt])
+  @@index([expiresAt])
+}
+
+enum PactoClassSource {
+  ADMINISTRADOR
+  ESCOLA
+}
+
+enum PactoAssessmentCode {
+  A0
+  A1
+  A2
+  A3
+}
+
+enum PactoComponent {
+  INICIAL
+  PORTUGUES
+  MATEMATICA
+}
+
+enum PactoAssessmentStatus {
+  RASCUNHO
+  ENVIADO
+  REABERTO
+}
+
+/**
+ * Turma específica do instrumento Pacto pela Alfabetização 2026.
+ */
+model PactoClass {
+  id        String           @id @default(uuid())
+  programId String
+  schoolId  String
+  grade     Int
+  shift     String
+  name      String
+  source    PactoClassSource
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  program     Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school      School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  assessments PactoAssessment[]
+
+  @@unique([programId, schoolId, grade, shift, name])
+  @@index([programId, schoolId, active])
+}
+
+/**
+ * Uma unidade de envio independente: A0, A1, A2 ou A3 de uma turma.
+ */
+model PactoAssessment {
+  id           String                @id @default(uuid())
+  classId      String
+  code         PactoAssessmentCode
+  status       PactoAssessmentStatus @default(RASCUNHO)
+  submittedAt  DateTime?
+  reopenedAt   DateTime?
+  reopenedById String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  class      PactoClass                 @relation(fields: [classId], references: [id], onDelete: Cascade)
+  components PactoAssessmentComponent[]
+  reopenedBy User?                      @relation("PactoAssessmentReopenedBy", fields: [reopenedById], references: [id], onDelete: SetNull)
+
+  @@unique([classId, code])
+  @@index([status, submittedAt])
+}
+
+/**
+ * Matrícula/participação podem variar por componente dentro de uma avaliação.
+ */
+model PactoAssessmentComponent {
+  id           String         @id @default(uuid())
+  assessmentId String
+  component    PactoComponent
+  enrolled     Int
+  evaluated    Int
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  assessment PactoAssessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  results    PactoSkillResult[]
+
+  @@unique([assessmentId, component])
+  @@index([component])
+}
+
+/**
+ * Quantidade por habilidade e nível; percentuais são sempre derivados.
+ */
+model PactoSkillResult {
+  id          String   @id @default(uuid())
+  componentId String
+  skill       String
+  level       String
+  count       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  component PactoAssessmentComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@unique([componentId, skill, level])
+  @@index([skill, level])
 }
 
 // ---------------------------- IMPORTAÇÕES ----------------------------

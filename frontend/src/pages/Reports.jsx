@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import { Alert, Button, Field, Select, LoadingBlock } from '../components/ui.jsx';
 import { PERIODS, yearsRange } from '../utils/format.js';
+import { supportsSharedFeature } from '../programs/registry.js';
 
 const REPORT_INFO = {
   geral: { icon: '📊', desc: 'Lista gerencial dos programas; cada pontuação permanece isolada' },
@@ -106,7 +107,7 @@ export default function Reports() {
             <Field label="Programa *">
               <Select value={filters.programId} onChange={(event) => chooseProgram(event.target.value)}>
                 <option value="">Selecione o programa...</option>
-                {(programs?.data || []).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
+                {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'relatorios')).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
               </Select>
             </Field>
           )}

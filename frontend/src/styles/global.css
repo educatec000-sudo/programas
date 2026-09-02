@@ -537,15 +537,80 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .permission-group h4 { font-size: 13px; text-transform: capitalize; color: var(--primary-dark); margin-bottom: 8px; }
 .permission-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 7px; }
 
+/* ---------- Coleta pública — Pacto pela Alfabetização ---------- */
+.public-collection-page { min-height: 100vh; background: #f1f5f9; color: var(--text); }
+.public-collection-header {
+  display: flex; align-items: center; gap: 12px; padding: 14px max(20px, calc((100vw - 1120px) / 2));
+  background: #0f2748; color: #fff; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+.public-collection-header > div:last-child { display: flex; flex-direction: column; }
+.public-collection-header strong { font-size: 14px; }
+.public-collection-header span { color: #bfdbfe; font-size: 11.5px; }
+.public-collection-brand {
+  width: 42px; height: 42px; display: grid; place-items: center; border-radius: 11px;
+  background: linear-gradient(135deg, #2563eb, #38bdf8); color: #fff; font-size: 14px; font-weight: 900;
+}
+.public-collection-shell { width: min(1120px, calc(100% - 32px)); margin: 24px auto; }
+.public-collection-shell > .card { margin-bottom: 16px; }
+.public-collection-error { min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; }
+.public-collection-error h1 { margin-top: 16px; }
+.public-school-card {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 18px;
+  margin-bottom: 16px; padding: 20px 22px; border-radius: 14px;
+  background: linear-gradient(135deg, #eff6ff, #fff); border: 1px solid #bfdbfe;
+}
+.public-school-card > div > span { color: var(--primary); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.public-school-card h1 { margin: 4px 0; font-size: 22px; }
+.public-school-card p { margin: 0; color: var(--text-2); font-size: 12.5px; }
+.pacto-assessment-selector { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+.pacto-assessment-button {
+  display: flex; flex-direction: column; gap: 3px; padding: 13px 15px; text-align: left;
+  border: 1px solid var(--border-2); border-radius: 10px; background: #fff; color: var(--text); cursor: pointer;
+}
+.pacto-assessment-button:hover { border-color: var(--primary); }
+.pacto-assessment-button.active { border-color: var(--primary); background: var(--primary-50); box-shadow: 0 0 0 2px rgba(37, 99, 235, .1); }
+.pacto-assessment-button strong { font-size: 16px; }
+.pacto-assessment-button span { color: var(--text-3); font-size: 10.5px; }
+.pacto-component { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); }
+.pacto-component h2 { margin-bottom: 12px; font-size: 16px; }
+.pacto-skill-list { display: flex; flex-direction: column; gap: 12px; }
+.pacto-skill-card { padding: 15px; border: 1px solid var(--border); border-radius: 11px; background: #f8fafc; }
+.pacto-skill-header { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 13px; }
+.pacto-sum-ok { color: #15803d; font-size: 11.5px; font-weight: 700; }
+.pacto-sum-error { color: #b91c1c; font-size: 11.5px; font-weight: 700; }
+.pacto-level-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pacto-level-grid .field { margin-bottom: 0; }
+.pacto-distribution-bar {
+  display: flex;
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  margin-bottom: 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+.pacto-distribution-bar span { display: block; min-width: 0; height: 100%; }
+.pacto-distribution-red { background: #dc2626; }
+.pacto-distribution-yellow { background: #eab308; }
+.pacto-distribution-green { background: #16a34a; }
+.pacto-distribution-gray { background: #94a3b8; }
+.public-collection-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); }
+.public-collection-footer { padding: 22px; color: #64748b; font-size: 11.5px; text-align: center; }
+
 @media (max-width: 900px) {
   .sidebar { display: none; }
   .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
   .auth-aside { display: none; }
   .program-card-grid { grid-template-columns: 1fr; }
+  .pacto-level-grid { grid-template-columns: 1fr; }
+  .pacto-assessment-selector { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 560px) {
   .program-card { min-height: 0; padding: 19px 16px; }
   .program-card-header, .program-card-footer { align-items: flex-start; flex-direction: column; }
   .program-card-footer .btn { width: 100%; }
+  .public-collection-shell { width: min(100% - 20px, 1120px); margin: 12px auto; }
+  .public-school-card, .public-collection-actions { align-items: stretch; flex-direction: column; }
+  .public-collection-actions .btn { width: 100%; }
 }

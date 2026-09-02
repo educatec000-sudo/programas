@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi.js';
 import { programsApi, schoolsApi, rankingsApi, analyticsApi, resultsApi, goalsApi, reportsApi } from '../services/resources.js';
@@ -19,6 +19,12 @@ export default function ProgramDetail() {
   const [tab, setTab] = useState(searchParams.get('tab') || 'resumo');
 
   const { data: program, loading, refresh } = useApi(() => programsApi.get(id), [id]);
+  const implementation = getProgramImplementation(program);
+  const sharedTabEnabled = (key) => !implementation?.disabledSharedTabs?.includes(key);
+
+  useEffect(() => {
+    if (implementation?.disabledSharedTabs?.includes(tab)) setTab('resumo');
+  }, [implementation, tab]);
 
   // seleção de período para ranking/análises
   const [year, setYear] = useState('');
@@ -26,16 +32,16 @@ export default function ProgramDetail() {
   const activeYear = year || program?.year || new Date().getFullYear();
 
   const { data: ranking, loading: rankingLoading } = useApi(
-    () => ((tab === 'ranking' || tab === 'graficos') && can('rankings:read') ? rankingsApi.get({ programId: id, year: activeYear, period: period || undefined }) : Promise.resolve(null)),
-    [id, activeYear, period, tab],
+    () => ((tab === 'ranking' || tab === 'graficos') && sharedTabEnabled(tab) && can('rankings:read') ? rankingsApi.get({ programId: id, year: activeYear, period: period || undefined }) : Promise.resolve(null)),
+    [id, activeYear, period, tab, program?.code],
   );
   const { data: evolution } = useApi(
-    () => (tab === 'graficos' && can('analytics:read') ? analyticsApi.evolution({ programId: id, year: activeYear }) : Promise.resolve(null)),
-    [id, activeYear, tab],
+    () => (tab === 'graficos' && sharedTabEnabled('graficos') && can('analytics:read') ? analyticsApi.evolution({ programId: id, year: activeYear }) : Promise.resolve(null)),
+    [id, activeYear, tab, program?.code],
   );
   const { data: evaluations, loading: evaluationsLoading } = useApi(
-    () => (tab === 'avaliacoes' && can('rankings:read') ? rankingsApi.evaluations({ programId: id }) : Promise.resolve(null)),
-    [id, tab],
+    () => (tab === 'avaliacoes' && sharedTabEnabled('avaliacoes') && can('rankings:read') ? rankingsApi.evaluations({ programId: id }) : Promise.resolve(null)),
+    [id, tab, program?.code],
   );
   const { data: history, loading: historyLoading } = useApi(
     () => (tab === 'historico' ? programsApi.history(id, { page: 1, pageSize: 100 }) : Promise.resolve(null)),
@@ -50,7 +56,6 @@ export default function ProgramDetail() {
   if (!program) return <div className="centered">Programa não encontrado</div>;
 
   const statusInfo = PROGRAM_STATUS[program.status];
-  const implementation = getProgramImplementation(program);
   const specificTabs = implementation?.adminTabs || [];
   const activeSpecificTab = specificTabs.find((item) => item.key === tab);
   const availablePeriods = [...new Set((ranking?.rows || []).length >= 0 && (ranking?.periods || []).filter((p) => p.year === activeYear).map((p) => p.period))];
@@ -75,17 +80,17 @@ export default function ProgramDetail() {
           { key: 'resumo', label: 'Visão geral' },
           ...specificTabs.map((item) => ({ key: item.key, label: item.label })),
           { key: 'escolas', label: 'Escolas participantes', count: program.schools.length },
-          can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators.length } : null,
-          can('rankings:read') ? { key: 'avaliacoes', label: 'Avaliações', count: program.evaluationsCount } : null,
-          can('results:read') ? { key: 'resultados', label: 'Resultados' } : null,
-          can('rankings:read') ? { key: 'ranking', label: 'Ranking' } : null,
-          can('analytics:read') ? { key: 'graficos', label: 'Gráficos' } : null,
+          sharedTabEnabled('criterios') && can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators.length } : null,
+          sharedTabEnabled('avaliacoes') && can('rankings:read') ? { key: 'avaliacoes', label: 'Avaliações', count: program.evaluationsCount } : null,
+          sharedTabEnabled('resultados') && can('results:read') ? { key: 'resultados', label: 'Resultados' } : null,
+          sharedTabEnabled('ranking') && can('rankings:read') ? { key: 'ranking', label: 'Ranking' } : null,
+          sharedTabEnabled('graficos') && can('analytics:read') ? { key: 'graficos', label: 'Gráficos' } : null,
           { key: 'historico', label: 'Histórico' },
-          can('reports:read') ? { key: 'relatorios', label: 'Relatórios' } : null,
+          sharedTabEnabled('relatorios') && can('reports:read') ? { key: 'relatorios', label: 'Relatórios' } : null,
         ].filter(Boolean)}
       />
 
-      {(tab === 'ranking' || tab === 'graficos') && (
+      {((tab === 'ranking' && sharedTabEnabled('ranking')) || (tab === 'graficos' && sharedTabEnabled('graficos'))) && (
         <div className="filter-bar">
           <Field label="Ano">
             <Select value={year} onChange={(e) => setYear(e.target.value)}>
@@ -118,20 +123,21 @@ export default function ProgramDetail() {
           setModalOpen={setSchoolsModal}
           success={success}
           error={error}
+          genericEvaluationEnabled={sharedTabEnabled('avaliacoes') && sharedTabEnabled('resultados')}
         />
       )}
 
-      {tab === 'criterios' && <IndicatorsTab program={program} />}
+      {tab === 'criterios' && sharedTabEnabled('criterios') && <IndicatorsTab program={program} />}
 
-      {tab === 'avaliacoes' && (
+      {tab === 'avaliacoes' && sharedTabEnabled('avaliacoes') && (
         <EvaluationsTab program={program} evaluations={evaluations} loading={evaluationsLoading} />
       )}
 
-      {tab === 'resultados' && (
+      {tab === 'resultados' && sharedTabEnabled('resultados') && (
         <ResultsTab program={program} can={can} modalOpen={resultModal} setModalOpen={setResultModal} success={success} error={error} />
       )}
 
-      {tab === 'ranking' && (
+      {tab === 'ranking' && sharedTabEnabled('ranking') && (
         <RankingTab
           program={program}
           ranking={ranking}
@@ -144,7 +150,7 @@ export default function ProgramDetail() {
         />
       )}
 
-      {tab === 'graficos' && (
+      {tab === 'graficos' && sharedTabEnabled('graficos') && (
         <>
           {rankingLoading || !ranking ? (
             <LoadingBlock />
@@ -167,7 +173,7 @@ export default function ProgramDetail() {
 
       {tab === 'historico' && <HistoryTab history={history} loading={historyLoading} />}
 
-      {tab === 'relatorios' && (
+      {tab === 'relatorios' && sharedTabEnabled('relatorios') && (
         <ReportsTab program={program} year={activeYear} period={period || ranking?.period} toast={toast} error={error} />
       )}
     </>
@@ -209,7 +215,7 @@ function InfoTab({ program, implementation }) {
   );
 }
 
-function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, error }) {
+function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, error, genericEvaluationEnabled }) {
   const { data: allSchools } = useApi(() => schoolsApi.list({ pageSize: 200 }), []);
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -266,7 +272,7 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
             key: 'actions', label: '', align: 'right',
             render: (s) => (
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
-                {can('rankings:read') && can('results:read') && (
+                {genericEvaluationEnabled && can('rankings:read') && can('results:read') && (
                   <Link to={`/programas/${program.id}/escolas/${s.id}`} className="btn btn-secondary btn-sm">
                     Ver avaliação
                   </Link>
@@ -280,7 +286,7 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
         ]}
         rows={program.schools}
         emptyTitle="Nenhuma escola vinculada"
-        emptyHint="Vincule escolas para habilitar o lançamento de resultados."
+        emptyHint={genericEvaluationEnabled ? 'Vincule escolas para habilitar o lançamento de resultados.' : 'Vincule escolas para habilitar a coleta específica do programa.'}
         emptyIcon="🏫"
       />
 
@@ -322,7 +328,7 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
         onClose={() => setConfirmRemove(null)}
         onConfirm={removeSchool}
         title="Desvincular escola"
-        message={`Remover "${confirmRemove?.name}" do programa? Os resultados já lançados são preservados.`}
+        message={`Remover "${confirmRemove?.name}" do programa? Os dados já enviados são preservados e o acesso de coleta deixa de funcionar.`}
         danger
         confirmLabel="Desvincular"
         busy={busy}

@@ -9,6 +9,7 @@ import DataTable from '../components/DataTable.jsx';
 import { Alert, Button, Field, Select, LoadingBlock, Badge } from '../components/ui.jsx';
 import { ComparisonBarChart } from '../components/charts.jsx';
 import { CLASSIFICATION_INFO, fmt, PERIODS, yearsRange } from '../utils/format.js';
+import { supportsSharedFeature } from '../programs/registry.js';
 
 export default function Rankings() {
   const { can } = useAuth();
@@ -103,7 +104,7 @@ export default function Rankings() {
         <Field label="Programa" required>
           <Select value={programId} onChange={(event) => { setProgramId(event.target.value); setIndicatorId(''); setPeriod(''); }}>
             <option value="">Selecione um programa...</option>
-            {(programs?.data || []).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
+            {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'ranking')).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
           </Select>
         </Field>
         <Field label="Critério">

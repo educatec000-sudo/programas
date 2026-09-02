@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { ATTAINMENT_CAP, classify, periodOrder } from '../lib/constants.js';
 import { HttpError } from '../lib/errors.js';
+import { PACTO_PROGRAM_CODE } from '../programs/pacto/config.js';
 
 /**
  * Núcleo de cálculo do CPE:
@@ -245,6 +246,21 @@ async function resolveRankingYear({ year, programId, indicatorId, schoolId }) {
   return latest?.year ?? new Date().getFullYear();
 }
 
+async function assertSharedScoringAvailable(programId) {
+  if (!programId) return;
+  const specificProgram = await prisma.program.findFirst({
+    where: { id: programId, code: PACTO_PROGRAM_CODE, deletedAt: null },
+    select: { id: true },
+  });
+  if (specificProgram) {
+    throw new HttpError(
+      422,
+      'O Pacto pela Alfabetização ainda não possui regra oficial de ranking. Consulte a área específica do programa.',
+      'PROGRAM_RANKING_UNAVAILABLE',
+    );
+  }
+}
+
 /**
  * Ranking completo com evolução (posição e pontuação no período anterior).
  * Escopos: por programa (programId), por indicador (indicatorId) ou geral.
@@ -258,6 +274,7 @@ export async function computeRanking(params) {
       'PROGRAM_REQUIRED',
     );
   }
+  await assertSharedScoringAvailable(programId);
   const year = await resolveRankingYear(params);
   const scope = await loadScope({ programId, indicatorId, year, schoolId });
 
@@ -373,6 +390,7 @@ export async function computeRanking(params) {
 
 /** Série de evolução temporal (pontuação média por período). */
 export async function evolutionSeries({ programId, indicatorId, year, schoolId }) {
+  await assertSharedScoringAvailable(programId);
   const scope = await loadScope({ programId, indicatorId, year, schoolId });
   const periodSet = new Set(scope.results.map((r) => `${r.year}|${r.period}`));
   const periods = [...periodSet]
@@ -416,6 +434,7 @@ export async function classificationDistribution(params) {
 /** Comparação entre escolas (série por período). */
 export async function compareSchools({ schoolIds, programId, year }) {
   if (!schoolIds?.length) return [];
+  await assertSharedScoringAvailable(programId);
   const scope = await loadScope({ programId, year });
   const periodSet = new Set(scope.results.filter((r) => schoolIds.includes(r.schoolId)).map((r) => `${r.year}|${r.period}`));
   const periods = [...periodSet]
@@ -453,6 +472,7 @@ export async function comparePrograms({ year, period }) {
 
   const out = [];
   for (const program of scope.programById.values()) {
+    if (program.code === PACTO_PROGRAM_CODE) continue;
     const subScope = { ...scope, results: scope.results.filter((r) => r.programId === program.id) };
     if (!subScope.results.length) continue;
     const series = periods

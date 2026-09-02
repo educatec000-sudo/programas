@@ -8,6 +8,7 @@ import {
 import { resultsForExport } from './result.service.js';
 import { listGoals, resolveGoalFromList } from './goal.service.js';
 import { HttpError } from '../lib/errors.js';
+import { PACTO_PROGRAM_CODE } from '../programs/pacto/config.js';
 
 /**
  * Relatórios — cada builder devolve um dataset tabular
@@ -42,11 +43,16 @@ async function reportGeral(query) {
   });
   const scoreEntries = await Promise.all(
     programs.map(async (program) => {
-      const ranking = await computeRanking({ programId: program.id, year: year ?? program.year });
-      const score = ranking.rows.length
-        ? Math.round((ranking.rows.reduce((sum, row) => sum + row.score, 0) / ranking.rows.length) * 10) / 10
-        : null;
-      return [program.id, score];
+      try {
+        const ranking = await computeRanking({ programId: program.id, year: year ?? program.year });
+        const score = ranking.rows.length
+          ? Math.round((ranking.rows.reduce((sum, row) => sum + row.score, 0) / ranking.rows.length) * 10) / 10
+          : null;
+        return [program.id, score];
+      } catch (error) {
+        if (error.code === 'PROGRAM_RANKING_UNAVAILABLE') return [program.id, null];
+        throw error;
+      }
     }),
   );
   const scoreByProgram = new Map(scoreEntries);
@@ -426,5 +432,20 @@ export const REPORT_TYPES = Object.keys(BUILDERS).map((key) => ({
 export async function buildReport(type, query) {
   const builder = BUILDERS[type];
   if (!builder) throw new HttpError(400, `Tipo de relatório inválido: ${type}`, 'BAD_REQUEST');
+
+  if (query.programId) {
+    const pacto = await prisma.program.findFirst({
+      where: { id: query.programId, code: PACTO_PROGRAM_CODE, deletedAt: null },
+      select: { id: true },
+    });
+    if (pacto) {
+      throw new HttpError(
+        422,
+        'O Pacto possui relatório próprio na área específica do programa.',
+        'PROGRAM_REPORT_UNAVAILABLE',
+      );
+    }
+  }
+
   return builder(query);
 }

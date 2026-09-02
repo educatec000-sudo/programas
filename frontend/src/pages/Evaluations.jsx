@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { Badge, Field, Select } from '../components/ui.jsx';
 import { CLASSIFICATION_INFO, fmt, fmtDateTime, PERIODS, yearsRange } from '../utils/format.js';
+import { supportsSharedFeature } from '../programs/registry.js';
 
 /** Avaliações consolidadas, sempre identificadas por programa e escola. */
 export default function Evaluations() {
@@ -30,7 +31,7 @@ export default function Evaluations() {
         <Field label="Programa">
           <Select value={filters.programId} onChange={set('programId')}>
             <option value="">Todos, exibidos separadamente</option>
-            {(programs?.data || []).map((program) => (
+            {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'avaliacoes')).map((program) => (
               <option key={program.id} value={program.id}>{program.code} — {program.name}</option>
             ))}
           </Select>
