@@ -7,6 +7,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { Button, Field, Input, Select, Modal, Badge, ConfirmDialog } from '../components/ui.jsx';
 import { fmt, PERIODS, yearsRange } from '../utils/format.js';
+import { supportsSharedFeature } from '../programs/registry.js';
 
 const SCOPE_LABELS = {
   GERAL: 'Geral',
@@ -41,6 +42,9 @@ export default function Goals() {
     scope: 'PROGRAMA', programId: '', schoolId: '', indicatorId: '',
     year: new Date().getFullYear(), period: '', value: '', description: '',
   });
+  const goalPrograms = (programs?.data || []).filter((item) => (
+    supportsSharedFeature(item, 'resultados') || item.id === form.programId
+  ));
 
   const setF = (k) => (e) => setFilters((f) => ({ ...f, [k]: e.target.value }));
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -161,7 +165,9 @@ export default function Goals() {
         <Field label="Ano">
           <Select value={filters.year} onChange={setF('year')}>
             <option value="">Todos</option>
-            {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
+            {[...new Set([...(programs?.data || []).map((item) => item.year), ...yearsRange(2023)])]
+              .sort((a, b) => b - a)
+              .map((y) => <option key={y} value={y}>{y}</option>)}
           </Select>
         </Field>
       </div>
@@ -196,15 +202,25 @@ export default function Goals() {
                 {Object.entries(SCOPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </Field>
-            <Field label="Ano" required>
-              <Select value={form.year} onChange={set('year')}>
-                {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
+            <Field label="Ano/ciclo" required hint={form.programId ? 'Definido pelo ciclo do programa' : undefined}>
+              <Select value={form.year} onChange={set('year')} disabled={Boolean(form.programId)}>
+                {[...new Set([Number(form.year), ...(programs?.data || []).map((item) => item.year), ...yearsRange(2023)])]
+                  .filter(Boolean)
+                  .sort((a, b) => b - a)
+                  .map((y) => <option key={y} value={y}>{y}</option>)}
               </Select>
             </Field>
-            <Field label="Programa" hint="Opcional — vincula a meta ao programa">
-              <Select value={form.programId} onChange={set('programId')}>
+            <Field label="Programa" hint="Opcional — selecione a execução anual correta">
+              <Select value={form.programId} onChange={(event) => {
+                const selected = goalPrograms.find((item) => item.id === event.target.value);
+                setForm((current) => ({
+                  ...current,
+                  programId: event.target.value,
+                  year: selected?.year || current.year,
+                }));
+              }}>
                 <option value="">—</option>
-                {(programs?.data || []).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
+                {goalPrograms.map((p) => <option key={p.id} value={p.id}>{p.code} — ciclo {p.year}</option>)}
               </Select>
             </Field>
             <Field label="Escola" hint="Opcional — meta específica da escola">

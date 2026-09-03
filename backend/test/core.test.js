@@ -19,7 +19,22 @@ import { createGoalSchema } from '../src/validations/result.validation.js';
 import { createProgramCriterionSchema } from '../src/validations/program.validation.js';
 import { countSchoolsWithData } from '../src/services/program.service.js';
 import { getAssessmentDefinition } from '../src/programs/pacto/config.js';
-import { buildSchoolStatus, percentage, validateAssessmentPayload } from '../src/programs/pacto/service.js';
+import {
+  buildSchoolStatus,
+  percentage,
+  publicCollectionPath,
+  validateAssessmentPayload,
+} from '../src/programs/pacto/service.js';
+import { updateClassSchema } from '../src/programs/pacto/validation.js';
+import { resolvePactoPublicLink } from '../../frontend/src/programs/pacto/link.js';
+import { buildPactoDashboard } from '../../frontend/src/programs/pacto/dashboard.js';
+import {
+  permanentProgramCode,
+  permanentProgramName,
+  programCycleCode,
+  selectCurrentProgramCycle,
+  summarizeProgramDeletionCounts,
+} from '../src/services/program-catalog.js';
 import {
   CollectionLinkState,
   assessmentCanBeReopened,
@@ -67,6 +82,34 @@ test('calcula cobertura dos cards somente para escolas vinculadas e ativas', () 
   assert.equal(counts.get('p2'), 1);
 });
 
+test('separa a identidade permanente do programa de seus ciclos anuais', () => {
+  assert.equal(permanentProgramCode('PACTO-ALFABETIZACAO-2026', 2026), 'PACTO-ALFABETIZACAO');
+  assert.equal(permanentProgramCode('PRG-2024-01', 2024), 'PRG-01');
+  assert.equal(permanentProgramName('Pacto pela Alfabetização 2026', 2026), 'Pacto pela Alfabetização');
+  assert.equal(programCycleCode('PACTO-ALFABETIZACAO', 2027), 'PACTO-ALFABETIZACAO-2027');
+
+  const cycles = [
+    { id: '2027', year: 2027, status: 'PLANEJAMENTO', deletedAt: null },
+    { id: '2026', year: 2026, status: 'EM_EXECUCAO', deletedAt: null },
+    { id: '2025', year: 2025, status: 'CONCLUIDO', deletedAt: null },
+  ];
+  assert.equal(selectCurrentProgramCycle(cycles).id, '2026');
+  assert.equal(selectCurrentProgramCycle(cycles, 'PLANEJAMENTO').id, '2027');
+});
+
+test('bloqueia exclusão do programa quando qualquer relação possui dados', () => {
+  assert.deepEqual(summarizeProgramDeletionCounts({ schools: 0, results: 0 }), {
+    counts: { schools: 0, results: 0 },
+    relatedRecords: 0,
+    canDelete: true,
+  });
+  assert.deepEqual(summarizeProgramDeletionCounts({ schools: 2, results: 5, documents: 1 }), {
+    counts: { schools: 2, results: 5, documents: 1 },
+    relatedRecords: 8,
+    canDelete: false,
+  });
+});
+
 test('representa as seis matrizes oficiais do Pacto 2026', () => {
   assert.equal(getAssessmentDefinition(1, 'A0').components[0].skills.length, 7);
   assert.equal(getAssessmentDefinition(2, 'A0').components[0].skills.length, 4);
@@ -74,6 +117,70 @@ test('representa as seis matrizes oficiais do Pacto 2026', () => {
   assert.deepEqual(a1FirstGrade.components.map((item) => item.code), ['PORTUGUES', 'MATEMATICA']);
   assert.equal(a1FirstGrade.components[0].skills.length, 3);
   assert.equal(a1FirstGrade.components[1].skills[0].levels.length, 3);
+});
+
+test('filtra o dashboard gerencial do Pacto por escola, ano, componente e avaliação', () => {
+  const definition = getAssessmentDefinition(2, 'A1');
+  const components = definition.components.map((component, componentIndex) => ({
+    id: `component-${componentIndex}`,
+    component: component.code,
+    enrolled: componentIndex === 0 ? 10 : 9,
+    evaluated: componentIndex === 0 ? 8 : 7,
+    results: component.skills.flatMap((skill) => skill.levels.map((level, index) => ({
+      skill: skill.code,
+      level: level.code,
+      count: componentIndex === 0 ? [2, 3, 3][index] : [1, 2, 4][index],
+    }))),
+  }));
+  const overview = {
+    schools: [
+      {
+        id: 'school-1', name: 'Escola 1', inep: '15000001',
+        classes: [{
+          id: 'class-1', schoolId: 'school-1', grade: 2, shift: 'M', name: 'A',
+          enabledAssessments: ['A1'],
+          assessments: [{ id: 'assessment-1', code: 'A1', status: 'ENVIADO', definition, components }],
+        }],
+      },
+      {
+        id: 'school-2', name: 'Escola 2', inep: '15000002',
+        classes: [{
+          id: 'class-2', schoolId: 'school-2', grade: 2, shift: 'M', name: 'B',
+          enabledAssessments: ['A1'],
+          assessments: [{ id: 'assessment-2', code: 'A1', status: 'ENVIADO', definition, components }],
+        }],
+      },
+    ],
+  };
+
+  const dashboard = buildPactoDashboard(overview, {
+    schoolId: 'school-1', grade: '2', component: 'PORTUGUES', assessment: 'A1', shift: 'M', classId: '',
+  });
+  assert.deepEqual(dashboard.metrics, {
+    participatingSchools: 1,
+    registeredClasses: 1,
+    classesWithData: 1,
+    enrolled: 10,
+    evaluated: 8,
+    completionPercentage: 100,
+    participationPercentage: 80,
+    completedAssessments: 1,
+    expectedAssessments: 1,
+    startedAssessments: 1,
+  });
+  assert.equal(dashboard.charts.length, 3);
+  assert.equal(dashboard.charts.find((item) => item.skill === 'LEITURA').levels[0].percentage, 25);
+  assert.equal(dashboard.schoolComparison.length, 1);
+  assert.equal(dashboard.classComparison.length, 1);
+  assert.equal(dashboard.classComparison[0].school, 'Escola 1');
+  assert.equal(dashboard.classComparison[0].component, 'PORTUGUES');
+
+  const incompatibleSchoolAndClass = buildPactoDashboard(overview, {
+    schoolId: 'school-1', grade: '', component: '', assessment: '', shift: '', classId: 'class-2',
+  });
+  assert.equal(incompatibleSchoolAndClass.metrics.registeredClasses, 0);
+  assert.equal(incompatibleSchoolAndClass.schoolComparison.length, 0);
+  assert.equal(incompatibleSchoolAndClass.classComparison.length, 0);
 });
 
 test('calcula os percentuais inteiros como a planilha do Pacto', () => {
@@ -130,9 +237,15 @@ test('permite avaliados acima de matriculados no Pacto, mas gera alerta', () => 
 });
 
 test('recusa o Pacto na importação genérica de resultados', () => {
-  const pacto = { id: 'pacto-id', code: 'PACTO-ALFABETIZACAO-2026', name: 'Pacto' };
+  const pacto = {
+    id: 'pacto-id',
+    code: 'PACTO-ALFABETIZACAO-2027',
+    name: 'Pacto',
+    year: 2027,
+    catalog: { code: 'PACTO-ALFABETIZACAO' },
+  };
   const built = resultsStrategy.buildRow(
-    { raw: { programa: pacto.code, inep: '15000000', criterio: 'IND-1', ano: 2026, periodo: 'Anual', resultado: 10 } },
+    { raw: { programa: pacto.code, inep: '15000000', criterio: 'IND-1', ano: 2027, periodo: 'Anual', resultado: 10 } },
     {
       programByCode: new Map([[pacto.code.toLowerCase(), pacto]]),
       schoolByInep: new Map([['15000000', { id: 'school-id', inep: '15000000', name: 'Escola' }]]),
@@ -142,6 +255,28 @@ test('recusa o Pacto na importação genérica de resultados', () => {
     },
   );
   assert.equal(built.errors.some((item) => item.field === 'programa' && item.message.includes('coleta específica')), true);
+});
+
+test('monta o link público na origem atual do CPE e nunca em outro site', () => {
+  const token = 'A'.repeat(43);
+  const path = publicCollectionPath(token);
+  const resolved = resolvePactoPublicLink(path, 'https://cpe-oficial.vercel.app');
+  assert.equal(path, `/coleta/pacto/${token}`);
+  assert.equal(resolved.token, token);
+  assert.equal(resolved.url, `https://cpe-oficial.vercel.app/coleta/pacto/${token}`);
+  assert.throws(
+    () => resolvePactoPublicLink(`https://formulario-teste.example/${token}`, 'https://cpe-oficial.vercel.app'),
+    /rota pública inválida/,
+  );
+});
+
+test('atualização parcial de turma não habilita avaliações implicitamente', () => {
+  assert.deepEqual(updateClassSchema.parse({ name: 'B' }), { name: 'B' });
+  assert.deepEqual(
+    updateClassSchema.parse({ enabledAssessments: ['A1', 'A2', 'A3'] }).enabledAssessments,
+    ['A1', 'A2', 'A3'],
+  );
+  assert.throws(() => updateClassSchema.parse({ enabledAssessments: [] }));
 });
 
 test('aplica validade e revogação no ciclo de vida do link de coleta', () => {
@@ -164,13 +299,22 @@ test('bloqueia o enviado e preserva o estado reaberto durante a correção', () 
 });
 
 test('calcula pendências e conclusão pelos quatro envios independentes de cada turma', () => {
-  const partial = buildSchoolStatus([{ assessments: [{ status: 'ENVIADO', submittedAt: new Date('2026-09-01') }] }]);
+  const partial = buildSchoolStatus([{ assessments: [{ code: 'A0', status: 'ENVIADO', submittedAt: new Date('2026-09-01') }] }]);
   assert.equal(partial.expectedAssessmentsCount, 4);
   assert.equal(partial.pendingAssessmentsCount, 3);
   assert.equal(partial.completionPercentage, 25);
   assert.equal(partial.status, 'PARCIAL');
 
-  const completed = buildSchoolStatus([{ assessments: ['A0', 'A1', 'A2', 'A3'].map(() => ({
+  const selectedAssessments = buildSchoolStatus([{
+    enabledAssessments: ['A1', 'A2', 'A3'],
+    assessments: [{ code: 'A1', status: 'ENVIADO', submittedAt: new Date('2026-09-01') }],
+  }]);
+  assert.equal(selectedAssessments.expectedAssessmentsCount, 3);
+  assert.equal(selectedAssessments.pendingAssessmentsCount, 2);
+  assert.equal(selectedAssessments.completionPercentage, 33);
+
+  const completed = buildSchoolStatus([{ assessments: ['A0', 'A1', 'A2', 'A3'].map((code) => ({
+    code,
     status: 'ENVIADO',
     submittedAt: new Date('2026-09-02'),
   })) }]);

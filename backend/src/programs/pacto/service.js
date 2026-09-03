@@ -4,6 +4,7 @@ import { audit, AuditAction } from '../../lib/audit.js';
 import { conflict, HttpError, notFound } from '../../lib/errors.js';
 import { env } from '../../config/env.js';
 import {
+  ASSESSMENT_CODES,
   PACTO_CONFIG,
   PACTO_PROGRAM_CODE,
   PACTO_PROGRAM_YEAR,
@@ -18,6 +19,11 @@ import {
   draftAssessmentStatus,
   publicAssessmentLocked,
 } from './lifecycle.js';
+import {
+  analyzePactoImport,
+  previewGroupToPayload,
+  readPactoImportFile,
+} from './import.js';
 
 const classInclude = {
   assessments: {
@@ -39,9 +45,20 @@ function generateCollectionToken() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
-function publicCollectionUrl(token) {
-  const origin = env.frontendUrl || env.corsOrigin || 'http://localhost:5173';
-  return `${origin}/coleta/pacto/${encodeURIComponent(token)}`;
+export function publicCollectionPath(token) {
+  return `/coleta/pacto/${encodeURIComponent(token)}`;
+}
+
+function trustedCollectionOrigin(requestOrigin) {
+  const normalizedRequestOrigin = String(requestOrigin || '').trim().replace(/\/$/, '');
+  if (normalizedRequestOrigin && env.corsOrigins.includes(normalizedRequestOrigin)) {
+    return normalizedRequestOrigin;
+  }
+  return env.frontendUrl || env.corsOrigin || 'http://localhost:5173';
+}
+
+function publicCollectionUrl(token, requestOrigin) {
+  return `${trustedCollectionOrigin(requestOrigin)}${publicCollectionPath(token)}`;
 }
 
 async function assertPactoProgram(programId) {
@@ -163,6 +180,7 @@ function serializeClass(item) {
     shift: item.shift,
     name: item.name,
     source: item.source,
+    enabledAssessments: item.enabledAssessments || ASSESSMENT_CODES,
     active: item.active,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -218,8 +236,11 @@ export function buildPactoAnalytics(classes) {
 }
 
 export function buildSchoolStatus(classes) {
-  const assessments = classes.flatMap((item) => item.assessments || []);
-  const expected = classes.length * PACTO_CONFIG.assessments.length;
+  const expectedByClass = classes.map((item) => new Set(item.enabledAssessments || ASSESSMENT_CODES));
+  const assessments = classes.flatMap((item, index) => (
+    (item.assessments || []).filter((assessment) => expectedByClass[index].has(assessment.code))
+  ));
+  const expected = expectedByClass.reduce((total, codes) => total + codes.size, 0);
   const sent = assessments.filter((item) => item.status === 'ENVIADO').length;
   const inProgress = assessments.filter((item) => item.status === 'RASCUNHO' || item.status === 'REABERTO').length;
   const pending = Math.max(0, expected - assessments.length);
@@ -384,7 +405,7 @@ export async function exportPactoReport(programId, actor, ip) {
   };
 }
 
-export async function generateSchoolLink(programId, schoolId, data, actor, ip) {
+export async function generateSchoolLink(programId, schoolId, data, actor, ip, requestOrigin) {
   const program = await assertPactoProgram(programId);
   const schoolLink = await assertActiveProgramSchool(programId, schoolId);
   const token = generateCollectionToken();
@@ -422,7 +443,8 @@ export async function generateSchoolLink(programId, schoolId, data, actor, ip) {
     ...link,
     program: { id: program.id, name: program.name },
     school: schoolLink.school,
-    url: publicCollectionUrl(token),
+    path: publicCollectionPath(token),
+    url: publicCollectionUrl(token, requestOrigin),
   };
 }
 
@@ -473,7 +495,14 @@ export async function createAdminClass(programId, data, actor, ip) {
     action: AuditAction.CREATE,
     entity: 'PactoClass',
     entityId: item.id,
-    metadata: { programId, schoolId: data.schoolId, grade: data.grade, shift: data.shift, name: data.name },
+    metadata: {
+      programId,
+      schoolId: data.schoolId,
+      grade: data.grade,
+      shift: data.shift,
+      name: data.name,
+      enabledAssessments: data.enabledAssessments,
+    },
     ip,
   });
   return item;
@@ -482,14 +511,24 @@ export async function createAdminClass(programId, data, actor, ip) {
 async function updateClass(classId, programId, schoolId, data) {
   const item = await prisma.pactoClass.findFirst({
     where: { id: classId, programId, schoolId, active: true },
-    include: { assessments: { select: { status: true } } },
+    include: { assessments: { select: { code: true, status: true } } },
   });
   if (!item) throw notFound('Turma não encontrada');
-  if (classIdentificationLocked(item.assessments)) {
+  const changesIdentification = ['grade', 'shift', 'name'].some((field) => (
+    data[field] !== undefined && String(data[field]) !== String(item[field])
+  ));
+  if (changesIdentification && classIdentificationLocked(item.assessments)) {
     throw conflict('A turma possui avaliação enviada. Reabra a avaliação antes de alterar a identificação da turma.');
   }
   if (data.grade !== undefined && Number(data.grade) !== item.grade && item.assessments.length) {
     throw conflict('O ano da turma não pode ser alterado depois que uma avaliação foi iniciada.');
+  }
+  if (data.enabledAssessments) {
+    const enabled = new Set(data.enabledAssessments);
+    const disabledStartedAssessment = item.assessments.find((assessment) => !enabled.has(assessment.code));
+    if (disabledStartedAssessment) {
+      throw conflict(`A avaliação ${disabledStartedAssessment.code} já foi iniciada e não pode ser removida da turma.`);
+    }
   }
   try {
     const updated = await prisma.pactoClass.update({
@@ -581,7 +620,12 @@ export async function createPublicClass(token, data, ip) {
     entity: 'PactoClass',
     entityId: item.id,
     userName: 'Coleta externa',
-    metadata: { programId: link.programId, schoolId: link.schoolId, source: 'ESCOLA' },
+    metadata: {
+      programId: link.programId,
+      schoolId: link.schoolId,
+      source: 'ESCOLA',
+      enabledAssessments: data.enabledAssessments,
+    },
     ip,
   });
   return item;
@@ -601,7 +645,152 @@ export async function updatePublicClass(token, classId, data, ip) {
   return item;
 }
 
-export function validateAssessmentPayload(pactoClass, payload, { submit }) {
+async function buildPublicImportPreview(token, file, mapping = {}) {
+  const link = await resolvePublicAccess(token);
+  const classes = await prisma.pactoClass.findMany({
+    where: { programId: link.programId, schoolId: link.schoolId, active: true },
+    include: classInclude,
+    orderBy: [{ grade: 'asc' }, { shift: 'asc' }, { name: 'asc' }],
+  });
+
+  let parsed;
+  try {
+    parsed = readPactoImportFile(file.path, file.originalname);
+  } catch (error) {
+    throw new HttpError(
+      422,
+      error?.message || 'Não foi possível ler o arquivo CSV/XLSX.',
+      'PACTO_IMPORT_READ_ERROR',
+    );
+  }
+
+  const preview = analyzePactoImport(parsed, classes, mapping);
+  const previewDigest = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(preview))
+    .digest('hex');
+  return { link, classes, preview: { ...preview, previewDigest } };
+}
+
+export async function previewPublicImport(token, file, mapping = {}) {
+  const { preview } = await buildPublicImportPreview(token, file, mapping);
+  return preview;
+}
+
+export async function confirmPublicImport(token, file, data, ip) {
+  const { link, classes, preview } = await buildPublicImportPreview(token, file, data.mapping || {});
+  if (!data.previewDigest || data.previewDigest !== preview.previewDigest) {
+    throw new HttpError(
+      409,
+      'O arquivo, o mapeamento ou os dados atuais mudaram desde a prévia. Gere uma nova prévia antes de confirmar.',
+      'PACTO_IMPORT_PREVIEW_CHANGED',
+    );
+  }
+  if (!preview.canConfirm) {
+    throw new HttpError(
+      422,
+      'A importação possui pendências bloqueantes. Corrija o arquivo ou o mapeamento e gere uma nova prévia.',
+      'PACTO_IMPORT_VALIDATION_ERROR',
+      preview.errors,
+    );
+  }
+
+  const replacementGroups = preview.groups.filter((group) => group.replacesDraft);
+  if (replacementGroups.length && !data.confirmReplace) {
+    throw new HttpError(
+      409,
+      'Confirme explicitamente a atualização dos componentes nos rascunhos existentes.',
+      'PACTO_IMPORT_REPLACE_CONFIRMATION_REQUIRED',
+      replacementGroups.map((group) => ({ key: group.id, className: group.className, assessment: group.assessment })),
+    );
+  }
+
+  const classById = new Map(classes.map((item) => [item.id, item]));
+  const prepared = preview.groups.map((group) => {
+    const pactoClass = classById.get(group.classId);
+    if (!pactoClass) throw notFound(`Turma não encontrada para o grupo ${group.id}`);
+    const payload = previewGroupToPayload(group);
+    const checked = validateAssessmentPayload(pactoClass, payload, {
+      submit: true,
+      requireAllComponents: false,
+    });
+    return { group, pactoClass, payload, checked };
+  });
+
+  let assessments;
+  try {
+    assessments = await prisma.$transaction(
+      async (tx) => {
+        const rows = [];
+        for (const item of prepared) {
+          rows.push(await persistAssessmentRecord(
+            tx,
+            item.pactoClass,
+            item.payload,
+            item.checked,
+            {
+              submit: false,
+              forceDraft: true,
+              expectedExisting: item.group.existingId
+                ? {
+                    id: item.group.existingId,
+                    status: item.group.existingStatus,
+                    updatedAt: item.group.existingUpdatedAt
+                      ? new Date(item.group.existingUpdatedAt).toISOString()
+                      : null,
+                  }
+                : null,
+            },
+          ));
+        }
+        return rows;
+      },
+      { isolationLevel: 'Serializable', maxWait: 10_000, timeout: 60_000 },
+    );
+  } catch (error) {
+    if (error?.code === 'P2034') {
+      throw new HttpError(
+        409,
+        'Os dados foram alterados durante a confirmação. Gere uma nova prévia e tente novamente.',
+        'PACTO_IMPORT_CONCURRENT_CHANGE',
+      );
+    }
+    throw error;
+  }
+
+  await audit({
+    action: AuditAction.IMPORT_CONFIRM,
+    entity: 'PactoAssessment',
+    userName: 'Coleta externa',
+    metadata: {
+      operation: 'IMPORT_POWER_BI_DRAFTS',
+      programId: link.programId,
+      schoolId: link.schoolId,
+      source: preview.file,
+      groups: prepared.map(({ group }) => ({
+        classId: group.classId,
+        code: group.assessment,
+        replacedDraft: group.replacesDraft,
+      })),
+    },
+    ip,
+  });
+
+  return {
+    imported: assessments.map((assessment, index) => (
+      serializeAssessment(assessment, prepared[index].pactoClass.grade)
+    )),
+    count: assessments.length,
+    status: 'RASCUNHO',
+    warnings: preview.warnings,
+  };
+}
+
+export function validateAssessmentPayload(
+  pactoClass,
+  payload,
+  { submit, requireAllComponents = submit },
+) {
   const definition = getAssessmentDefinition(pactoClass.grade, payload.code);
   if (!definition) throw new HttpError(422, 'Avaliação inválida para esta turma', 'INVALID_ASSESSMENT');
 
@@ -677,7 +866,7 @@ export function validateAssessmentPayload(pactoClass, payload, { submit }) {
     normalized.push({ ...component, results });
   }
 
-  if (submit) {
+  if (requireAllComponents) {
     for (const code of expectedComponents.keys()) {
       if (!receivedComponentCodes.has(code)) errors.push({ field: code, message: 'Componente obrigatório não informado' });
     }
@@ -689,71 +878,106 @@ export function validateAssessmentPayload(pactoClass, payload, { submit }) {
   return { definition, components: normalized, warnings };
 }
 
+async function persistAssessmentRecord(
+  tx,
+  pactoClass,
+  payload,
+  checked,
+  { submit, forceDraft = false, expectedExisting = undefined },
+) {
+  const existing = await tx.pactoAssessment.findUnique({
+    where: { classId_code: { classId: pactoClass.id, code: payload.code } },
+    select: { id: true, status: true, updatedAt: true },
+  });
+  if (expectedExisting !== undefined) {
+    const existingTimestamp = existing?.updatedAt ? new Date(existing.updatedAt).toISOString() : null;
+    if (
+      (expectedExisting === null && existing)
+      || (expectedExisting && (
+        !existing
+        || existing.id !== expectedExisting.id
+        || existing.status !== expectedExisting.status
+        || (expectedExisting.updatedAt && existingTimestamp !== expectedExisting.updatedAt)
+      ))
+    ) {
+      throw new HttpError(
+        409,
+        'Um rascunho foi alterado desde a prévia. Gere uma nova prévia antes de importar.',
+        'PACTO_IMPORT_CONCURRENT_CHANGE',
+      );
+    }
+  }
+  if (publicAssessmentLocked(existing?.status)) {
+    throw conflict('Esta avaliação já foi enviada. Solicite a reabertura ao administrador para corrigir.');
+  }
+
+  const row = existing
+    ? await tx.pactoAssessment.update({
+        where: { id: existing.id },
+        data: {
+          status: submit ? 'ENVIADO' : forceDraft ? 'RASCUNHO' : draftAssessmentStatus(existing.status),
+          submittedAt: submit ? new Date() : forceDraft ? null : undefined,
+        },
+      })
+    : await tx.pactoAssessment.create({
+        data: {
+          classId: pactoClass.id,
+          code: payload.code,
+          status: submit ? 'ENVIADO' : 'RASCUNHO',
+          submittedAt: submit ? new Date() : null,
+        },
+      });
+
+  for (const component of checked.components) {
+    const componentRow = await tx.pactoAssessmentComponent.upsert({
+      where: {
+        assessmentId_component: { assessmentId: row.id, component: component.component },
+      },
+      create: {
+        assessmentId: row.id,
+        component: component.component,
+        enrolled: component.enrolled,
+        evaluated: component.evaluated,
+      },
+      update: { enrolled: component.enrolled, evaluated: component.evaluated },
+    });
+    await tx.pactoSkillResult.deleteMany({ where: { componentId: componentRow.id } });
+    if (component.results.length) {
+      await tx.pactoSkillResult.createMany({
+        data: component.results.map((result) => ({
+          componentId: componentRow.id,
+          skill: result.skill,
+          level: result.level,
+          count: result.count,
+        })),
+      });
+    }
+  }
+
+  return tx.pactoAssessment.findUnique({
+    where: { id: row.id },
+    include: classInclude.assessments.include,
+  });
+}
+
 async function saveAssessment(token, payload, { submit, ip }) {
   const link = await resolvePublicAccess(token);
   const pactoClass = await prisma.pactoClass.findFirst({
     where: { id: payload.classId, programId: link.programId, schoolId: link.schoolId, active: true },
   });
   if (!pactoClass) throw notFound('Turma não encontrada para esta escola');
-
-  const existing = await prisma.pactoAssessment.findUnique({
-    where: { classId_code: { classId: pactoClass.id, code: payload.code } },
-    select: { id: true, status: true },
-  });
-  if (publicAssessmentLocked(existing?.status)) {
-    throw conflict('Esta avaliação já foi enviada. Solicite a reabertura ao administrador para corrigir.');
+  if (!(pactoClass.enabledAssessments || ASSESSMENT_CODES).includes(payload.code)) {
+    throw new HttpError(
+      422,
+      `A avaliação ${payload.code} não está habilitada para esta turma`,
+      'ASSESSMENT_NOT_ENABLED',
+    );
   }
 
   const checked = validateAssessmentPayload(pactoClass, payload, { submit });
-  const assessment = await prisma.$transaction(async (tx) => {
-    const row = existing
-      ? await tx.pactoAssessment.update({
-          where: { id: existing.id },
-          data: {
-            status: submit ? 'ENVIADO' : draftAssessmentStatus(existing.status),
-            submittedAt: submit ? new Date() : undefined,
-          },
-        })
-      : await tx.pactoAssessment.create({
-          data: {
-            classId: pactoClass.id,
-            code: payload.code,
-            status: submit ? 'ENVIADO' : 'RASCUNHO',
-            submittedAt: submit ? new Date() : null,
-          },
-        });
-
-    for (const component of checked.components) {
-      const componentRow = await tx.pactoAssessmentComponent.upsert({
-        where: {
-          assessmentId_component: { assessmentId: row.id, component: component.component },
-        },
-        create: {
-          assessmentId: row.id,
-          component: component.component,
-          enrolled: component.enrolled,
-          evaluated: component.evaluated,
-        },
-        update: { enrolled: component.enrolled, evaluated: component.evaluated },
-      });
-      await tx.pactoSkillResult.deleteMany({ where: { componentId: componentRow.id } });
-      if (component.results.length) {
-        await tx.pactoSkillResult.createMany({
-          data: component.results.map((result) => ({
-            componentId: componentRow.id,
-            skill: result.skill,
-            level: result.level,
-            count: result.count,
-          })),
-        });
-      }
-    }
-
-    return tx.pactoAssessment.findUnique({
-      where: { id: row.id },
-      include: classInclude.assessments.include,
-    });
-  });
+  const assessment = await prisma.$transaction((tx) => (
+    persistAssessmentRecord(tx, pactoClass, payload, checked, { submit })
+  ));
 
   await audit({
     action: submit ? AuditAction.CREATE : AuditAction.UPDATE,

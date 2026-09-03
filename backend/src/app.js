@@ -45,7 +45,11 @@ export function createApp() {
   if (env.nodeEnv !== 'test') {
     app.use(
       morgan(env.isDev ? 'dev' : 'combined', {
-        skip: (req) => req.originalUrl.includes('/notifications') && req.method === 'GET',
+        // Tokens de coleta são credenciais bearer e nunca devem aparecer nos logs de acesso.
+        skip: (req) => (
+          req.originalUrl.startsWith(`${env.apiPrefix}/public/pacto/`)
+          || (req.originalUrl.includes('/notifications') && req.method === 'GET')
+        ),
       }),
     );
   }

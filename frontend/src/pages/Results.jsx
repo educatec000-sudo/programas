@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApi, useDebounce } from '../hooks/useApi.js';
 import { resultsApi, programsApi, schoolsApi, indicatorsApi } from '../services/resources.js';
@@ -48,6 +48,11 @@ export default function Results() {
     () => (form.programId ? programsApi.get(form.programId) : Promise.resolve(null)),
     [form.programId],
   );
+  useEffect(() => {
+    if (formProgram?.year && form.year !== formProgram.year) {
+      setForm((current) => ({ ...current, year: formProgram.year }));
+    }
+  }, [formProgram, form.year]);
   const [overwrite, setOverwrite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -218,7 +223,9 @@ export default function Results() {
         <Field label="Ano">
           <Select value={filters.year} onChange={setF('year')}>
             <option value="">Todos</option>
-            {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
+            {[...new Set([...(programs?.data || []).map((item) => item.year), ...yearsRange(2023)])]
+              .sort((a, b) => b - a)
+              .map((y) => <option key={y} value={y}>{y}</option>)}
           </Select>
         </Field>
         <Field label="Período">
@@ -256,7 +263,16 @@ export default function Results() {
         <form onSubmit={submit}>
           <div className="form-grid">
             <Field label="Programa" required>
-              <Select value={form.programId} onChange={(e) => setForm((f) => ({ ...f, programId: e.target.value, schoolId: '', indicatorId: '' }))} required>
+              <Select value={form.programId} onChange={(event) => {
+                const selected = (programs?.data || []).find((item) => item.id === event.target.value);
+                setForm((current) => ({
+                  ...current,
+                  programId: event.target.value,
+                  schoolId: '',
+                  indicatorId: '',
+                  year: selected?.year || current.year,
+                }));
+              }} required>
                 <option value="">Selecione...</option>
                 {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'resultados')).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
               </Select>
@@ -273,10 +289,8 @@ export default function Results() {
                 {(formProgram?.indicators || []).filter((criterion) => criterion.active).map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.code} — {criterion.name}</option>)}
               </Select>
             </Field>
-            <Field label="Ano" required>
-              <Select value={form.year} onChange={(e) => setForm((f) => ({ ...f, year: Number(e.target.value) }))}>
-                {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
-              </Select>
+            <Field label="Ano/ciclo" required hint="Definido pela execução selecionada do programa">
+              <Input type="number" value={formProgram?.year || form.year} readOnly disabled />
             </Field>
             <Field label="Período" required>
               <Select value={form.period} onChange={(e) => setForm((f) => ({ ...f, period: e.target.value }))}>

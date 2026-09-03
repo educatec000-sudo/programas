@@ -1,5 +1,7 @@
+import { unlink } from 'node:fs/promises';
 import { wrap } from '../../lib/wrap.js';
 import { getClientIp } from '../../lib/auth.js';
+import { HttpError } from '../../lib/errors.js';
 import * as service from './service.js';
 
 export const adminOverview = wrap(async (req, res) => {
@@ -21,6 +23,7 @@ export const generateLink = wrap(async (req, res) => {
       req.data.body,
       req.user,
       getClientIp(req),
+      req.get('origin'),
     ),
   );
 });
@@ -96,4 +99,84 @@ export const submitAssessment = wrap(async (req, res) => {
   res.json(
     await service.submitPublicAssessment(req.data.params.token, req.data.body, getClientIp(req)),
   );
+});
+
+function parseImportMapping(value) {
+  if (!value) return {};
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error();
+    if (parsed.mode != null && !['long', 'wide'].includes(parsed.mode)) throw new Error();
+    for (const section of ['columns', 'results', 'resultPercentages', 'classes']) {
+      const entries = Object.entries(parsed[section] || {});
+      if (entries.length > 100 || (parsed[section] && (Array.isArray(parsed[section]) || typeof parsed[section] !== 'object'))) {
+        throw new Error();
+      }
+      if (entries.some(([key, source]) => (
+        key.length > 200
+        || (source !== null && (typeof source !== 'string' || source.length > 300))
+      ))) throw new Error();
+    }
+    return {
+      ...(parsed.mode && { mode: parsed.mode }),
+      columns: { ...(parsed.columns || {}) },
+      results: { ...(parsed.results || {}) },
+      resultPercentages: { ...(parsed.resultPercentages || {}) },
+      classes: { ...(parsed.classes || {}) },
+    };
+  } catch {
+    throw new HttpError(400, 'O mapeamento enviado é inválido.', 'PACTO_IMPORT_MAPPING_INVALID');
+  }
+}
+
+async function removeTemporaryUpload(file) {
+  if (!file?.path) return;
+  try {
+    await unlink(file.path);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') console.error('[PACTO_IMPORT_CLEANUP]', error?.message);
+  }
+}
+
+export const previewImport = wrap(async (req, res) => {
+  try {
+    if (!req.file) {
+      throw new HttpError(400, 'Selecione um arquivo CSV ou XLSX.', 'PACTO_IMPORT_FILE_REQUIRED');
+    }
+    res.json(
+      await service.previewPublicImport(
+        req.data.params.token,
+        req.file,
+        parseImportMapping(req.body?.mapping),
+      ),
+    );
+  } finally {
+    await removeTemporaryUpload(req.file);
+  }
+});
+
+export const confirmImport = wrap(async (req, res) => {
+  try {
+    if (!req.file) {
+      throw new HttpError(400, 'Selecione um arquivo CSV ou XLSX.', 'PACTO_IMPORT_FILE_REQUIRED');
+    }
+    const previewDigest = String(req.body?.previewDigest || '');
+    if (!/^[a-f0-9]{64}$/.test(previewDigest)) {
+      throw new HttpError(400, 'A confirmação não corresponde a uma prévia válida.', 'PACTO_IMPORT_PREVIEW_REQUIRED');
+    }
+    res.json(
+      await service.confirmPublicImport(
+        req.data.params.token,
+        req.file,
+        {
+          mapping: parseImportMapping(req.body?.mapping),
+          previewDigest,
+          confirmReplace: req.body?.confirmReplace === true || req.body?.confirmReplace === 'true',
+        },
+        getClientIp(req),
+      ),
+    );
+  } finally {
+    await removeTemporaryUpload(req.file);
+  }
 });

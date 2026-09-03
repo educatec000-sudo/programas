@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useApi } from '../../hooks/useApi.js';
-import { pactoAdminApi } from '../../services/resources.js';
+import { pactoAdminApi, pactoPublicApi } from '../../services/resources.js';
+import { resolvePactoPublicLink } from './link.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import DataTable from '../../components/DataTable.jsx';
@@ -13,6 +14,8 @@ const STATUS = {
   PARCIAL: { label: 'Envios parciais', cls: 'badge-blue' },
   CONCLUIDA: { label: 'Concluída', cls: 'badge-green' },
 };
+
+const ALL_ASSESSMENTS = ['A0', 'A1', 'A2', 'A3'];
 
 const ASSESSMENT_STATUS = {
   RASCUNHO: { label: 'Rascunho', cls: 'badge-yellow' },
@@ -33,11 +36,14 @@ export default function PactoAdmin({ program }) {
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [linkModal, setLinkModal] = useState(null);
   const [generatedLink, setGeneratedLink] = useState(null);
+  const [linkVerification, setLinkVerification] = useState(null);
   const [expiresAt, setExpiresAt] = useState(futureDate());
   const [classModal, setClassModal] = useState(false);
   const [editingAdminClass, setEditingAdminClass] = useState(null);
   const [assessmentDetail, setAssessmentDetail] = useState(null);
-  const [classForm, setClassForm] = useState({ schoolId: '', grade: 1, shift: 'M', name: '' });
+  const [classForm, setClassForm] = useState({
+    schoolId: '', grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS,
+  });
   const [busy, setBusy] = useState(false);
 
   const school = useMemo(
@@ -49,13 +55,28 @@ export default function PactoAdmin({ program }) {
   if (error) return <div className="alert alert-error">{error.message}</div>;
   if (!data) return null;
 
+  const editingIdentificationLocked = Boolean(
+    editingAdminClass?.assessments?.some((assessment) => assessment.status === 'ENVIADO'),
+  );
+
   const generateLink = async () => {
     setBusy(true);
     try {
       const endOfDay = new Date(`${expiresAt}T23:59:59`);
       const result = await pactoAdminApi.generateLink(program.id, linkModal.id, endOfDay.toISOString());
-      setGeneratedLink(result.url);
-      success('Link exclusivo gerado. Copie-o antes de fechar esta janela.');
+      const publicLink = resolvePactoPublicLink(result.path, window.location.origin);
+      const verification = await pactoPublicApi.bootstrap(publicLink.token);
+      if (verification.school.id !== linkModal.id || verification.program.id !== program.id) {
+        throw new Error('A verificação do link retornou outra escola ou outro programa. O endereço não será exibido.');
+      }
+      setGeneratedLink(publicLink.url);
+      setLinkVerification({
+        schoolName: verification.school.name,
+        schoolInep: verification.school.inep,
+        programName: verification.program.name,
+        classesCount: verification.classes.length,
+      });
+      success('Link exclusivo gerado e verificado na API pública do Pacto.');
       refresh();
     } catch (err) {
       toastError(err.message);
@@ -91,6 +112,7 @@ export default function PactoAdmin({ program }) {
         grade: Number(classForm.grade),
         shift: classForm.shift,
         name: classForm.name,
+        enabledAssessments: classForm.enabledAssessments,
       };
       if (editingAdminClass) {
         await pactoAdminApi.updateClass(program.id, editingAdminClass.id, payload);
@@ -101,7 +123,7 @@ export default function PactoAdmin({ program }) {
       }
       setClassModal(false);
       setEditingAdminClass(null);
-      setClassForm({ schoolId: '', grade: 1, shift: 'M', name: '' });
+      setClassForm({ schoolId: '', grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS });
       refresh();
     } catch (err) {
       toastError(err.details?.map((item) => item.message).join(' · ') || err.message);
@@ -112,13 +134,28 @@ export default function PactoAdmin({ program }) {
 
   const openNewAdminClass = () => {
     setEditingAdminClass(null);
-    setClassForm({ schoolId: '', grade: 1, shift: 'M', name: '' });
+    setClassForm({ schoolId: '', grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS });
     setClassModal(true);
+  };
+
+  const toggleAdminAssessment = (code) => {
+    setClassForm((current) => ({
+      ...current,
+      enabledAssessments: current.enabledAssessments.includes(code)
+        ? current.enabledAssessments.filter((item) => item !== code)
+        : ALL_ASSESSMENTS.filter((item) => item === code || current.enabledAssessments.includes(item)),
+    }));
   };
 
   const openEditAdminClass = (item) => {
     setEditingAdminClass(item);
-    setClassForm({ schoolId: item.schoolId, grade: item.grade, shift: item.shift, name: item.name });
+    setClassForm({
+      schoolId: item.schoolId,
+      grade: item.grade,
+      shift: item.shift,
+      name: item.name,
+      enabledAssessments: item.enabledAssessments || ALL_ASSESSMENTS,
+    });
     setSelectedSchool(null);
     setClassModal(true);
   };
@@ -187,7 +224,7 @@ export default function PactoAdmin({ program }) {
             render: (item) => (
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }} onClick={(event) => event.stopPropagation()}>
                 <Button size="sm" variant="secondary" onClick={() => setSelectedSchool(item.id)}>Visualizar</Button>
-                {can('programs:write') && <Button size="sm" onClick={() => { setLinkModal(item); setGeneratedLink(null); setExpiresAt(futureDate()); }}>Gerar link</Button>}
+                {can('programs:write') && <Button size="sm" onClick={() => { setLinkModal(item); setGeneratedLink(null); setLinkVerification(null); setExpiresAt(futureDate()); }}>Gerar link</Button>}
                 {can('programs:write') && item.collectionLink && <Button size="sm" variant="ghost" onClick={() => revokeLink(item)}>Revogar</Button>}
               </div>
             ),
@@ -253,46 +290,48 @@ export default function PactoAdmin({ program }) {
             <div className="card-header-row">
               <div>
                 <div className="card-title">{item.grade}º ano · Turno {item.shift} · Turma {item.name}</div>
-                <div className="card-subtitle">Cadastro: {item.source === 'ESCOLA' ? 'gestor da escola' : 'administração'}</div>
+                <div className="card-subtitle">
+                  Cadastro: {item.source === 'ESCOLA' ? 'gestor da escola' : 'administração'} · Avaliações no link: {(item.enabledAssessments || ALL_ASSESSMENTS).join(', ')}
+                </div>
               </div>
               {can('programs:write') && (
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={item.assessments.some((assessment) => assessment.status === 'ENVIADO')}
-                  title={item.assessments.some((assessment) => assessment.status === 'ENVIADO') ? 'Reabra todas as avaliações enviadas antes de corrigir a turma.' : undefined}
+                  title="Corrigir a identificação ou configurar as avaliações disponíveis no link"
                   onClick={() => openEditAdminClass(item)}
                 >
-                  Corrigir turma
+                  Configurar turma
                 </Button>
               )}
             </div>
-            {!item.assessments.length ? <div className="table-empty">Nenhuma avaliação iniciada.</div> : (
-              <table className="table">
-                <thead><tr><th>Avaliação</th><th>Status</th><th>Envio</th><th>Alertas</th><th /></tr></thead>
-                <tbody>
-                  {item.assessments.map((assessment) => {
-                    const info = ASSESSMENT_STATUS[assessment.status];
-                    return (
-                      <tr key={assessment.id}>
-                        <td><strong>{assessment.code}</strong></td>
-                        <td><Badge cls={info?.cls}>{info?.label}</Badge></td>
-                        <td>{assessment.submittedAt ? fmtDateTime(assessment.submittedAt) : '—'}</td>
-                        <td>{assessment.warnings.length ? <Badge cls="badge-yellow">{assessment.warnings.length} alerta(s)</Badge> : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>
+            <table className="table">
+              <thead><tr><th>Avaliação</th><th>Status</th><th>Envio</th><th>Alertas</th><th /></tr></thead>
+              <tbody>
+                {(item.enabledAssessments || ALL_ASSESSMENTS).map((code) => {
+                  const assessment = item.assessments.find((saved) => saved.code === code);
+                  const info = assessment ? ASSESSMENT_STATUS[assessment.status] : null;
+                  return (
+                    <tr key={code}>
+                      <td><strong>{code}</strong></td>
+                      <td>{assessment ? <Badge cls={info?.cls}>{info?.label}</Badge> : <Badge cls="badge-gray">Pendente</Badge>}</td>
+                      <td>{assessment?.submittedAt ? fmtDateTime(assessment.submittedAt) : '—'}</td>
+                      <td>{assessment?.warnings.length ? <Badge cls="badge-yellow">{assessment.warnings.length} alerta(s)</Badge> : '—'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {assessment && (
                           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                             <Button size="sm" variant="secondary" onClick={() => setAssessmentDetail({ assessment, pactoClass: item })}>Ver dados</Button>
                             {can('evaluations:write') && assessment.status === 'ENVIADO' && (
                               <Button size="sm" variant="secondary" onClick={() => reopen(assessment.id)}>Reabrir</Button>
                             )}
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ))}
       </Modal>
@@ -343,12 +382,12 @@ export default function PactoAdmin({ program }) {
 
       <Modal
         open={Boolean(linkModal)}
-        onClose={() => { setLinkModal(null); setGeneratedLink(null); }}
+        onClose={() => { setLinkModal(null); setGeneratedLink(null); setLinkVerification(null); }}
         title={`Link de preenchimento — ${linkModal?.name || ''}`}
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setLinkModal(null); setGeneratedLink(null); }}>Fechar</Button>
+            <Button variant="secondary" onClick={() => { setLinkModal(null); setGeneratedLink(null); setLinkVerification(null); }}>Fechar</Button>
             {!generatedLink && <Button onClick={generateLink} disabled={busy || !expiresAt}>{busy ? 'Gerando...' : 'Gerar link exclusivo'}</Button>}
           </>
         }
@@ -356,6 +395,13 @@ export default function PactoAdmin({ program }) {
         {generatedLink ? (
           <>
             <div className="alert alert-warn">Por segurança, o endereço completo é mostrado somente agora. Gerar outro link revogará este.</div>
+            {linkVerification && (
+              <div className="alert alert-success">
+                Link conferido pela API pública: <strong>{linkVerification.schoolName}</strong>
+                {linkVerification.schoolInep ? ` · INEP ${linkVerification.schoolInep}` : ''}
+                {` · ${linkVerification.programName} · ${linkVerification.classesCount} turma(s)`}
+              </div>
+            )}
             <Field label="Endereço exclusivo">
               <div style={{ display: 'flex', gap: 8 }}>
                 <Input value={generatedLink} readOnly />
@@ -378,10 +424,13 @@ export default function PactoAdmin({ program }) {
         footer={
           <>
             <Button variant="secondary" onClick={() => { setClassModal(false); setEditingAdminClass(null); }}>Cancelar</Button>
-            <Button onClick={saveAdminClass} disabled={busy || !classForm.schoolId || !classForm.name}>{busy ? 'Salvando...' : editingAdminClass ? 'Salvar correção' : 'Cadastrar'}</Button>
+            <Button onClick={saveAdminClass} disabled={busy || !classForm.schoolId || !classForm.name || !classForm.enabledAssessments.length}>{busy ? 'Salvando...' : editingAdminClass ? 'Salvar correção' : 'Cadastrar'}</Button>
           </>
         }
       >
+        {editingIdentificationLocked && (
+          <div className="alert alert-info">A identificação está bloqueada porque há envio concluído. Ainda é possível acrescentar avaliações ao link; para alterar ano, turno ou turma, reabra os envios.</div>
+        )}
         <Field label="Escola" required>
           <Select disabled={Boolean(editingAdminClass)} value={classForm.schoolId} onChange={(event) => setClassForm((form) => ({ ...form, schoolId: event.target.value }))}>
             <option value="">Selecione</option>
@@ -389,17 +438,35 @@ export default function PactoAdmin({ program }) {
           </Select>
         </Field>
         <Field label="Ano" required>
-          <Select value={classForm.grade} onChange={(event) => setClassForm((form) => ({ ...form, grade: event.target.value }))}>
+          <Select disabled={editingIdentificationLocked} value={classForm.grade} onChange={(event) => setClassForm((form) => ({ ...form, grade: event.target.value }))}>
             <option value="1">1º ano</option><option value="2">2º ano</option>
           </Select>
         </Field>
         <Field label="Turno" required>
-          <Select value={classForm.shift} onChange={(event) => setClassForm((form) => ({ ...form, shift: event.target.value }))}>
+          <Select disabled={editingIdentificationLocked} value={classForm.shift} onChange={(event) => setClassForm((form) => ({ ...form, shift: event.target.value }))}>
             <option value="M">M</option><option value="T">T</option>
           </Select>
         </Field>
         <Field label="Turma" required>
-          <Input value={classForm.name} maxLength={30} onChange={(event) => setClassForm((form) => ({ ...form, name: event.target.value.toUpperCase() }))} placeholder="Ex.: A" />
+          <Input disabled={editingIdentificationLocked} value={classForm.name} maxLength={30} onChange={(event) => setClassForm((form) => ({ ...form, name: event.target.value.toUpperCase() }))} placeholder="Ex.: A" />
+        </Field>
+        <Field label="Avaliações disponíveis no link" required hint="Somente as avaliações selecionadas serão exibidas para esta turma.">
+          <div className="pacto-assessment-checks">
+            {ALL_ASSESSMENTS.map((code) => {
+              const started = editingAdminClass?.assessments?.some((assessment) => assessment.code === code);
+              return (
+                <label key={code} className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={classForm.enabledAssessments.includes(code)}
+                    disabled={started}
+                    onChange={() => toggleAdminAssessment(code)}
+                  />
+                  <span><strong>{code}</strong>{started ? ' · já iniciada' : ''}</span>
+                </label>
+              );
+            })}
+          </div>
         </Field>
       </Modal>
     </>

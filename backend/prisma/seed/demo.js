@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import bcrypt from 'bcryptjs';
+import { permanentProgramCode, permanentProgramName } from '../../src/services/program-catalog.js';
 
 /** RNG determinístico (mulberry32) — dados de demonstração reproduzíveis. */
 function rng(seed) {
@@ -14,30 +15,30 @@ function rng(seed) {
 }
 
 const SCHOOL_NAMES = [
-  ['E.M.E.F. Bela Vista', 'Belém', 'URBANA'],
-  ['E.M.E.F. Cidade Nova', 'Ananindeua', 'URBANA'],
-  ['E.M.E.F. Marituba Norte', 'Marituba', 'URBANA'],
-  ['E.M.E.F. Benevides Centro', 'Benevides', 'URBANA'],
-  ['E.M.E.F. Santo Antônio', 'Benevides', 'URBANA'],
-  ['E.M.E.F. Castanhal Sul', 'Castanhal', 'URBANA'],
-  ['E.M.E.F. Guamá', 'Belém', 'URBANA'],
-  ['E.M.E.F. Terra Firme', 'Belém', 'URBANA'],
-  ['E.M.E.F. Icoaraci', 'Belém', 'URBANA'],
-  ['E.M.E.F. Santa Izabel Norte', 'Santa Izabel do Pará', 'URBANA'],
-  ['E.M.E.F. Santo Antônio do Tauá', 'Santo Antônio do Tauá', 'URBANA'],
-  ['E.M.E.F. Barcarena Rio', 'Barcarena', 'URBANA'],
-  ['E.M.E.F. Pedreira', 'Belém', 'URBANA'],
-  ['E.M.E.F. Jurunas', 'Belém', 'URBANA'],
-  ['E.M.E.F. Ananindeua Oeste', 'Ananindeua', 'URBANA'],
-  ['E.M.E.F. Marituba Sul', 'Marituba', 'URBANA'],
-  ['E.M.E.F. Castanhal Norte', 'Castanhal', 'URBANA'],
-  ['E.M.E.F. Benevides Rural', 'Benevides', 'RURAL'],
-  ['E.M.E.F. Vigia', 'Vigia', 'URBANA'],
-  ['E.M.E.F. Castanhal Rural', 'Castanhal', 'RURAL'],
-  ['E.M.E.F. São Francisco', 'Belém', 'URBANA'],
-  ['E.M.E.F. Inhangapi', 'Santa Izabel do Pará', 'RURAL'],
-  ['E.M.E.F. Curuçá', 'Curuçá', 'URBANA'],
-  ['E.M.E.F. Primavera', 'Primavera', 'RURAL'],
+  ['E.M.E.F. Bela Vista', 'URBANA'],
+  ['E.M.E.F. Cidade Nova', 'URBANA'],
+  ['E.M.E.F. Marituba Norte', 'URBANA'],
+  ['E.M.E.F. Benevides Centro', 'URBANA'],
+  ['E.M.E.F. Santo Antônio', 'URBANA'],
+  ['E.M.E.F. Castanhal Sul', 'URBANA'],
+  ['E.M.E.F. Guamá', 'URBANA'],
+  ['E.M.E.F. Terra Firme', 'URBANA'],
+  ['E.M.E.F. Icoaraci', 'URBANA'],
+  ['E.M.E.F. Santa Izabel Norte', 'URBANA'],
+  ['E.M.E.F. Santo Antônio do Tauá', 'URBANA'],
+  ['E.M.E.F. Barcarena Rio', 'URBANA'],
+  ['E.M.E.F. Pedreira', 'URBANA'],
+  ['E.M.E.F. Jurunas', 'URBANA'],
+  ['E.M.E.F. Ananindeua Oeste', 'URBANA'],
+  ['E.M.E.F. Marituba Sul', 'URBANA'],
+  ['E.M.E.F. Castanhal Norte', 'URBANA'],
+  ['E.M.E.F. Benevides Rural', 'RURAL'],
+  ['E.M.E.F. Vigia', 'URBANA'],
+  ['E.M.E.F. Castanhal Rural', 'RURAL'],
+  ['E.M.E.F. São Francisco', 'URBANA'],
+  ['E.M.E.F. Inhangapi', 'RURAL'],
+  ['E.M.E.F. Curuçá', 'URBANA'],
+  ['E.M.E.F. Primavera', 'RURAL'],
 ];
 
 export const DEMO_SCHOOL_INEPS = SCHOOL_NAMES.map((_, index) =>
@@ -146,11 +147,10 @@ export async function seedDemoData(prisma) {
   // Escolas
   const schools = [];
   for (let i = 0; i < SCHOOL_NAMES.length; i++) {
-    const [name, municipality, zone] = SCHOOL_NAMES[i];
+    const [name, zone] = SCHOOL_NAMES[i];
     const inep = DEMO_SCHOOL_INEPS[i];
     const data = {
       name,
-      municipality,
       district: zone === 'RURAL' ? 'Zona Rural' : ['Centro', 'Bairro Novo', 'Cidade Nova', 'Terra Firme'][i % 4],
       zone,
       adminDependency: 'MUNICIPAL',
@@ -223,10 +223,22 @@ export async function seedDemoData(prisma) {
       description: `${def.name} — programa de educação sob responsabilidade do ${def.organ}, ciclo ${def.year}.`,
       deletedAt: null,
     };
+    const catalogCode = permanentProgramCode(def.code, def.year);
+    const catalog = await prisma.programCatalog.upsert({
+      where: { code: catalogCode },
+      update: { deletedAt: null },
+      create: {
+        code: catalogCode,
+        name: permanentProgramName(def.name, def.year),
+        description: programData.description,
+        objective: def.objective,
+        organ: def.organ,
+      },
+    });
     const program = await prisma.program.upsert({
       where: { code: def.code },
-      update: programData,
-      create: { code: def.code, ...programData },
+      update: { ...programData, catalogId: catalog.id },
+      create: { catalogId: catalog.id, code: def.code, ...programData },
     });
     programs.push(program);
 

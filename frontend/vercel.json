@@ -16,6 +16,10 @@
   ],
   "rewrites": [
     {
+      "source": "/coleta/pacto/:token",
+      "destination": "/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

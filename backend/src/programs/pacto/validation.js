@@ -12,10 +12,17 @@ export const generateLinkSchema = z.object({
   expiresAt: z.coerce.date().refine((value) => value > new Date(), 'A validade deve estar no futuro'),
 });
 
+const enabledAssessmentsSchema = z
+  .array(z.enum(['A0', 'A1', 'A2', 'A3']))
+  .min(1, 'Selecione ao menos uma avaliação')
+  .max(4)
+  .refine((items) => new Set(items).size === items.length, 'Não repita avaliações');
+
 const classFields = {
   grade: z.coerce.number().int().min(1).max(2),
   shift: z.enum(['M', 'T']),
   name: z.string().trim().min(1).max(30).transform((value) => value.toUpperCase()),
+  enabledAssessments: enabledAssessmentsSchema.default(['A0', 'A1', 'A2', 'A3']),
 };
 
 export const adminClassSchema = z.object({

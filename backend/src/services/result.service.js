@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma.js';
 import { notFound, conflict, HttpError } from '../lib/errors.js';
 import { audit, AuditAction } from '../lib/audit.js';
 import { parsePagination, buildPagination } from '../lib/pagination.js';
-import { PACTO_PROGRAM_CODE } from '../programs/pacto/config.js';
+import { PACTO_CATALOG_CODE } from '../programs/pacto/config.js';
 
 const resultInclude = {
   program: { select: { id: true, code: true, name: true } },
@@ -27,7 +27,7 @@ async function dimensionErrors(items) {
   const [programs, schools, indicators, schoolLinks, indicatorLinks] = await Promise.all([
     prisma.program.findMany({
       where: { id: { in: programIds }, deletedAt: null },
-      select: { id: true, code: true },
+      select: { id: true, code: true, year: true, catalog: { select: { code: true } } },
     }),
     prisma.school.findMany({
       where: { id: { in: schoolIds }, deletedAt: null },
@@ -48,8 +48,9 @@ async function dimensionErrors(items) {
   ]);
 
   const validPrograms = new Set(programs.map((row) => row.id));
+  const programYears = new Map(programs.map((row) => [row.id, row.year]));
   const specificCollectionPrograms = new Set(
-    programs.filter((row) => row.code === PACTO_PROGRAM_CODE).map((row) => row.id),
+    programs.filter((row) => row.catalog.code === PACTO_CATALOG_CODE).map((row) => row.id),
   );
   const validSchools = new Set(schools.map((row) => row.id));
   const validIndicators = new Set(indicators.map((row) => row.id));
@@ -58,6 +59,9 @@ async function dimensionErrors(items) {
 
   return items.map((item) => {
     if (!validPrograms.has(item.programId)) return 'Programa não encontrado ou excluído';
+    if (Number(item.year) !== programYears.get(item.programId)) {
+      return `O resultado deve pertencer ao ciclo ${programYears.get(item.programId)} deste programa`;
+    }
     if (specificCollectionPrograms.has(item.programId)) {
       return 'O Pacto pela Alfabetização usa a coleta específica por turma; não aceita lançamento no resultado genérico';
     }

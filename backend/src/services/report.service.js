@@ -8,7 +8,7 @@ import {
 import { resultsForExport } from './result.service.js';
 import { listGoals, resolveGoalFromList } from './goal.service.js';
 import { HttpError } from '../lib/errors.js';
-import { PACTO_PROGRAM_CODE } from '../programs/pacto/config.js';
+import { PACTO_CATALOG_CODE } from '../programs/pacto/config.js';
 
 /**
  * Relatórios — cada builder devolve um dataset tabular
@@ -435,7 +435,7 @@ export async function buildReport(type, query) {
 
   if (query.programId) {
     const pacto = await prisma.program.findFirst({
-      where: { id: query.programId, code: PACTO_PROGRAM_CODE, deletedAt: null },
+      where: { id: query.programId, deletedAt: null, catalog: { code: PACTO_CATALOG_CODE } },
       select: { id: true },
     });
     if (pacto) {

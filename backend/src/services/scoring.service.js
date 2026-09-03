@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { ATTAINMENT_CAP, classify, periodOrder } from '../lib/constants.js';
 import { HttpError } from '../lib/errors.js';
-import { PACTO_PROGRAM_CODE } from '../programs/pacto/config.js';
+import { PACTO_CATALOG_CODE } from '../programs/pacto/config.js';
 
 /**
  * Núcleo de cálculo do CPE:
@@ -109,7 +109,7 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
     }),
     prisma.program.findMany({
       where: { deletedAt: null },
-      select: { id: true, code: true, name: true, year: true, status: true },
+      select: { id: true, code: true, name: true, year: true, status: true, catalog: { select: { code: true } } },
     }),
   ]);
 
@@ -228,37 +228,21 @@ function aggregate(scope, { year, period, indicatorOnly }) {
   return [...bySchool.values()].filter((a) => a.score !== null);
 }
 
-async function resolveRankingYear({ year, programId, indicatorId, schoolId }) {
-  const parsed = Number(year);
-  if (Number.isInteger(parsed)) return parsed;
-  const latest = await prisma.result.findFirst({
-    where: {
-      ...(programId && { programId }),
-      ...(indicatorId && { indicatorId }),
-      ...(schoolId && { schoolId }),
-      program: { deletedAt: null },
-      school: { deletedAt: null },
-      indicator: { deletedAt: null },
-    },
-    orderBy: { year: 'desc' },
-    select: { year: true },
+async function getScoringProgram(programId) {
+  if (!programId) return null;
+  const program = await prisma.program.findFirst({
+    where: { id: programId, deletedAt: null },
+    select: { id: true, code: true, year: true, catalog: { select: { code: true } } },
   });
-  return latest?.year ?? new Date().getFullYear();
-}
-
-async function assertSharedScoringAvailable(programId) {
-  if (!programId) return;
-  const specificProgram = await prisma.program.findFirst({
-    where: { id: programId, code: PACTO_PROGRAM_CODE, deletedAt: null },
-    select: { id: true },
-  });
-  if (specificProgram) {
+  if (!program) throw new HttpError(404, 'Ciclo do programa não encontrado', 'NOT_FOUND');
+  if (program.catalog.code === PACTO_CATALOG_CODE) {
     throw new HttpError(
       422,
       'O Pacto pela Alfabetização ainda não possui regra oficial de ranking. Consulte a área específica do programa.',
       'PROGRAM_RANKING_UNAVAILABLE',
     );
   }
+  return program;
 }
 
 /**
@@ -274,8 +258,15 @@ export async function computeRanking(params) {
       'PROGRAM_REQUIRED',
     );
   }
-  await assertSharedScoringAvailable(programId);
-  const year = await resolveRankingYear(params);
+  const program = await getScoringProgram(programId);
+  if (params.year && Number(params.year) !== program.year) {
+    throw new HttpError(
+      422,
+      `Os dados desta execução pertencem ao ciclo ${program.year}`,
+      'PROGRAM_CYCLE_YEAR_MISMATCH',
+    );
+  }
+  const year = program.year;
   const scope = await loadScope({ programId, indicatorId, year, schoolId });
 
   // períodos disponíveis no escopo (p/ evolução)
@@ -472,7 +463,7 @@ export async function comparePrograms({ year, period }) {
 
   const out = [];
   for (const program of scope.programById.values()) {
-    if (program.code === PACTO_PROGRAM_CODE) continue;
+    if (program.catalog.code === PACTO_CATALOG_CODE) continue;
     const subScope = { ...scope, results: scope.results.filter((r) => r.programId === program.id) };
     if (!subScope.results.length) continue;
     const series = periods

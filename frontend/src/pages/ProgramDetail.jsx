@@ -8,8 +8,22 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { Button, Field, Input, Modal, Badge, LoadingBlock, Tabs, Select, ConfirmDialog } from '../components/ui.jsx';
 import { EvolutionChart, ClassificationDonut } from '../components/charts.jsx';
-import { PROGRAM_STATUS, CLASSIFICATION_INFO, SCHOOL_ZONE, fmt, fmtDateTime, PERIODS, yearsRange } from '../utils/format.js';
+import { PROGRAM_STATUS, CLASSIFICATION_INFO, SCHOOL_ZONE, fmt, fmtDateTime, PERIODS } from '../utils/format.js';
 import { getProgramImplementation } from '../programs/registry.js';
+
+const DELETION_IMPACT_LABELS = {
+  schools: 'Escolas vinculadas',
+  indicators: 'Indicadores vinculados',
+  results: 'Resultados',
+  goals: 'Metas',
+  evaluations: 'Avaliações consolidadas',
+  collectionLinks: 'Links de coleta',
+  pactoClasses: 'Turmas do Pacto',
+  pactoAssessments: 'Avaliações do Pacto',
+  pactoComponents: 'Componentes avaliados',
+  pactoSkillResults: 'Resultados por habilidade',
+  documents: 'Documentos vinculados',
+};
 
 export default function ProgramDetail() {
   const { id } = useParams();
@@ -26,10 +40,10 @@ export default function ProgramDetail() {
     if (implementation?.disabledSharedTabs?.includes(tab)) setTab('resumo');
   }, [implementation, tab]);
 
-  // seleção de período para ranking/análises
-  const [year, setYear] = useState('');
+  // O ano é definido pelo ciclo selecionado; somente o período varia dentro dele.
   const [period, setPeriod] = useState('');
-  const activeYear = year || program?.year || new Date().getFullYear();
+  useEffect(() => setPeriod(''), [id]);
+  const activeYear = program?.year || new Date().getFullYear();
 
   const { data: ranking, loading: rankingLoading } = useApi(
     () => ((tab === 'ranking' || tab === 'graficos') && sharedTabEnabled(tab) && can('rankings:read') ? rankingsApi.get({ programId: id, year: activeYear, period: period || undefined }) : Promise.resolve(null)),
@@ -51,6 +65,11 @@ export default function ProgramDetail() {
   // modais
   const [schoolsModal, setSchoolsModal] = useState(false);
   const [resultModal, setResultModal] = useState(false);
+  const [cycleModal, setCycleModal] = useState(false);
+  const [cycleForm, setCycleForm] = useState({ year: '', periodLabel: 'Anual', status: 'PLANEJAMENTO' });
+  const [deleteModal, setDeleteModal] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState(null);
+  const [managementBusy, setManagementBusy] = useState(false);
 
   if (loading) return <LoadingBlock />;
   if (!program) return <div className="centered">Programa não encontrado</div>;
@@ -60,11 +79,57 @@ export default function ProgramDetail() {
   const activeSpecificTab = specificTabs.find((item) => item.key === tab);
   const availablePeriods = [...new Set((ranking?.rows || []).length >= 0 && (ranking?.periods || []).filter((p) => p.year === activeYear).map((p) => p.period))];
 
+  const openCycleModal = () => {
+    const latestYear = Math.max(activeYear, ...(program.cycles || []).map((cycle) => cycle.year));
+    setCycleForm({ year: latestYear + 1, periodLabel: 'Anual', status: 'PLANEJAMENTO' });
+    setCycleModal(true);
+  };
+  const createCycle = async () => {
+    setManagementBusy(true);
+    try {
+      const cycle = await programsApi.createCycle(program.id, {
+        ...cycleForm,
+        year: Number(cycleForm.year),
+      });
+      success(`Ciclo ${cycle.year} criado sem copiar escolas ou dados de outros anos.`);
+      setCycleModal(false);
+      navigate(`/programas/${cycle.id}`);
+    } catch (err) {
+      error(err.message);
+    } finally {
+      setManagementBusy(false);
+    }
+  };
+  const openDeleteModal = async () => {
+    setDeleteModal(true);
+    setDeleteImpact(null);
+    try {
+      setDeleteImpact(await programsApi.deletionImpact(program.id));
+    } catch (err) {
+      error(err.message);
+      setDeleteModal(false);
+    }
+  };
+  const deleteProgram = async () => {
+    if (!deleteImpact?.canDelete) return;
+    setManagementBusy(true);
+    try {
+      await programsApi.remove(program.id);
+      success('Programa vazio e seus ciclos foram arquivados com segurança.');
+      navigate('/programas');
+    } catch (err) {
+      if (err.details) setDeleteImpact(err.details);
+      error(err.message);
+    } finally {
+      setManagementBusy(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
-        title={program.name}
-        subtitle={`${program.code} · ${program.year} · ${program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`}
+        title={program.catalog?.name || program.name}
+        subtitle={`${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`}
         actions={
           <>
             <Badge cls={statusInfo?.cls} >{statusInfo?.label}</Badge>
@@ -72,6 +137,26 @@ export default function ProgramDetail() {
           </>
         }
       />
+
+      <div className="card card-pad program-cycle-context">
+        <div>
+          <div className="card-title">Ano/ciclo do programa</div>
+          <div className="card-subtitle">Cada ciclo possui escolas, turmas, avaliações e resultados independentes.</div>
+        </div>
+        <Field label="Ciclo em uso" className="program-cycle-selector">
+          <Select value={program.id} onChange={(event) => navigate(`/programas/${event.target.value}`)}>
+            {(program.cycles || []).map((cycle) => (
+              <option key={cycle.id} value={cycle.id}>
+                {cycle.year}{cycle.periodLabel ? ` · ${cycle.periodLabel}` : ''} · {PROGRAM_STATUS[cycle.status]?.label || cycle.status}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <div className="program-cycle-actions">
+          {can('programs:write') && <Button size="sm" variant="secondary" onClick={openCycleModal}>+ Adicionar ciclo</Button>}
+          {can('programs:delete') && <Button size="sm" variant="danger" onClick={openDeleteModal}>Excluir programa</Button>}
+        </div>
+      </div>
 
       <Tabs
         active={tab}
@@ -92,12 +177,6 @@ export default function ProgramDetail() {
 
       {((tab === 'ranking' && sharedTabEnabled('ranking')) || (tab === 'graficos' && sharedTabEnabled('graficos'))) && (
         <div className="filter-bar">
-          <Field label="Ano">
-            <Select value={year} onChange={(e) => setYear(e.target.value)}>
-              <option value={program.year}>{program.year} (do programa)</option>
-              {yearsRange(2023).filter((y) => y !== program.year).map((y) => <option key={y} value={y}>{y}</option>)}
-            </Select>
-          </Field>
           <Field label="Período">
             <Select value={period} onChange={(e) => setPeriod(e.target.value)}>
               <option value="">Mais recente</option>
@@ -110,7 +189,11 @@ export default function ProgramDetail() {
         </div>
       )}
 
-      {tab === 'resumo' && <InfoTab program={program} implementation={implementation} />}
+      {tab === 'resumo' && (
+        implementation?.OverviewComponent
+          ? React.createElement(implementation.OverviewComponent, { program })
+          : <InfoTab program={program} implementation={implementation} />
+      )}
 
       {activeSpecificTab && React.createElement(activeSpecificTab.Component, { program, refreshProgram: refresh })}
 
@@ -157,12 +240,12 @@ export default function ProgramDetail() {
           ) : (
             <div className="chart-grid">
               <EvolutionChart
-                title={`Evolução — ${program.name}`}
+                title={`Evolução — ${program.catalog?.name || program.name} · ${program.year}`}
                 subtitle="Pontuação média das escolas por período, sem combinar outros programas"
                 data={evolution || []}
               />
               <ClassificationDonut
-                title={`Classificação — ${program.name}`}
+                title={`Classificação — ${program.catalog?.name || program.name} · ${program.year}`}
                 subtitle={`${ranking.period || '—'}/${ranking.year}`}
                 distribution={ranking.rows.reduce((acc, r) => ({ ...acc, [r.classification]: (acc[r.classification] || 0) + 1 }), {})}
               />
@@ -176,6 +259,94 @@ export default function ProgramDetail() {
       {tab === 'relatorios' && sharedTabEnabled('relatorios') && (
         <ReportsTab program={program} year={activeYear} period={period || ranking?.period} toast={toast} error={error} />
       )}
+
+      <Modal
+        open={cycleModal}
+        onClose={() => setCycleModal(false)}
+        title="Adicionar ano/ciclo"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCycleModal(false)} disabled={managementBusy}>Cancelar</Button>
+            <Button onClick={createCycle} disabled={managementBusy || !cycleForm.year}>
+              {managementBusy ? 'Criando...' : 'Criar ciclo'}
+            </Button>
+          </>
+        }
+      >
+        <div className="alert alert-info" style={{ marginTop: 0 }}>
+          O novo ciclo será criado vazio. Escolas, indicadores, turmas, avaliações e resultados não serão copiados de {program.year}.
+        </div>
+        <Field label="Ano" required>
+          <Input
+            type="number"
+            min="2000"
+            max="2100"
+            value={cycleForm.year}
+            onChange={(event) => setCycleForm((current) => ({ ...current, year: event.target.value }))}
+          />
+        </Field>
+        <Field label="Período/identificação">
+          <Input
+            value={cycleForm.periodLabel}
+            maxLength={60}
+            placeholder="Ex.: Anual"
+            onChange={(event) => setCycleForm((current) => ({ ...current, periodLabel: event.target.value }))}
+          />
+        </Field>
+        <Field label="Status inicial">
+          <Select
+            value={cycleForm.status}
+            onChange={(event) => setCycleForm((current) => ({ ...current, status: event.target.value }))}
+          >
+            {Object.entries(PROGRAM_STATUS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
+          </Select>
+        </Field>
+      </Modal>
+
+      <Modal
+        open={deleteModal}
+        onClose={() => !managementBusy && setDeleteModal(false)}
+        title="Excluir programa?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteModal(false)} disabled={managementBusy}>Cancelar</Button>
+            <Button
+              variant="danger"
+              onClick={deleteProgram}
+              disabled={managementBusy || !deleteImpact?.canDelete}
+            >
+              {managementBusy ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </>
+        }
+      >
+        <p style={{ marginTop: 0 }}>
+          Essa ação arquivará o programa e todos os seus ciclos. Deseja continuar?
+        </p>
+        {!deleteImpact ? (
+          <LoadingBlock label="Verificando vínculos e dados relacionados..." />
+        ) : (
+          <>
+            <div className="program-delete-impact">
+              <div><strong>{deleteImpact.cycles.length}</strong><span>Ciclos: {deleteImpact.cycles.map((cycle) => cycle.year).join(', ')}</span></div>
+              {Object.entries(DELETION_IMPACT_LABELS).map(([key, label]) => (
+                <div key={key}><strong>{deleteImpact.counts[key] || 0}</strong><span>{label}</span></div>
+              ))}
+            </div>
+            {deleteImpact.canDelete ? (
+              <div className="alert alert-warn" style={{ marginBottom: 0 }}>
+                Nenhum dado relacionado foi encontrado. A exclusão será lógica e poderá ser auditada.
+              </div>
+            ) : (
+              <div className="alert alert-error" style={{ marginBottom: 0 }}>
+                Exclusão bloqueada: existem {deleteImpact.relatedRecords} registros relacionados. Nenhum dado será removido silenciosamente.
+              </div>
+            )}
+          </>
+        )}
+      </Modal>
     </>
   );
 }
@@ -189,17 +360,21 @@ function InfoTab({ program, implementation }) {
         <div className="card-title">Objetivo e descrição</div>
         <p style={{ color: 'var(--text-2)', fontSize: 13.5 }}>{program.objective || 'Sem objetivo cadastrado.'}</p>
         <p style={{ color: 'var(--text-2)', fontSize: 13.5 }}>{program.description || 'Sem descrição cadastrada.'}</p>
-        <div className={`alert ${implementation ? 'alert-success' : 'alert-warn'}`} style={{ marginTop: 18, marginBottom: 0 }}>
-          {implementation
-            ? 'O ambiente específico deste programa está registrado conforme sua documentação oficial.'
-            : 'Instrumento específico ainda não registrado. As abas disponíveis exibem somente a infraestrutura e os dados compartilhados já existentes no CPE.'}
+        <div className={`alert ${implementation && !implementation.unavailableCycle ? 'alert-success' : 'alert-warn'}`} style={{ marginTop: 18, marginBottom: 0 }}>
+          {implementation?.unavailableCycle
+            ? `O ciclo ${program.year} existe no catálogo, mas ainda não possui instrumento oficial implementado. Coleta, resultados genéricos e ranking permanecem desabilitados para evitar regras inventadas.`
+            : implementation
+              ? 'O ambiente específico deste programa está registrado conforme sua documentação oficial.'
+              : 'Instrumento específico ainda não registrado. As abas disponíveis exibem somente a infraestrutura e os dados compartilhados já existentes no CPE.'}
         </div>
       </div>
       <div className="card card-pad">
         <div className="card-title">Dados do programa</div>
         <dl className="kv-list">
-          <dt>Código</dt><dd><span className="mono">{program.code}</span></dd>
-          <dt>Ano</dt><dd>{program.year}</dd>
+          <dt>Programa no catálogo</dt><dd>{program.catalog?.name || program.name}</dd>
+          <dt>Código do catálogo</dt><dd><span className="mono">{program.catalog?.code || '—'}</span></dd>
+          <dt>Código do ciclo</dt><dd><span className="mono">{program.code}</span></dd>
+          <dt>Ano/ciclo</dt><dd>{program.year}</dd>
           <dt>Período</dt><dd>{program.periodLabel || '—'}</dd>
           <dt>Órgão</dt><dd>{program.organ || '—'}</dd>
           <dt>Referência geral (não usada na pontuação)</dt><dd>{program.globalGoal != null ? `${fmt(program.globalGoal)}%` : '—'}</dd>

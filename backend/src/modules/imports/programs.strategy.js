@@ -1,7 +1,15 @@
 import { prisma } from '../../lib/prisma.js';
 import { pickField, toNumber } from './parser.js';
-import { str, classifyRow } from './base.js';
+import { str } from './base.js';
 import { IMPORT_ROW_STATUS } from '../../lib/constants.js';
+import {
+  permanentProgramCode,
+  permanentProgramName,
+} from '../../services/program-catalog.js';
+
+function catalogCycleKey(name, year) {
+  return `${permanentProgramName(name, year).toLocaleLowerCase('pt-BR')}|${Number(year)}`;
+}
 
 const STATUS_MAP = {
   planejamento: 'PLANEJAMENTO',
@@ -31,11 +39,24 @@ export const programsStrategy = {
   ],
 
   async loadContext() {
-    const programs = await prisma.program.findMany({ select: { id: true, code: true, name: true } });
-    return { byCode: new Map(programs.map((p) => [p.code.toLowerCase(), p])) };
+    const [programs, catalogs] = await Promise.all([
+      prisma.program.findMany({
+        select: { id: true, catalogId: true, code: true, name: true, year: true, catalog: { select: { code: true, name: true } } },
+      }),
+      prisma.programCatalog.findMany({ select: { id: true, code: true, name: true } }),
+    ]);
+    return {
+      byCode: new Map(programs.map((program) => [program.code.toLowerCase(), program])),
+      byCycle: new Map(programs.map((program) => [
+        catalogCycleKey(program.catalog.name, program.year),
+        program,
+      ])),
+      catalogByCode: new Map(catalogs.map((catalog) => [catalog.code.toLowerCase(), catalog])),
+      catalogByName: new Map(catalogs.map((catalog) => [catalog.name.toLowerCase(), catalog])),
+    };
   },
 
-  buildRow(row) {
+  buildRow(row, ctx) {
     const errors = [];
     const code = str(pickField(row.raw, this.aliases.code)).toUpperCase();
     const name = str(pickField(row.raw, this.aliases.name));
@@ -44,6 +65,13 @@ export const programsStrategy = {
     if (!code || code.length < 2) errors.push({ field: 'codigo', message: 'Código é obrigatório' });
     if (!name || name.length < 3) errors.push({ field: 'nome', message: 'Nome é obrigatório (mín. 3 caracteres)' });
     if (!year || year < 2000 || year > 2100) errors.push({ field: 'ano', message: 'Ano inválido (2000-2100)' });
+    const existingCode = code ? ctx.byCode.get(code.toLowerCase()) : null;
+    if (existingCode && year && existingCode.year !== year) {
+      errors.push({
+        field: 'ano',
+        message: `O código ${code} já identifica o ciclo ${existingCode.year}; use outro código para o novo ciclo`,
+      });
+    }
 
     const statusRaw = str(pickField(row.raw, this.aliases.status)).toLowerCase();
     const globalGoal = toNumber(pickField(row.raw, this.aliases.globalGoal));
@@ -67,9 +95,16 @@ export const programsStrategy = {
   },
 
   classify(rowData, ctx, seen) {
-    if (seen.has(rowData.key)) return IMPORT_ROW_STATUS.DUPLICADO;
-    seen.add(rowData.key);
-    return ctx.byCode.has(rowData.key) ? IMPORT_ROW_STATUS.ATUALIZAR : IMPORT_ROW_STATUS.NOVO;
+    const catalogCode = permanentProgramCode(rowData.data.code, rowData.data.year);
+    const catalogName = permanentProgramName(rowData.data.name, rowData.data.year);
+    const catalog = ctx.catalogByCode.get(catalogCode.toLowerCase())
+      || ctx.catalogByName.get(catalogName.toLowerCase());
+    const cycleKey = catalogCycleKey(catalog?.name || catalogName, rowData.data.year);
+    if (seen.has(cycleKey)) return IMPORT_ROW_STATUS.DUPLICADO;
+    seen.add(cycleKey);
+    return ctx.byCode.has(rowData.key) || ctx.byCycle.has(cycleKey)
+      ? IMPORT_ROW_STATUS.ATUALIZAR
+      : IMPORT_ROW_STATUS.NOVO;
   },
 
   async apply(validRows, ctx) {
@@ -79,14 +114,35 @@ export const programsStrategy = {
       for (const row of validRows) {
         // Nunca mutar row.data: o staging é reutilizado na resposta/auditoria.
         const { code, name, ...fields } = row.data;
-        const existing = ctx.byCode.get(code.toLowerCase());
+        const catalogCode = permanentProgramCode(code, fields.year);
+        const catalogName = permanentProgramName(name, fields.year);
+        let catalog = ctx.catalogByCode.get(catalogCode.toLowerCase())
+          || ctx.catalogByName.get(catalogName.toLowerCase());
+        const cycleKey = catalogCycleKey(catalog?.name || catalogName, fields.year);
+        const existing = ctx.byCode.get(code.toLowerCase()) || ctx.byCycle.get(cycleKey);
         if (existing) {
-          // O nome cadastrado é preservado em atualizações por planilha.
+          // Código, nome e catálogo são preservados em atualizações por planilha.
           await tx.program.update({ where: { id: existing.id }, data: fields });
           updated++;
         } else {
-          const createdProgram = await tx.program.create({ data: { code, name, ...fields } });
+          if (!catalog) {
+            catalog = await tx.programCatalog.create({
+              data: {
+                code: catalogCode,
+                name: catalogName,
+                description: fields.description,
+                objective: fields.objective,
+                organ: fields.organ,
+              },
+            });
+            ctx.catalogByCode.set(catalogCode.toLowerCase(), catalog);
+            ctx.catalogByName.set(catalogName.toLowerCase(), catalog);
+          }
+          const createdProgram = await tx.program.create({
+            data: { catalogId: catalog.id, code, name, ...fields },
+          });
           ctx.byCode.set(code.toLowerCase(), createdProgram);
+          ctx.byCycle.set(cycleKey, createdProgram);
           created++;
         }
       }

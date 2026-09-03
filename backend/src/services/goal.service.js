@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma.js';
 import { notFound, conflict, HttpError } from '../lib/errors.js';
 import { audit, AuditAction } from '../lib/audit.js';
 import { parsePagination, buildPagination } from '../lib/pagination.js';
+import { PACTO_CATALOG_CODE } from '../programs/pacto/config.js';
 
 const goalInclude = {
   program: { select: { id: true, code: true, name: true } },
@@ -41,6 +42,26 @@ async function assertDimensions(data) {
   if (data.programId) {
     const p = await prisma.program.findFirst({ where: { id: data.programId, deletedAt: null } });
     if (!p) throw new HttpError(422, 'Programa informado não existe', 'VALIDATION_ERROR');
+    if (p.catalogId) {
+      const catalog = await prisma.programCatalog.findUnique({
+        where: { id: p.catalogId },
+        select: { code: true },
+      });
+      if (catalog?.code === PACTO_CATALOG_CODE) {
+        throw new HttpError(
+          422,
+          'O Pacto não aceita metas genéricas sem regra oficial de pontuação',
+          'PROGRAM_SPECIFIC_RULES_REQUIRED',
+        );
+      }
+    }
+    if (Number(data.year) !== p.year) {
+      throw new HttpError(
+        422,
+        `A meta deve pertencer ao ciclo ${p.year} do programa informado`,
+        'PROGRAM_CYCLE_YEAR_MISMATCH',
+      );
+    }
   }
   if (data.schoolId) {
     const s = await prisma.school.findFirst({ where: { id: data.schoolId, deletedAt: null } });
@@ -175,6 +196,20 @@ export function resolveGoalFromList(goals, { programId, schoolId, indicatorId, p
 /** Endpoint de consulta: qual meta se aplica a uma combinação? */
 export async function lookupGoal(params) {
   const { programId, schoolId, indicatorId, year, period } = params;
+  if (programId) {
+    const program = await prisma.program.findFirst({
+      where: { id: programId, deletedAt: null },
+      select: { year: true },
+    });
+    if (!program) throw new HttpError(404, 'Programa informado não existe', 'NOT_FOUND');
+    if (Number(year) !== program.year) {
+      throw new HttpError(
+        422,
+        `A consulta deve usar o ciclo ${program.year} do programa`,
+        'PROGRAM_CYCLE_YEAR_MISMATCH',
+      );
+    }
+  }
   const goals = await prisma.goal.findMany({
     where: { year: Number(year) },
     include: goalInclude,

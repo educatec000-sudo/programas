@@ -40,7 +40,9 @@ const upload = multer({
     if (req.routeType === 'import') {
       const ext = path.extname(file.originalname || '').toLowerCase();
       if (!UPLOAD_SUFFIXES.includes(ext)) {
-        return cb(new Error(`Formato não suportado (${ext || 'sem extensão'}). Use CSV ou XLSX.`));
+        const error = new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'file');
+        error.message = `Formato não suportado (${ext || 'sem extensão'}). Use CSV ou XLSX.`;
+        return cb(error);
       }
     }
     cb(null, true);

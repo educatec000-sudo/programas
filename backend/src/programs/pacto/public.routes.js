@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { validate } from '../../middlewares/validate.js';
+import { uploadImportFile } from '../../middlewares/upload.js';
 import * as controller from './controller.js';
 import {
   assessmentPayloadSchema,
@@ -20,9 +21,33 @@ const collectionLimiter = rateLimit({
   },
 });
 
+const importLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: { code: 'RATE_LIMIT', message: 'Muitas importações. Aguarde um momento e tente novamente.' },
+  },
+});
+
 const router = Router();
 router.use(collectionLimiter);
 
+router.post(
+  '/:token/import/preview',
+  importLimiter,
+  validate({ params: publicTokenParamsSchema }),
+  uploadImportFile,
+  controller.previewImport,
+);
+router.post(
+  '/:token/import/confirm',
+  importLimiter,
+  validate({ params: publicTokenParamsSchema }),
+  uploadImportFile,
+  controller.confirmImport,
+);
 router.get('/:token', validate({ params: publicTokenParamsSchema }), controller.publicBootstrap);
 router.post(
   '/:token/classes',

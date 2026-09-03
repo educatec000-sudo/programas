@@ -225,8 +225,31 @@ enum ProgramStatus {
   CANCELADO
 }
 
+model ProgramCatalog {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  name        String
+  description String?
+  objective   String?
+  organ       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  cycles Program[]
+
+  @@index([name])
+  @@index([deletedAt])
+}
+
+/**
+ * Execução anual/ciclo de um programa permanente do catálogo.
+ * Todas as relações operacionais continuam apontando para esta execução,
+ * impedindo que escolas, avaliações e resultados de anos distintos se misturem.
+ */
 model Program {
   id          String        @id @default(uuid())
+  catalogId   String
   code        String        @unique
   name        String
   description String?
@@ -240,6 +263,7 @@ model Program {
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
+  catalog         ProgramCatalog          @relation(fields: [catalogId], references: [id], onDelete: Restrict)
   schools         ProgramSchool[]
   indicators      ProgramIndicator[]
   results         Result[]
@@ -248,6 +272,7 @@ model Program {
   collectionLinks ProgramCollectionLink[]
   pactoClasses    PactoClass[]
 
+  @@unique([catalogId, year])
   @@index([year, status])
   @@index([name])
 }
@@ -473,16 +498,17 @@ enum PactoAssessmentStatus {
  * Turma específica do instrumento Pacto pela Alfabetização 2026.
  */
 model PactoClass {
-  id        String           @id @default(uuid())
-  programId String
-  schoolId  String
-  grade     Int
-  shift     String
-  name      String
-  source    PactoClassSource
-  active    Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id                 String                @id @default(uuid())
+  programId          String
+  schoolId           String
+  grade              Int
+  shift              String
+  name               String
+  source             PactoClassSource
+  enabledAssessments PactoAssessmentCode[] @default([A0, A1, A2, A3])
+  active             Boolean               @default(true)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   program     Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
   school      School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)

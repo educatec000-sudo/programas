@@ -1,4 +1,5 @@
 import PactoAdmin from './pacto/PactoAdmin.jsx';
+import PactoDashboard from './pacto/PactoDashboard.jsx';
 
 /**
  * Registro dos ambientes específicos de programas.
@@ -7,11 +8,14 @@ import PactoAdmin from './pacto/PactoAdmin.jsx';
  * oficial. O código estável e o ciclo identificam a implementação; o nome de
  * exibição nunca é usado em condicionais espalhadas pela aplicação.
  */
+const PACTO_DISABLED_SHARED_TABS = ['criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios'];
+
 const implementations = [
   {
     code: 'PACTO-ALFABETIZACAO-2026',
     year: 2026,
-    disabledSharedTabs: ['criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios'],
+    disabledSharedTabs: PACTO_DISABLED_SHARED_TABS,
+    OverviewComponent: PactoDashboard,
     adminTabs: [
       { key: 'coleta-pacto', label: 'Coleta do Pacto', Component: PactoAdmin },
     ],
@@ -25,9 +29,22 @@ function normalizeCode(code) {
 export function getProgramImplementation(program) {
   if (!program) return null;
   const code = normalizeCode(program.code);
-  return implementations.find((item) => (
+  const exact = implementations.find((item) => (
     normalizeCode(item.code) === code && (item.year == null || Number(item.year) === Number(program.year))
-  )) || null;
+  ));
+  if (exact) return exact;
+
+  // Ciclos futuros do Pacto permanecem no mesmo catálogo, mas não recebem
+  // formulário, pontuação ou coleta genéricos sem documentação oficial própria.
+  if (normalizeCode(program.catalog?.code) === 'PACTO-ALFABETIZACAO') {
+    return {
+      catalogCode: 'PACTO-ALFABETIZACAO',
+      disabledSharedTabs: PACTO_DISABLED_SHARED_TABS,
+      unavailableCycle: true,
+      adminTabs: [],
+    };
+  }
+  return null;
 }
 
 export function supportsSharedFeature(program, feature) {

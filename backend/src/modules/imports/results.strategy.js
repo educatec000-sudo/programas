@@ -3,7 +3,7 @@ import { pickField, toNumber } from './parser.js';
 import { str } from './base.js';
 import { IMPORT_ROW_STATUS, PERIODS } from '../../lib/constants.js';
 import { HttpError } from '../../lib/errors.js';
-import { PACTO_PROGRAM_CODE } from '../../programs/pacto/config.js';
+import { PACTO_CATALOG_CODE } from '../../programs/pacto/config.js';
 
 const PERIOD_ALIASES = (() => {
   const map = new Map();
@@ -40,7 +40,10 @@ export const resultsStrategy = {
 
   async loadContext() {
     const [programs, schools, indicators, results, schoolLinks, indicatorLinks] = await Promise.all([
-      prisma.program.findMany({ where: { deletedAt: null }, select: { id: true, code: true, name: true } }),
+      prisma.program.findMany({
+        where: { deletedAt: null },
+        select: { id: true, code: true, name: true, year: true, catalog: { select: { code: true } } },
+      }),
       prisma.school.findMany({ where: { deletedAt: null }, select: { id: true, inep: true, name: true } }),
       prisma.indicator.findMany({
         where: { deletedAt: null, status: 'ATIVO' },
@@ -97,7 +100,7 @@ export const resultsStrategy = {
     const program = programKey ? ctx.programByCode.get(programKey) : undefined;
     if (!programKey) errors.push({ field: 'programa', message: 'Programa é obrigatório' });
     else if (!program) errors.push({ field: 'programa', message: `Programa não encontrado: "${programKey}"` });
-    else if (program.code === PACTO_PROGRAM_CODE) {
+    else if (program.catalog.code === PACTO_CATALOG_CODE) {
       errors.push({
         field: 'programa',
         message: 'O Pacto usa a coleta específica por turma e não aceita importação de resultados genéricos',
@@ -120,6 +123,9 @@ export const resultsStrategy = {
     }
 
     if (!year || year < 2000 || year > 2100) errors.push({ field: 'ano', message: 'Ano inválido' });
+    else if (program && year !== program.year) {
+      errors.push({ field: 'ano', message: `Este código pertence ao ciclo ${program.year}; informe esse ano` });
+    }
     if (!period) {
       errors.push({
         field: 'periodo',
@@ -159,7 +165,11 @@ export const resultsStrategy = {
     const programIds = [...new Set(validRows.map((row) => row.data.programId))];
     const pactoProgram = programIds.length
       ? await prisma.program.findFirst({
-          where: { id: { in: programIds }, code: PACTO_PROGRAM_CODE, deletedAt: null },
+          where: {
+            id: { in: programIds },
+            deletedAt: null,
+            catalog: { code: PACTO_CATALOG_CODE },
+          },
           select: { id: true },
         })
       : null;

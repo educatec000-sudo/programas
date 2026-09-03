@@ -4,6 +4,7 @@ import { authenticate, requirePermission } from '../middlewares/auth.js';
 import * as controller from '../controllers/program.controller.js';
 import {
   createProgramSchema,
+  createProgramCycleSchema,
   updateProgramSchema,
   addProgramSchoolsSchema,
   updateProgramSchoolSchema,
@@ -25,11 +26,20 @@ const listQuery = paginationQuery.extend({
   status: z.enum(['PLANEJAMENTO', 'EM_EXECUCAO', 'CONCLUIDO', 'SUSPENSO', 'CANCELADO']).optional(),
   includeCoverage: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
 });
+const catalogListQuery = listQuery.omit({ year: true });
 
+router.get('/catalogs', requirePermission('programs:read'), validate({ query: catalogListQuery }), controller.listCatalogs);
 router.get('/', requirePermission('programs:read'), validate({ query: listQuery }), controller.list);
 router.post('/', requirePermission('programs:write'), validate({ body: createProgramSchema }), controller.create);
 router.get('/:id', requirePermission('programs:read'), controller.get);
 router.put('/:id', requirePermission('programs:write'), validate({ body: updateProgramSchema }), controller.update);
+router.post(
+  '/:id/cycles',
+  requirePermission('programs:write'),
+  validate({ body: createProgramCycleSchema }),
+  controller.createCycle,
+);
+router.get('/:id/deletion-impact', requirePermission('programs:delete'), controller.deletionImpact);
 router.delete('/:id', requirePermission('programs:delete'), controller.remove);
 router.get('/:id/history', requirePermission('programs:read'), validate({ query: paginationQuery }), controller.history);
 router.use('/:id/pacto', pactoAdminRoutes);

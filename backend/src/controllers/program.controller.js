@@ -3,6 +3,10 @@ import { wrap } from '../lib/wrap.js';
 import { getClientIp } from '../lib/auth.js';
 import { parseIdParams } from '../middlewares/validate.js';
 
+export const listCatalogs = wrap(async (req, res) => {
+  res.json(await programService.listProgramCatalogs(req.data.query));
+});
+
 export const list = wrap(async (req, res) => {
   res.json(await programService.listPrograms(req.data.query));
 });
@@ -19,9 +23,19 @@ export const update = wrap(async (req, res) => {
   res.json(await programService.updateProgram(parseIdParams(req), req.data.body, req.user, getClientIp(req)));
 });
 
+export const createCycle = wrap(async (req, res) => {
+  res.status(201).json(
+    await programService.createProgramCycle(parseIdParams(req), req.data.body, req.user, getClientIp(req)),
+  );
+});
+
+export const deletionImpact = wrap(async (req, res) => {
+  res.json(await programService.getProgramDeletionImpact(parseIdParams(req)));
+});
+
 export const remove = wrap(async (req, res) => {
   await programService.deleteProgram(parseIdParams(req), req.user, getClientIp(req));
-  res.json({ message: 'Programa removido (exclusão lógica)' });
+  res.json({ message: 'Programa e seus ciclos vazios foram arquivados com segurança' });
 });
 
 export const history = wrap(async (req, res) => {

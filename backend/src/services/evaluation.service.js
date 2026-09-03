@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { notFound } from '../lib/errors.js';
+import { notFound, HttpError } from '../lib/errors.js';
 import { audit, AuditAction } from '../lib/audit.js';
 import { computeRanking } from './scoring.service.js';
 import { notify } from './notification.service.js';
@@ -11,8 +11,15 @@ import { notify } from './notification.service.js';
 export async function consolidate({ programId, year, period }, actor, ip) {
   const program = await prisma.program.findFirst({ where: { id: programId, deletedAt: null } });
   if (!program) throw notFound('Programa não encontrado');
+  if (Number(year) !== program.year) {
+    throw new HttpError(
+      422,
+      `A avaliação deve ser consolidada dentro do ciclo ${program.year}`,
+      'PROGRAM_CYCLE_YEAR_MISMATCH',
+    );
+  }
 
-  const ranking = await computeRanking({ programId, year, period });
+  const ranking = await computeRanking({ programId, year: program.year, period });
   if (!ranking.rows.length) {
     throw notFound('Nenhum resultado/meta encontrado para consolidar neste período');
   }

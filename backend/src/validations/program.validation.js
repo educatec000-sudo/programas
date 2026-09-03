@@ -16,6 +16,12 @@ export const createProgramSchema = z.object({
 
 export const updateProgramSchema = createProgramSchema.partial();
 
+export const createProgramCycleSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  periodLabel: emptyToNull(z.string().max(60)),
+  status: z.enum(['PLANEJAMENTO', 'EM_EXECUCAO', 'CONCLUIDO', 'SUSPENSO', 'CANCELADO']).default('PLANEJAMENTO'),
+});
+
 export const addProgramSchoolsSchema = z.object({
   schoolIds: z.array(uuid).min(1, 'selecione ao menos uma escola'),
 });

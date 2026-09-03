@@ -52,6 +52,9 @@ export const techniciansApi = {
 
 export const programsApi = {
   ...crud('/programs'),
+  catalogs: (params) => request('/programs/catalogs', { params: allRows(params) }),
+  createCycle: (id, body) => request(`/programs/${id}/cycles`, { method: 'POST', body }),
+  deletionImpact: (id) => request(`/programs/${id}/deletion-impact`),
   getWithTab: (id) => request(`/programs/${id}`),
   history: (id, params) => request(`/programs/${id}/history`, { params }),
   schoolEvaluation: (id, schoolId, params) =>
@@ -97,6 +100,26 @@ export const pactoPublicApi = {
     request(`/public/pacto/${encodeURIComponent(token)}/assessments/draft`, { method: 'PUT', body }),
   submit: (token, body) =>
     request(`/public/pacto/${encodeURIComponent(token)}/assessments/submit`, { method: 'POST', body }),
+  previewImport: (token, file, mapping = {}) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mapping', JSON.stringify(mapping));
+    return request(`/public/pacto/${encodeURIComponent(token)}/import/preview`, {
+      method: 'POST',
+      body: form,
+    });
+  },
+  confirmImport: (token, file, { mapping, previewDigest, confirmReplace }) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mapping', JSON.stringify(mapping || {}));
+    form.append('previewDigest', previewDigest);
+    form.append('confirmReplace', String(Boolean(confirmReplace)));
+    return request(`/public/pacto/${encodeURIComponent(token)}/import/confirm`, {
+      method: 'POST',
+      body: form,
+    });
+  },
 };
 
 export const indicatorsApi = {

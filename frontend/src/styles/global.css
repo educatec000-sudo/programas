@@ -470,6 +470,11 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   text-transform: uppercase;
 }
 .program-card-cycle { color: var(--text-3); font-size: 12.5px; }
+.program-card-current-cycle {
+  margin: -6px 0 10px;
+  color: var(--text-2);
+  font-size: 11.5px;
+}
 .program-card-description {
   min-height: 42px;
   margin: 18px 0;
@@ -527,6 +532,32 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   line-height: 1.4;
 }
 .program-card-collection-note { margin-top: 4px; color: #64748b; }
+.program-cycle-context {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 360px) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.program-cycle-context .field { margin: 0; }
+.program-cycle-actions { display: flex; justify-content: flex-end; gap: 8px; padding-bottom: 1px; }
+.program-delete-impact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+}
+.program-delete-impact > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #f8fafc;
+}
+.program-delete-impact strong { min-width: 24px; color: var(--text); font-size: 16px; text-align: right; }
+.program-delete-impact span { color: var(--text-2); font-size: 11px; line-height: 1.3; }
 
 .timeline { list-style: none; margin: 0; padding: 0; }
 .timeline li { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
@@ -536,6 +567,31 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .permission-group { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; background: #f8fafc; }
 .permission-group h4 { font-size: 13px; text-transform: capitalize; color: var(--primary-dark); margin-bottom: 8px; }
 .permission-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 7px; }
+
+/* ---------- Dashboard — Pacto pela Alfabetização ---------- */
+.pacto-dashboard-filters { margin-bottom: 16px; }
+.pacto-dashboard-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 10px 14px;
+  margin-top: 16px;
+}
+.pacto-dashboard-filter-grid .field { margin-bottom: 0; }
+.pacto-dashboard-metrics { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+.pacto-dashboard-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.pacto-dashboard-chart { min-width: 0; }
+.pacto-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 12px 0 2px; }
+.pacto-chart-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); font-size: 10.5px; }
+.pacto-chart-legend i { width: 9px; height: 9px; border-radius: 3px; }
+.pacto-dashboard-results { display: block; min-width: 330px; max-width: 620px; color: var(--text-2); font-size: 11.5px; line-height: 1.45; white-space: normal; }
+.pacto-table-subtitle { display: block; margin-top: 2px; color: var(--text-3); font-size: 10.5px; }
+.pacto-dashboard-section-title { color: var(--text); font-size: 17px; font-weight: 750; }
+.pacto-dashboard-section-subtitle { margin-top: 3px; color: var(--text-3); font-size: 12px; }
 
 /* ---------- Coleta pública — Pacto pela Alfabetização ---------- */
 .public-collection-page { min-height: 100vh; background: #f1f5f9; color: var(--text); }
@@ -571,6 +627,12 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .pacto-assessment-button.active { border-color: var(--primary); background: var(--primary-50); box-shadow: 0 0 0 2px rgba(37, 99, 235, .1); }
 .pacto-assessment-button strong { font-size: 16px; }
 .pacto-assessment-button span { color: var(--text-3); font-size: 10.5px; }
+.pacto-assessment-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pacto-assessment-checks .checkbox-row { margin: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 9px; background: #f8fafc; }
+.pacto-assessment-checks input { width: 17px; height: 17px; accent-color: var(--primary); }
+.pacto-saved-assessment { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.pacto-results-caption { padding: 7px 10px; background: #eff6ff; color: #1e3a8a; font-size: 12px; font-weight: 700; }
+.pacto-result-level { display: block; margin-bottom: 3px; color: var(--text-3); font-size: 10.5px; }
 .pacto-component { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); }
 .pacto-component h2 { margin-bottom: 12px; font-size: 16px; }
 .pacto-skill-list { display: flex; flex-direction: column; gap: 12px; }
@@ -596,21 +658,67 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .pacto-distribution-gray { background: #94a3b8; }
 .public-collection-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border); }
 .public-collection-footer { padding: 22px; color: #64748b; font-size: 11.5px; text-align: center; }
+.pacto-import-callout {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  margin-bottom: 16px; padding: 17px 20px; border: 1px solid #a5b4fc; border-radius: 12px;
+  background: linear-gradient(135deg, #eef2ff, #fff);
+}
+.pacto-import-callout > div { display: flex; flex-direction: column; gap: 3px; }
+.pacto-import-callout strong { color: #312e81; font-size: 14px; }
+.pacto-import-callout span { color: var(--text-2); font-size: 12px; }
+.pacto-import-intro { display: flex; flex-direction: column; gap: 3px; margin-bottom: 18px; padding: 13px 15px; border-radius: 10px; background: #eff6ff; color: #1e3a8a; }
+.pacto-import-intro span { font-size: 12px; }
+.pacto-import-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 20px 0; }
+.pacto-import-summary > div { display: flex; flex-direction: column; padding: 11px; border: 1px solid var(--border); border-radius: 9px; background: #f8fafc; }
+.pacto-import-summary strong { font-size: 18px; }
+.pacto-import-summary span { color: var(--text-3); font-size: 10.5px; }
+.pacto-import-section { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.pacto-import-section .form-grid { margin-top: 14px; }
+.pacto-import-section .field { min-width: 0; }
+.pacto-import-details { margin-top: 12px; border: 1px solid var(--border); border-radius: 9px; background: #f8fafc; }
+.pacto-import-details summary { padding: 12px 14px; color: var(--primary); font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.pacto-import-result-mapping { padding: 0 14px 14px; }
+.pacto-import-map-label { display: block; margin: 5px 0 3px; color: var(--text-3); font-size: 10.5px; font-weight: 700; }
+.pacto-import-class-map { margin-top: 16px; padding: 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #f8fbff; }
+.pacto-import-issues { margin: 10px 0; padding: 11px 13px; border-radius: 9px; font-size: 12px; }
+.pacto-import-issues.error { border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; }
+.pacto-import-issues.warning { border: 1px solid #fde68a; background: #fffbeb; color: #92400e; }
+.pacto-import-issues ul { margin: 6px 0 0; padding-left: 18px; }
+.pacto-import-group { margin-top: 14px; padding: 15px; border: 1px solid var(--border); border-left-width: 4px; border-radius: 10px; }
+.pacto-import-group.valid { border-left-color: #16a34a; }
+.pacto-import-group.invalid { border-left-color: #dc2626; }
+.pacto-import-table { margin-top: 12px; }
+.pacto-import-table td small { display: block; margin-top: 2px; color: var(--text-3); }
+.pacto-import-replace-confirm { margin: 18px 0 12px; padding: 12px 14px; border: 1px solid #f59e0b; border-radius: 9px; background: #fffbeb; }
+.pacto-import-replace-confirm input { width: 17px; height: 17px; accent-color: var(--primary); }
+.modal-xl .modal-footer { flex-wrap: wrap; }
 
 @media (max-width: 900px) {
   .sidebar { display: none; }
   .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
   .auth-aside { display: none; }
   .program-card-grid { grid-template-columns: 1fr; }
+  .program-cycle-context { grid-template-columns: 1fr; align-items: stretch; }
+  .program-cycle-actions { justify-content: flex-start; }
+  .pacto-dashboard-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pacto-dashboard-chart-grid { grid-template-columns: 1fr; }
   .pacto-level-grid { grid-template-columns: 1fr; }
   .pacto-assessment-selector { grid-template-columns: repeat(2, 1fr); }
+  .pacto-assessment-checks { grid-template-columns: 1fr; }
+  .pacto-import-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 560px) {
   .program-card { min-height: 0; padding: 19px 16px; }
   .program-card-header, .program-card-footer { align-items: flex-start; flex-direction: column; }
   .program-card-footer .btn { width: 100%; }
+  .program-cycle-actions { flex-direction: column; }
+  .program-cycle-actions .btn { width: 100%; }
+  .program-delete-impact { grid-template-columns: 1fr; }
+  .pacto-dashboard-filter-grid { grid-template-columns: 1fr; }
+  .pacto-dashboard-filters .card-header-row { align-items: stretch; flex-direction: column; }
   .public-collection-shell { width: min(100% - 20px, 1120px); margin: 12px auto; }
-  .public-school-card, .public-collection-actions { align-items: stretch; flex-direction: column; }
-  .public-collection-actions .btn { width: 100%; }
+  .public-school-card, .public-collection-actions, .pacto-import-callout { align-items: stretch; flex-direction: column; }
+  .public-collection-actions .btn, .pacto-import-callout .btn { width: 100%; }
+  .pacto-import-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

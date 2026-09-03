@@ -5,7 +5,14 @@ import { parsePagination, buildPagination } from '../lib/pagination.js';
 import { periodOrder } from '../lib/constants.js';
 import { attainment } from './scoring.service.js';
 import { resolveGoalFromList } from './goal.service.js';
-import { PACTO_PROGRAM_CODE } from '../programs/pacto/config.js';
+import { PACTO_CATALOG_CODE } from '../programs/pacto/config.js';
+import {
+  permanentProgramCode,
+  permanentProgramName,
+  programCycleCode,
+  selectCurrentProgramCycle,
+  summarizeProgramDeletionCounts,
+} from './program-catalog.js';
 
 /** Conta escolas com algum dado oficial (resultado ou envio específico), considerando somente vínculos ativos. */
 export function countSchoolsWithData(activeLinks, resultGroups) {
@@ -19,6 +26,123 @@ export function countSchoolsWithData(activeLinks, resultGroups) {
   return new Map([...schoolsByProgram].map(([programId, schoolIds]) => [programId, schoolIds.size]));
 }
 
+export async function listProgramCatalogs(query) {
+  const { page, pageSize, skip, take } = parsePagination(query);
+  const { search, status } = query;
+  const where = {
+    deletedAt: null,
+    cycles: { some: { deletedAt: null, ...(status && { status }) } },
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+        { organ: { contains: search, mode: 'insensitive' } },
+        { cycles: { some: { deletedAt: null, code: { contains: search, mode: 'insensitive' } } } },
+      ],
+    }),
+  };
+
+  const [total, catalogs] = await Promise.all([
+    prisma.programCatalog.count({ where }),
+    prisma.programCatalog.findMany({
+      where,
+      include: {
+        cycles: {
+          where: { deletedAt: null },
+          include: {
+            _count: {
+              select: { schools: { where: { active: true } }, indicators: { where: { active: true } }, results: true },
+            },
+          },
+          orderBy: { year: 'desc' },
+        },
+      },
+      orderBy: { code: 'asc' },
+      skip,
+      take,
+    }),
+  ]);
+
+  const includeCoverage = Boolean(query.includeCoverage);
+  const cycles = catalogs.flatMap((catalog) => catalog.cycles);
+  const cycleIds = cycles.map((cycle) => cycle.id);
+  const [activeLinks, resultGroups, pactoSubmissions] = includeCoverage && cycleIds.length
+    ? await Promise.all([
+        prisma.programSchool.findMany({
+          where: { programId: { in: cycleIds }, active: true, school: { deletedAt: null } },
+          select: { programId: true, schoolId: true },
+        }),
+        prisma.result.groupBy({
+          by: ['programId', 'schoolId'],
+          where: { programId: { in: cycleIds }, school: { deletedAt: null } },
+        }),
+        prisma.pactoAssessment.findMany({
+          where: { status: 'ENVIADO', class: { programId: { in: cycleIds }, active: true } },
+          select: { class: { select: { programId: true, schoolId: true } } },
+        }),
+      ])
+    : [[], [], []];
+  const schoolsWithData = countSchoolsWithData(activeLinks, [
+    ...resultGroups,
+    ...pactoSubmissions.map((item) => item.class),
+  ]);
+
+  const serialized = catalogs.map((catalog) => {
+    const cycleRows = catalog.cycles.map((cycle) => {
+      const schoolsWithDataCount = includeCoverage ? schoolsWithData.get(cycle.id) || 0 : null;
+      const pendingSchoolsCount = includeCoverage
+        ? Math.max(0, cycle._count.schools - schoolsWithDataCount)
+        : null;
+      return {
+        id: cycle.id,
+        code: cycle.code,
+        year: cycle.year,
+        periodLabel: cycle.periodLabel,
+        status: cycle.status,
+        schoolsCount: cycle._count.schools,
+        schoolsWithDataCount,
+        pendingSchoolsCount,
+        dataCoveragePercent: includeCoverage && cycle._count.schools
+          ? Math.round((schoolsWithDataCount / cycle._count.schools) * 100)
+          : includeCoverage ? 0 : null,
+        indicatorsCount: cycle._count.indicators,
+        resultsCount: cycle._count.results,
+        createdAt: cycle.createdAt,
+      };
+    });
+    const current = selectCurrentProgramCycle(cycleRows, status);
+    return {
+      id: catalog.id,
+      code: catalog.code,
+      name: catalog.name,
+      description: catalog.description,
+      objective: catalog.objective,
+      organ: catalog.organ,
+      createdAt: catalog.createdAt,
+      cycles: cycleRows,
+      cyclesCount: cycleRows.length,
+      availableYears: cycleRows.map((cycle) => cycle.year),
+      currentCycleId: current?.id || null,
+      currentCycle: current,
+      year: current?.year || null,
+      periodLabel: current?.periodLabel || null,
+      status: current?.status || 'PLANEJAMENTO',
+      schoolsCount: current?.schoolsCount || 0,
+      schoolsWithDataCount: current?.schoolsWithDataCount || 0,
+      pendingSchoolsCount: current?.pendingSchoolsCount || 0,
+      dataCoveragePercent: current?.dataCoveragePercent || 0,
+      indicatorsCount: current?.indicatorsCount || 0,
+      resultsCount: current?.resultsCount || 0,
+    };
+  });
+
+  return { data: serialized, pagination: buildPagination(total, page, pageSize) };
+}
+
+/**
+ * Lista de execuções mantida para telas operacionais e integrações existentes.
+ * O catálogo público de entrada usa listProgramCatalogs e não aceita filtro anual.
+ */
 export async function listPrograms(query) {
   const { page, pageSize, skip, take } = parsePagination(query);
   const { search, year, status } = query;
@@ -43,6 +167,7 @@ export async function listPrograms(query) {
     prisma.program.findMany({
       where,
       include: {
+        catalog: { select: { id: true, code: true, name: true } },
         _count: {
           select: { schools: { where: { active: true } }, indicators: { where: { active: true } }, results: true },
         },
@@ -89,6 +214,7 @@ export async function listPrograms(query) {
         : includeCoverage ? 0 : null;
       return {
         id: p.id,
+        catalog: p.catalog,
         code: p.code,
         name: p.name,
         description: p.description,
@@ -113,8 +239,23 @@ export async function listPrograms(query) {
 
 export async function getProgram(id) {
   const program = await prisma.program.findFirst({
-    where: { id, deletedAt: null },
+    where: { id, deletedAt: null, catalog: { deletedAt: null } },
     include: {
+      catalog: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          description: true,
+          objective: true,
+          organ: true,
+          cycles: {
+            where: { deletedAt: null },
+            select: { id: true, code: true, year: true, periodLabel: true, status: true },
+            orderBy: { year: 'desc' },
+          },
+        },
+      },
       schools: {
         where: { school: { deletedAt: null } },
         include: {
@@ -145,6 +286,15 @@ export async function getProgram(id) {
 
   return {
     id: program.id,
+    catalog: {
+      id: program.catalog.id,
+      code: program.catalog.code,
+      name: program.catalog.name,
+      description: program.catalog.description,
+      objective: program.catalog.objective,
+      organ: program.catalog.organ,
+    },
+    cycles: program.catalog.cycles,
     code: program.code,
     name: program.name,
     description: program.description,
@@ -175,12 +325,54 @@ export async function getProgram(id) {
 }
 
 export async function createProgram(data, actor, ip) {
-  const exists = await prisma.program.findUnique({ where: { code: data.code } });
-  if (exists && !exists.deletedAt) throw conflict('Já existe um programa com este código');
+  const existingCode = await prisma.program.findUnique({ where: { code: data.code } });
+  if (existingCode && !existingCode.deletedAt) throw conflict('Já existe um ciclo com este código');
 
-  const program = exists
-    ? await prisma.program.update({ where: { id: exists.id }, data: { ...data, deletedAt: null } })
-    : await prisma.program.create({ data });
+  const catalogCode = permanentProgramCode(data.code, data.year);
+  const catalogName = permanentProgramName(data.name, data.year);
+  const program = await prisma.$transaction(async (tx) => {
+    let catalog = existingCode?.catalogId
+      ? await tx.programCatalog.findUnique({ where: { id: existingCode.catalogId } })
+      : await tx.programCatalog.findFirst({
+          where: {
+            OR: [
+              { code: catalogCode },
+              { name: { equals: catalogName, mode: 'insensitive' } },
+            ],
+          },
+        });
+    if (!catalog) {
+      catalog = await tx.programCatalog.create({
+        data: {
+          code: catalogCode,
+          name: catalogName,
+          description: data.description,
+          objective: data.objective,
+          organ: data.organ,
+        },
+      });
+    } else if (catalog.deletedAt) {
+      catalog = await tx.programCatalog.update({
+        where: { id: catalog.id },
+        data: { deletedAt: null, name: catalogName },
+      });
+    }
+
+    const sameCycle = await tx.program.findUnique({
+      where: { catalogId_year: { catalogId: catalog.id, year: Number(data.year) } },
+    });
+    if (sameCycle && sameCycle.id !== existingCode?.id && !sameCycle.deletedAt) {
+      throw conflict(`O programa já possui o ciclo ${data.year}`);
+    }
+
+    const reusable = existingCode || (sameCycle?.deletedAt ? sameCycle : null);
+    return reusable
+      ? tx.program.update({
+          where: { id: reusable.id },
+          data: { ...data, catalogId: catalog.id, deletedAt: null },
+        })
+      : tx.program.create({ data: { ...data, catalogId: catalog.id } });
+  });
 
   await audit({
     userId: actor.id,
@@ -188,20 +380,94 @@ export async function createProgram(data, actor, ip) {
     action: AuditAction.CREATE,
     entity: 'Program',
     entityId: program.id,
-    metadata: { code: program.code, name: program.name },
+    metadata: { code: program.code, name: program.name, catalogCode, year: program.year },
     ip,
   });
   return program;
 }
 
+export async function createProgramCycle(id, data, actor, ip) {
+  const reference = await prisma.program.findFirst({
+    where: { id, deletedAt: null, catalog: { deletedAt: null } },
+    include: { catalog: true },
+  });
+  if (!reference) throw notFound('Programa não encontrado');
+  const existing = await prisma.program.findUnique({
+    where: { catalogId_year: { catalogId: reference.catalogId, year: Number(data.year) } },
+  });
+  if (existing && !existing.deletedAt) throw conflict(`O ciclo ${data.year} já existe neste programa`);
+
+  const code = programCycleCode(reference.catalog.code, data.year);
+  const codeOwner = await prisma.program.findUnique({ where: { code } });
+  if (codeOwner && codeOwner.id !== existing?.id) throw conflict(`O código técnico ${code} já está em uso`);
+
+  const cycle = existing
+    ? await prisma.program.update({
+        where: { id: existing.id },
+        data: {
+          code,
+          name: `${reference.catalog.name} ${data.year}`,
+          periodLabel: data.periodLabel,
+          status: data.status,
+          deletedAt: null,
+        },
+      })
+    : await prisma.program.create({
+        data: {
+          catalogId: reference.catalogId,
+          code,
+          name: `${reference.catalog.name} ${data.year}`,
+          description: reference.catalog.description,
+          objective: reference.catalog.objective,
+          organ: reference.catalog.organ,
+          year: Number(data.year),
+          periodLabel: data.periodLabel,
+          status: data.status,
+        },
+      });
+
+  await audit({
+    userId: actor.id,
+    userName: actor.name,
+    action: AuditAction.CREATE,
+    entity: 'Program',
+    entityId: cycle.id,
+    metadata: { catalogId: reference.catalogId, cycle: cycle.year, code: cycle.code },
+    ip,
+  });
+  return cycle;
+}
+
 export async function updateProgram(id, data, actor, ip) {
-  const program = await prisma.program.findFirst({ where: { id, deletedAt: null } });
+  const program = await prisma.program.findFirst({
+    where: { id, deletedAt: null },
+    include: { catalog: true },
+  });
   if (!program) throw notFound('Programa não encontrado');
   if (data.code && data.code !== program.code) {
     const exists = await prisma.program.findUnique({ where: { code: data.code } });
-    if (exists && exists.id !== id) throw conflict('Já existe um programa com este código');
+    if (exists && exists.id !== id) throw conflict('Já existe um ciclo com este código');
   }
-  const updated = await prisma.program.update({ where: { id }, data });
+  if (data.year && Number(data.year) !== program.year) {
+    throw new HttpError(
+      422,
+      'O ano de um ciclo existente não pode ser alterado. Adicione outro ciclo ao programa.',
+      'PROGRAM_CYCLE_YEAR_IMMUTABLE',
+    );
+  }
+
+  const catalogUpdate = {
+    ...(data.name !== undefined && { name: permanentProgramName(data.name, data.year || program.year) }),
+    ...(data.description !== undefined && { description: data.description }),
+    ...(data.objective !== undefined && { objective: data.objective }),
+    ...(data.organ !== undefined && { organ: data.organ }),
+  };
+  const [updated] = await prisma.$transaction([
+    prisma.program.update({ where: { id }, data }),
+    ...(Object.keys(catalogUpdate).length
+      ? [prisma.programCatalog.update({ where: { id: program.catalogId }, data: catalogUpdate })]
+      : []),
+  ]);
   await audit({
     userId: actor.id,
     userName: actor.name,
@@ -214,27 +480,127 @@ export async function updateProgram(id, data, actor, ip) {
   return updated;
 }
 
-export async function deleteProgram(id, actor, ip) {
-  const program = await prisma.program.findFirst({ where: { id, deletedAt: null } });
+async function buildProgramDeletionImpact(id, db = prisma) {
+  const program = await db.program.findFirst({
+    where: { id, deletedAt: null, catalog: { deletedAt: null } },
+    select: { catalogId: true, catalog: { select: { code: true, name: true } } },
+  });
   if (!program) throw notFound('Programa não encontrado');
-  await prisma.program.update({ where: { id }, data: { deletedAt: new Date() } });
+  const cycles = await db.program.findMany({
+    where: { catalogId: program.catalogId, deletedAt: null },
+    select: { id: true, year: true },
+    orderBy: { year: 'asc' },
+  });
+  const cycleIds = cycles.map((cycle) => cycle.id);
+  const [
+    schools,
+    indicators,
+    results,
+    goals,
+    evaluations,
+    collectionLinks,
+    pactoClasses,
+    pactoAssessments,
+    pactoComponents,
+    pactoSkillResults,
+    documents,
+  ] = await Promise.all([
+    db.programSchool.count({ where: { programId: { in: cycleIds } } }),
+    db.programIndicator.count({ where: { programId: { in: cycleIds } } }),
+    db.result.count({ where: { programId: { in: cycleIds } } }),
+    db.goal.count({ where: { programId: { in: cycleIds } } }),
+    db.evaluation.count({ where: { programId: { in: cycleIds } } }),
+    db.programCollectionLink.count({ where: { programId: { in: cycleIds } } }),
+    db.pactoClass.count({ where: { programId: { in: cycleIds } } }),
+    db.pactoAssessment.count({ where: { class: { programId: { in: cycleIds } } } }),
+    db.pactoAssessmentComponent.count({ where: { assessment: { class: { programId: { in: cycleIds } } } } }),
+    db.pactoSkillResult.count({ where: { component: { assessment: { class: { programId: { in: cycleIds } } } } } }),
+    db.document.count({
+      where: {
+        deletedAt: null,
+        OR: [
+          { entity: 'Program', entityId: { in: cycleIds } },
+          { entity: 'ProgramCatalog', entityId: program.catalogId },
+        ],
+      },
+    }),
+  ]);
+  const counts = {
+    schools,
+    indicators,
+    results,
+    goals,
+    evaluations,
+    collectionLinks,
+    pactoClasses,
+    pactoAssessments,
+    pactoComponents,
+    pactoSkillResults,
+    documents,
+  };
+  return {
+    catalogId: program.catalogId,
+    code: program.catalog.code,
+    name: program.catalog.name,
+    cycles,
+    ...summarizeProgramDeletionCounts(counts),
+  };
+}
+
+export async function getProgramDeletionImpact(id) {
+  return buildProgramDeletionImpact(id);
+}
+
+export async function deleteProgram(id, actor, ip) {
+  const impact = await buildProgramDeletionImpact(id);
+  if (!impact.canDelete) {
+    throw new HttpError(
+      409,
+      'O programa possui dados vinculados e não pode ser excluído. Remova ou arquive os vínculos de forma explícita antes de continuar.',
+      'PROGRAM_HAS_RELATED_DATA',
+      impact,
+    );
+  }
+  const deletedAt = new Date();
+  await prisma.$transaction([
+    prisma.program.updateMany({
+      where: { catalogId: impact.catalogId, deletedAt: null },
+      data: { deletedAt },
+    }),
+    prisma.programCatalog.update({
+      where: { id: impact.catalogId },
+      data: { deletedAt },
+    }),
+  ]);
   await audit({
     userId: actor.id,
     userName: actor.name,
     action: AuditAction.DELETE,
-    entity: 'Program',
-    entityId: id,
-    metadata: { code: program.code, name: program.name },
+    entity: 'ProgramCatalog',
+    entityId: impact.catalogId,
+    metadata: { code: impact.code, name: impact.name, cycles: impact.cycles.map((cycle) => cycle.year) },
     ip,
   });
 }
 
 /** Histórico do programa sem exigir acesso à auditoria administrativa global. */
 export async function listProgramHistory(id, query = {}) {
-  const program = await prisma.program.findFirst({ where: { id, deletedAt: null }, select: { id: true } });
+  const program = await prisma.program.findFirst({
+    where: { id, deletedAt: null },
+    select: { id: true, catalogId: true },
+  });
   if (!program) throw notFound('Programa não encontrado');
+  const cycles = await prisma.program.findMany({
+    where: { catalogId: program.catalogId },
+    select: { id: true },
+  });
   const { page, pageSize, skip, take } = parsePagination(query, { defaultPageSize: 25 });
-  const where = { entity: 'Program', entityId: id };
+  const where = {
+    OR: [
+      { entity: 'Program', entityId: { in: cycles.map((cycle) => cycle.id) } },
+      { entity: 'ProgramCatalog', entityId: program.catalogId },
+    ],
+  };
   const [total, rows] = await Promise.all([
     prisma.auditLog.count({ where }),
     prisma.auditLog.findMany({
@@ -311,14 +677,23 @@ export async function getSchoolProgramEvaluation(programId, schoolId, query = {}
   const link = await prisma.programSchool.findUnique({
     where: { programId_schoolId: { programId, schoolId } },
     include: {
-      program: { select: { id: true, code: true, name: true, year: true, deletedAt: true } },
+      program: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          year: true,
+          deletedAt: true,
+          catalog: { select: { code: true } },
+        },
+      },
       school: { select: { id: true, inep: true, name: true, deletedAt: true } },
     },
   });
   if (!link || link.program.deletedAt || link.school.deletedAt) {
     throw notFound('Escola ou programa não encontrado');
   }
-  if (link.program.code === PACTO_PROGRAM_CODE) {
+  if (link.program.catalog.code === PACTO_CATALOG_CODE) {
     throw new HttpError(
       422,
       'O Pacto usa a revisão de envios na área específica do programa.',
@@ -326,7 +701,14 @@ export async function getSchoolProgramEvaluation(programId, schoolId, query = {}
     );
   }
 
-  const year = Number(query.year || link.program.year);
+  if (query.year && Number(query.year) !== link.program.year) {
+    throw new HttpError(
+      422,
+      `A avaliação desta escola pertence ao ciclo ${link.program.year}`,
+      'PROGRAM_CYCLE_YEAR_MISMATCH',
+    );
+  }
+  const year = link.program.year;
   const periodRows = await prisma.result.findMany({
     where: { programId, schoolId, year },
     select: { period: true },
