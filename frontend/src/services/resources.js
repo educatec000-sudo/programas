@@ -63,7 +63,10 @@ export const programsApi = {
   addSchools: (id, schoolIds) => request(`/programs/${id}/schools`, { method: 'POST', body: { schoolIds } }),
   updateSchoolLink: (id, schoolId, active) =>
     request(`/programs/${id}/schools/${schoolId}`, { method: 'PUT', body: { active } }),
-  removeSchool: (id, schoolId) => request(`/programs/${id}/schools/${schoolId}`, { method: 'DELETE' }),
+  schoolDeletionImpact: (id, schoolId) =>
+    request(`/programs/${id}/schools/${schoolId}/deletion-impact`),
+  removeSchool: (id, schoolId, params = {}) =>
+    request(`/programs/${id}/schools/${schoolId}`, { method: 'DELETE', params }),
   addIndicators: (id, items) => request(`/programs/${id}/indicators`, { method: 'POST', body: { items } }),
   updateIndicator: (id, indicatorId, body) =>
     request(`/programs/${id}/indicators/${indicatorId}`, { method: 'PUT', body }),
@@ -88,6 +91,41 @@ export const pactoAdminApi = {
     request(`/programs/${programId}/pacto/classes/${classId}`, { method: 'PUT', body }),
   reopenAssessment: (programId, assessmentId) =>
     request(`/programs/${programId}/pacto/assessments/${assessmentId}/reopen`, { method: 'POST' }),
+  deleteAssessment: (programId, assessmentId) =>
+    request(`/programs/${programId}/pacto/assessments/${assessmentId}`, { method: 'DELETE' }),
+};
+
+export const cncaApi = {
+  previewImport: (programId, form) =>
+    request(`/programs/${programId}/cnca/import/preview`, { method: 'POST', body: form }),
+  confirmImport: (programId, body) =>
+    request(`/programs/${programId}/cnca/import/confirm`, { method: 'POST', body }),
+  participatingSchools: (programId) =>
+    request(`/programs/${programId}/cnca/schools`),
+  availableSchools: (programId) =>
+    request(`/programs/${programId}/cnca/schools/available`),
+  addSchool: (programId, body) =>
+    request(`/programs/${programId}/cnca/schools`, { method: 'POST', body }),
+  removeSchool: (programId, schoolId) =>
+    request(`/programs/${programId}/cnca/schools/${schoolId}`, { method: 'DELETE' }),
+  bulkRemoveSchools: (programId, body) =>
+    request(`/programs/${programId}/cnca/schools/bulk-remove`, { method: 'POST', body }),
+  dashboard: (programId, params) =>
+    request(`/programs/${programId}/cnca/dashboard`, { params }),
+  schoolResults: (programId, params) =>
+    request(`/programs/${programId}/cnca/school-results`, { params }),
+  singleSchoolDetail: (programId, schoolId, params) =>
+    request(`/programs/${programId}/cnca/school-results/${schoolId}`, { params }),
+  deleteResult: (programId, resultId) =>
+    request(`/programs/${programId}/cnca/results/${resultId}`, { method: 'DELETE' }),
+  bulkDeleteResults: (programId, body) =>
+    request(`/programs/${programId}/cnca/results/bulk-delete`, { method: 'POST', body }),
+  publishResults: (programId, body) =>
+    request(`/programs/${programId}/cnca/results/publish`, { method: 'POST', body }),
+  ranking: (programId, params) =>
+    request(`/programs/${programId}/cnca/ranking`, { params }),
+  filters: (programId) =>
+    request(`/programs/${programId}/cnca/filters`),
 };
 
 export const pactoPublicApi = {
@@ -100,6 +138,10 @@ export const pactoPublicApi = {
     request(`/public/pacto/${encodeURIComponent(token)}/assessments/draft`, { method: 'PUT', body }),
   submit: (token, body) =>
     request(`/public/pacto/${encodeURIComponent(token)}/assessments/submit`, { method: 'POST', body }),
+  submitAll: (token) =>
+    request(`/public/pacto/${encodeURIComponent(token)}/assessments/submit-all`, { method: 'POST' }),
+  deleteDraft: (token, classId, code) =>
+    request(`/public/pacto/${encodeURIComponent(token)}/assessments/${classId}/${code}`, { method: 'DELETE' }),
   previewImport: (token, file, mapping = {}) => {
     const form = new FormData();
     form.append('file', file);
@@ -109,12 +151,13 @@ export const pactoPublicApi = {
       body: form,
     });
   },
-  confirmImport: (token, file, { mapping, previewDigest, confirmReplace }) => {
+  confirmImport: (token, file, { mapping, previewDigest, confirmReplace, submitAll }) => {
     const form = new FormData();
     form.append('file', file);
     form.append('mapping', JSON.stringify(mapping || {}));
     form.append('previewDigest', previewDigest);
     form.append('confirmReplace', String(Boolean(confirmReplace)));
+    if (submitAll) form.append('submitAll', 'true');
     return request(`/public/pacto/${encodeURIComponent(token)}/import/confirm`, {
       method: 'POST',
       body: form,

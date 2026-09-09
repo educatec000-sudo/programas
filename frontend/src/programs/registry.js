@@ -1,5 +1,10 @@
 import PactoAdmin from './pacto/PactoAdmin.jsx';
 import PactoDashboard from './pacto/PactoDashboard.jsx';
+import CncaDashboard from './cnca/CncaDashboard.jsx';
+import CncaSchools from './cnca/CncaSchools.jsx';
+import CncaSchoolResults from './cnca/CncaSchoolResults.jsx';
+import CncaRanking from './cnca/CncaRanking.jsx';
+import CncaImport from './cnca/CncaImport.jsx';
 
 /**
  * Registro dos ambientes específicos de programas.
@@ -8,7 +13,8 @@ import PactoDashboard from './pacto/PactoDashboard.jsx';
  * oficial. O código estável e o ciclo identificam a implementação; o nome de
  * exibição nunca é usado em condicionais espalhadas pela aplicação.
  */
-const PACTO_DISABLED_SHARED_TABS = ['criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios'];
+const PACTO_DISABLED_SHARED_TABS = ['escolas', 'criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios'];
+const CNCA_DISABLED_SHARED_TABS = ['escolas', 'criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios'];
 
 const implementations = [
   {
@@ -18,6 +24,29 @@ const implementations = [
     OverviewComponent: PactoDashboard,
     adminTabs: [
       { key: 'coleta-pacto', label: 'Coleta do Pacto', Component: PactoAdmin },
+    ],
+  },
+  {
+    code: 'CNCA-2026',
+    year: 2026,
+    disabledSharedTabs: CNCA_DISABLED_SHARED_TABS,
+    OverviewComponent: CncaDashboard,
+    adminTabs: [
+      { key: 'cnca-escolas', label: 'Escolas Participantes', Component: CncaSchools },
+      { key: 'cnca-resultados', label: 'Resultados por Escola', Component: CncaSchoolResults },
+      { key: 'cnca-ranking', label: 'Ranking Oficial', Component: CncaRanking },
+      { key: 'cnca-import', label: 'Importar Planilha Oficial', Component: CncaImport },
+    ],
+  },
+  {
+    code: 'CNCA',
+    disabledSharedTabs: CNCA_DISABLED_SHARED_TABS,
+    OverviewComponent: CncaDashboard,
+    adminTabs: [
+      { key: 'cnca-escolas', label: 'Escolas Participantes', Component: CncaSchools },
+      { key: 'cnca-resultados', label: 'Resultados por Escola', Component: CncaSchoolResults },
+      { key: 'cnca-ranking', label: 'Ranking Oficial', Component: CncaRanking },
+      { key: 'cnca-import', label: 'Importar Planilha Oficial', Component: CncaImport },
     ],
   },
 ];
@@ -33,6 +62,21 @@ export function getProgramImplementation(program) {
     normalizeCode(item.code) === code && (item.year == null || Number(item.year) === Number(program.year))
   ));
   if (exact) return exact;
+
+  // Catálogo CNCA genérico
+  if (normalizeCode(program.catalog?.code) === 'CNCA' || normalizeCode(program.code).startsWith('CNCA')) {
+    return {
+      catalogCode: 'CNCA',
+      disabledSharedTabs: CNCA_DISABLED_SHARED_TABS,
+      OverviewComponent: CncaDashboard,
+      adminTabs: [
+        { key: 'cnca-escolas', label: 'Escolas Participantes', Component: CncaSchools },
+        { key: 'cnca-resultados', label: 'Resultados por Escola', Component: CncaSchoolResults },
+        { key: 'cnca-ranking', label: 'Ranking Oficial', Component: CncaRanking },
+        { key: 'cnca-import', label: 'Importar Planilha Oficial', Component: CncaImport },
+      ],
+    };
+  }
 
   // Ciclos futuros do Pacto permanecem no mesmo catálogo, mas não recebem
   // formulário, pontuação ou coleta genéricos sem documentação oficial própria.

@@ -4,7 +4,7 @@
 
 O programa informado pelo responsável é **Pacto pela Alfabetização 2026**.
 
-O arquivo HTML recebido inicialmente é somente o índice/frameset de uma pasta de trabalho exportada pelo Microsoft Excel. Seus caminhos internos ainda usam um nome legado contendo `PARC-2026`, mas isso não altera a identificação confirmada do programa.
+O arquivo HTML recebido inicialmente é somente o índice/frameset de uma pasta de trabalho exportada pelo Microsoft Excel.
 
 A escola usada no exemplo é E.M.E.I.E.F. Santa Anastácia, INEP 15066665, Abaetetuba.
 

@@ -187,6 +187,7 @@ model School {
   technicianLinks SchoolTechnician[]
   collectionLinks ProgramCollectionLink[]
   pactoClasses    PactoClass[]
+  cncaResults     CncaSchoolResult[]
 
   @@index([name])
   @@index([district])
@@ -271,6 +272,7 @@ model Program {
   evaluations     Evaluation[]
   collectionLinks ProgramCollectionLink[]
   pactoClasses    PactoClass[]
+  cncaResults     CncaSchoolResult[]
 
   @@unique([catalogId, year])
   @@index([year, status])
@@ -575,6 +577,59 @@ model PactoSkillResult {
 
   @@unique([componentId, skill, level])
   @@index([skill, level])
+}
+
+// ---------------------------- CNCA — COMPROMISSO NACIONAL CRIANÇA ALFABETIZADA ----------------------------
+
+enum CncaComponent {
+  ESCRITA
+  LEITURA
+  MATEMATICA
+  FLUENCIA
+}
+
+/**
+ * Resultado consolidado por escola do Compromisso Nacional Criança Alfabetizada (CNCA).
+ * Armazena fielmente os dados oficiais das quatro matrizes: Matemática, Leitura, Escrita e Fluência.
+ */
+model CncaSchoolResult {
+  id                String        @id @default(uuid())
+  programId         String
+  schoolId          String
+  year              Int
+  assessment        String // ex.: "Diagnóstica", "Formativa 1", "Formativa 2", "Somativa", "Entrada", "Saída", "2026"
+  grade             String // ex.: "1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano", "2º ano EF"
+  component         CncaComponent
+  enrolled          Int? // matriculados / previstos
+  evaluated         Int? // avaliados / presentes
+  participationRate Float? // taxa de participação (%)
+  averageScore      Float? // proficiência média / % de acerto geral
+
+  // Métricas específicas de Fluência Leitora
+  pcpm         Float? // palavras corretas por minuto
+  ppcpm        Float? // pseudopalavras corretas por minuto
+  accuracyRate Float? // taxa de precisão (%)
+  fluentRate   Float? // percentual de alunos no perfil fluente (%)
+
+  // Distribuição dos níveis oficiais de desempenho (JSON estruturado: [{ level: string, count?: number, percentage?: number }])
+  performanceLevels Json?
+
+  // Habilidades e descritores oficiais (JSON estruturado: [{ code: string, name?: string, percentage?: number, description?: string }])
+  // Ex: Matemática [ { code: "H01", percentage: 72.5 }, { code: "H02", percentage: 58.0 }, ... ]
+  skills Json?
+
+  source     String   @default("IMPORTACAO")
+  rawDetails Json? // metadados e colunas adicionais preservados da planilha oficial
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, schoolId, year, assessment, grade, component])
+  @@index([programId, year, component, grade])
+  @@index([schoolId])
+  @@index([component, assessment])
 }
 
 // ---------------------------- IMPORTAÇÕES ----------------------------

@@ -32,10 +32,11 @@ function requireProgram(params) {
 
 export const overview = wrap(async (req, res) => {
   const params = requireProgram(query.parse(req.query));
+  const ranking = await computeRanking(params);
   const [evolution, distribution, goals] = await Promise.all([
     evolutionSeries(params),
-    classificationDistribution(params),
-    goalsStatus(params),
+    classificationDistribution({ ...params, ranking }),
+    goalsStatus({ ...params, ranking }),
   ]);
   res.json({ evolution, distribution, goals });
 });

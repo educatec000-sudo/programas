@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi.js';
 import { analyticsApi, programsApi } from '../services/resources.js';
 import PageHeader from '../components/PageHeader.jsx';
@@ -28,6 +28,13 @@ export default function Analytics() {
     [programId],
   );
 
+  React.useEffect(() => {
+    if (program?.year && program.year !== year) {
+      setYear(program.year);
+      setCompareProgramYear(program.year);
+    }
+  }, [program?.id, program?.year]);
+
   const [selectedSchools, setSelectedSchools] = useState([]);
   const { data: comparison } = useApi(
     () =>
@@ -54,7 +61,20 @@ export default function Analytics() {
 
       <div className="filter-bar">
         <Field label="Programa">
-          <Select value={programId} onChange={(e) => { setProgramId(e.target.value); setIndicatorId(''); setSelectedSchools([]); }}>
+          <Select
+            value={programId}
+            onChange={(e) => {
+              const newId = e.target.value;
+              setProgramId(newId);
+              setIndicatorId('');
+              setSelectedSchools([]);
+              const p = (programs?.data || []).find((item) => item.id === newId);
+              if (p?.year) {
+                setYear(p.year);
+                setCompareProgramYear(p.year);
+              }
+            }}
+          >
             <option value="">Selecione um programa...</option>
             {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'graficos')).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
           </Select>
@@ -62,7 +82,11 @@ export default function Analytics() {
         <Field label="Indicador">
           <Select value={indicatorId} onChange={(e) => setIndicatorId(e.target.value)} disabled={!programId}>
             <option value="">Todos os critérios do programa</option>
-            {(program?.indicators || []).map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.code}</option>)}
+            {(program?.indicators || []).map((criterion) => (
+              <option key={criterion.id} value={criterion.id}>
+                {criterion.code} — {criterion.name}
+              </option>
+            ))}
           </Select>
         </Field>
         <Field label="Ano">

@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import DataTable from '../../components/DataTable.jsx';
 import { Badge, Button, Field, Input, LoadingBlock, Modal, Select } from '../../components/ui.jsx';
 import { fmtDateTime } from '../../utils/format.js';
+import { formatGradeLabel } from './dashboard.js';
 
 const STATUS = {
   NAO_INICIADA: { label: 'Não iniciada', cls: 'badge-gray' },
@@ -44,6 +45,9 @@ export default function PactoAdmin({ program }) {
   const [classForm, setClassForm] = useState({
     schoolId: '', grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS,
   });
+  const [classRows, setClassRows] = useState([
+    { grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS },
+  ]);
   const [busy, setBusy] = useState(false);
 
   const school = useMemo(
@@ -108,18 +112,52 @@ export default function PactoAdmin({ program }) {
   const saveAdminClass = async () => {
     setBusy(true);
     try {
-      const payload = {
-        grade: Number(classForm.grade),
-        shift: classForm.shift,
-        name: classForm.name,
-        enabledAssessments: classForm.enabledAssessments,
-      };
       if (editingAdminClass) {
+        const payload = {
+          grade: Number(classForm.grade),
+          shift: classForm.shift,
+          name: classForm.name,
+          enabledAssessments: classForm.enabledAssessments,
+        };
         await pactoAdminApi.updateClass(program.id, editingAdminClass.id, payload);
         success('Turma atualizada no programa.');
       } else {
-        await pactoAdminApi.createClass(program.id, { schoolId: classForm.schoolId, ...payload });
-        success('Turma cadastrada no programa.');
+        if (!classForm.schoolId) {
+          toastError('Selecione uma escola.');
+          setBusy(false);
+          return;
+        }
+        const validRows = classRows
+          .filter((row) => row.name && row.name.trim().length > 0)
+          .map((row) => ({
+            grade: Number(row.grade),
+            shift: row.shift,
+            name: row.name.trim().toUpperCase(),
+            enabledAssessments: row.enabledAssessments?.length ? row.enabledAssessments : ALL_ASSESSMENTS,
+          }));
+
+        if (!validRows.length) {
+          toastError('Preencha o nome de pelo menos uma turma.');
+          setBusy(false);
+          return;
+        }
+
+        const keys = new Set();
+        for (const row of validRows) {
+          const k = `${row.grade}-${row.shift}-${row.name}`;
+          if (keys.has(k)) {
+            toastError(`A turma ${formatGradeLabel(row.grade)} ${row.shift} - ${row.name} está duplicada no formulário.`);
+            setBusy(false);
+            return;
+          }
+          keys.add(k);
+        }
+
+        await pactoAdminApi.createClass(program.id, {
+          schoolId: classForm.schoolId,
+          classes: validRows,
+        });
+        success(`${validRows.length} turma(s) cadastrada(s) no programa com sucesso!`);
       }
       setClassModal(false);
       setEditingAdminClass(null);
@@ -135,7 +173,48 @@ export default function PactoAdmin({ program }) {
   const openNewAdminClass = () => {
     setEditingAdminClass(null);
     setClassForm({ schoolId: '', grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS });
+    setClassRows([
+      { grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS },
+    ]);
     setClassModal(true);
+  };
+
+  const addAdminClassRow = () => {
+    setClassRows((current) => [
+      ...current,
+      { grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS },
+    ]);
+  };
+
+  const removeAdminClassRow = (index) => {
+    setClassRows((current) => current.filter((_, i) => i !== index));
+  };
+
+  const updateAdminClassRow = (index, field, value) => {
+    setClassRows((current) => current.map((row, i) => (
+      i === index ? { ...row, [field]: value } : row
+    )));
+  };
+
+  const toggleAdminRowAssessment = (index, code) => {
+    setClassRows((current) => current.map((row, i) => {
+      if (i !== index) return row;
+      const enabled = row.enabledAssessments.includes(code)
+        ? row.enabledAssessments.filter((c) => c !== code)
+        : ALL_ASSESSMENTS.filter((c) => c === code || row.enabledAssessments.includes(c));
+      return { ...row, enabledAssessments: enabled };
+    }));
+  };
+
+  const applyAdminDefaultPreset = () => {
+    setClassRows([
+      { grade: 0, shift: 'M', name: 'A', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 0, shift: 'T', name: 'B', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 1, shift: 'M', name: 'A', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 1, shift: 'T', name: 'B', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 2, shift: 'M', name: 'A', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 2, shift: 'T', name: 'B', enabledAssessments: ALL_ASSESSMENTS },
+    ]);
   };
 
   const toggleAdminAssessment = (code) => {
@@ -165,6 +244,18 @@ export default function PactoAdmin({ program }) {
     try {
       await pactoAdminApi.reopenAssessment(program.id, assessmentId);
       success('Avaliação reaberta para correção.');
+      refresh();
+    } catch (err) {
+      toastError(err.message);
+    }
+  };
+
+  const removeAssessment = async (assessmentId) => {
+    if (!window.confirm('Excluir este rascunho de avaliação? Todos os dados registrados nesta etapa serão removidos.')) return;
+    try {
+      await pactoAdminApi.deleteAssessment(program.id, assessmentId);
+      success('Rascunho excluído com sucesso.');
+      setSelectedSchool(null);
       refresh();
     } catch (err) {
       toastError(err.message);
@@ -241,7 +332,7 @@ export default function PactoAdmin({ program }) {
         <div className="card-subtitle">Percentuais agregados por ano, avaliação e habilidade. Não representam nota geral nem ranking.</div>
         <DataTable
           columns={[
-            { key: 'grade', label: 'Ano', render: (item) => `${item.grade}º ano` },
+            { key: 'grade', label: 'Etapa / Ano', render: (item) => formatGradeLabel(item.grade) },
             { key: 'assessment', label: 'Avaliação', render: (item) => <strong>{item.assessment}</strong> },
             { key: 'componentLabel', label: 'Componente' },
             { key: 'skillLabel', label: 'Habilidade' },
@@ -289,7 +380,7 @@ export default function PactoAdmin({ program }) {
           <div key={item.id} className="card card-pad" style={{ marginBottom: 12 }}>
             <div className="card-header-row">
               <div>
-                <div className="card-title">{item.grade}º ano · Turno {item.shift} · Turma {item.name}</div>
+                <div className="card-title">{formatGradeLabel(item.grade)} · Turno {item.shift} · Turma {item.name}</div>
                 <div className="card-subtitle">
                   Cadastro: {item.source === 'ESCOLA' ? 'gestor da escola' : 'administração'} · Avaliações no link: {(item.enabledAssessments || ALL_ASSESSMENTS).join(', ')}
                 </div>
@@ -323,6 +414,9 @@ export default function PactoAdmin({ program }) {
                             <Button size="sm" variant="secondary" onClick={() => setAssessmentDetail({ assessment, pactoClass: item })}>Ver dados</Button>
                             {can('evaluations:write') && assessment.status === 'ENVIADO' && (
                               <Button size="sm" variant="secondary" onClick={() => reopen(assessment.id)}>Reabrir</Button>
+                            )}
+                            {can('evaluations:write') && assessment.status !== 'ENVIADO' && (
+                              <Button size="sm" variant="danger" onClick={() => removeAssessment(assessment.id)}>Excluir rascunho</Button>
                             )}
                           </div>
                         )}
@@ -419,55 +513,140 @@ export default function PactoAdmin({ program }) {
       <Modal
         open={classModal}
         onClose={() => { setClassModal(false); setEditingAdminClass(null); }}
-        title={editingAdminClass ? 'Corrigir turma do Pacto 2026' : 'Cadastrar turma no Pacto 2026'}
-        size="sm"
+        title={editingAdminClass ? 'Corrigir turma do Pacto 2026' : 'Cadastrar turmas no Pacto 2026'}
+        size={editingAdminClass ? 'sm' : 'lg'}
         footer={
           <>
             <Button variant="secondary" onClick={() => { setClassModal(false); setEditingAdminClass(null); }}>Cancelar</Button>
-            <Button onClick={saveAdminClass} disabled={busy || !classForm.schoolId || !classForm.name || !classForm.enabledAssessments.length}>{busy ? 'Salvando...' : editingAdminClass ? 'Salvar correção' : 'Cadastrar'}</Button>
+            {editingAdminClass ? (
+              <Button onClick={saveAdminClass} disabled={busy || !classForm.schoolId || !classForm.name || !classForm.enabledAssessments.length}>
+                {busy ? 'Salvando...' : 'Salvar correção'}
+              </Button>
+            ) : (
+              <Button onClick={saveAdminClass} disabled={busy || !classForm.schoolId || !classRows.some((r) => r.name.trim().length > 0)}>
+                {busy ? 'Salvando...' : `Cadastrar ${classRows.filter((r) => r.name.trim().length > 0).length > 1 ? `${classRows.filter((r) => r.name.trim().length > 0).length} turmas` : 'turma'}`}
+              </Button>
+            )}
           </>
         }
       >
-        {editingIdentificationLocked && (
-          <div className="alert alert-info">A identificação está bloqueada porque há envio concluído. Ainda é possível acrescentar avaliações ao link; para alterar ano, turno ou turma, reabra os envios.</div>
-        )}
-        <Field label="Escola" required>
-          <Select disabled={Boolean(editingAdminClass)} value={classForm.schoolId} onChange={(event) => setClassForm((form) => ({ ...form, schoolId: event.target.value }))}>
-            <option value="">Selecione</option>
-            {data.schools.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Ano" required>
-          <Select disabled={editingIdentificationLocked} value={classForm.grade} onChange={(event) => setClassForm((form) => ({ ...form, grade: event.target.value }))}>
-            <option value="1">1º ano</option><option value="2">2º ano</option>
-          </Select>
-        </Field>
-        <Field label="Turno" required>
-          <Select disabled={editingIdentificationLocked} value={classForm.shift} onChange={(event) => setClassForm((form) => ({ ...form, shift: event.target.value }))}>
-            <option value="M">M</option><option value="T">T</option>
-          </Select>
-        </Field>
-        <Field label="Turma" required>
-          <Input disabled={editingIdentificationLocked} value={classForm.name} maxLength={30} onChange={(event) => setClassForm((form) => ({ ...form, name: event.target.value.toUpperCase() }))} placeholder="Ex.: A" />
-        </Field>
-        <Field label="Avaliações disponíveis no link" required hint="Somente as avaliações selecionadas serão exibidas para esta turma.">
-          <div className="pacto-assessment-checks">
-            {ALL_ASSESSMENTS.map((code) => {
-              const started = editingAdminClass?.assessments?.some((assessment) => assessment.code === code);
-              return (
-                <label key={code} className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={classForm.enabledAssessments.includes(code)}
-                    disabled={started}
-                    onChange={() => toggleAdminAssessment(code)}
-                  />
-                  <span><strong>{code}</strong>{started ? ' · já iniciada' : ''}</span>
-                </label>
-              );
-            })}
+        {editingAdminClass ? (
+          <>
+            {editingIdentificationLocked && (
+              <div className="alert alert-info">A identificação está bloqueada porque há envio concluído. Ainda é possível acrescentar avaliações ao link; para alterar ano, turno ou turma, reabra os envios.</div>
+            )}
+            <Field label="Escola" required>
+              <Select disabled value={classForm.schoolId}>
+                {data.schools.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Etapa / Ano" required>
+              <Select disabled={editingIdentificationLocked} value={classForm.grade} onChange={(event) => setClassForm((form) => ({ ...form, grade: event.target.value }))}>
+                <option value="0">PII</option>
+                <option value="1">1º ano</option>
+                <option value="2">2º ano</option>
+              </Select>
+            </Field>
+            <Field label="Turno" required>
+              <Select disabled={editingIdentificationLocked} value={classForm.shift} onChange={(event) => setClassForm((form) => ({ ...form, shift: event.target.value }))}>
+                <option value="M">M</option><option value="T">T</option>
+              </Select>
+            </Field>
+            <Field label="Turma" required>
+              <Input disabled={editingIdentificationLocked} value={classForm.name} maxLength={30} onChange={(event) => setClassForm((form) => ({ ...form, name: event.target.value.toUpperCase() }))} placeholder="Ex.: A" />
+            </Field>
+            <Field label="Avaliações disponíveis no link" required hint="Somente as avaliações selecionadas serão exibidas para esta turma.">
+              <div className="pacto-assessment-checks">
+                {ALL_ASSESSMENTS.map((code) => {
+                  const started = editingAdminClass?.assessments?.some((assessment) => assessment.code === code);
+                  return (
+                    <label key={code} className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={classForm.enabledAssessments.includes(code)}
+                        disabled={started}
+                        onChange={() => toggleAdminAssessment(code)}
+                      />
+                      <span><strong>{code}</strong>{started ? ' · já iniciada' : ''}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+          </>
+        ) : (
+          <div>
+            <Field label="Escola participante" required hint="Selecione a escola que receberá as turmas cadastradas.">
+              <Select value={classForm.schoolId} onChange={(event) => setClassForm((form) => ({ ...form, schoolId: event.target.value }))}>
+                <option value="">Selecione uma escola</option>
+                {data.schools.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </Select>
+            </Field>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 0 12px 0', background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <span style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>Adição rápida de turmas</span>
+                <div style={{ fontSize: 12, color: '#64748b' }}>Cadastre várias turmas da escola em uma única etapa.</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button size="sm" variant="secondary" onClick={applyAdminDefaultPreset}>⚡ Padrão (PII, 1º e 2º A, B)</Button>
+                <Button size="sm" onClick={addAdminClassRow}>+ Adicionar linha</Button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '48vh', overflowY: 'auto', paddingRight: 4 }}>
+              {classRows.map((row, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                  <div style={{ width: 110 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Etapa / Ano</label>
+                    <Select value={row.grade} onChange={(e) => updateAdminClassRow(idx, 'grade', e.target.value)}>
+                      <option value="0">PII</option>
+                      <option value="1">1º ano</option>
+                      <option value="2">2º ano</option>
+                    </Select>
+                  </div>
+                  <div style={{ width: 90 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Turno</label>
+                    <Select value={row.shift} onChange={(e) => updateAdminClassRow(idx, 'shift', e.target.value)}>
+                      <option value="M">M</option>
+                      <option value="T">T</option>
+                    </Select>
+                  </div>
+                  <div style={{ width: 130 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Turma *</label>
+                    <Input maxLength={30} value={row.name} onChange={(e) => updateAdminClassRow(idx, 'name', e.target.value.toUpperCase())} placeholder="Ex.: A" />
+                  </div>
+                  <div style={{ flex: '1 1 200px' }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Avaliações</label>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                      {ALL_ASSESSMENTS.map((code) => (
+                        <label key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={row.enabledAssessments.includes(code)}
+                            onChange={() => toggleAdminRowAssessment(idx, code)}
+                          />
+                          <strong>{code}</strong>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {classRows.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => removeAdminClassRow(idx)}
+                      title="Remover linha"
+                      style={{ marginTop: 22, color: '#dc2626', borderColor: '#fca5a5' }}
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </Field>
+        )}
       </Modal>
     </>
   );

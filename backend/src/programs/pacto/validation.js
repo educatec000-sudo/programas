@@ -7,6 +7,11 @@ export const programClassParamsSchema = z.object({ id: uuid, classId: uuid });
 export const programAssessmentParamsSchema = z.object({ id: uuid, assessmentId: uuid });
 export const publicTokenParamsSchema = z.object({ token: z.string().min(32).max(256) });
 export const publicClassParamsSchema = z.object({ token: z.string().min(32).max(256), classId: uuid });
+export const publicAssessmentParamsSchema = z.object({
+  token: z.string().min(32).max(256),
+  classId: uuid,
+  code: z.enum(['A0', 'A1', 'A2', 'A3']),
+});
 
 export const generateLinkSchema = z.object({
   expiresAt: z.coerce.date().refine((value) => value > new Date(), 'A validade deve estar no futuro'),
@@ -19,18 +24,32 @@ const enabledAssessmentsSchema = z
   .refine((items) => new Set(items).size === items.length, 'Não repita avaliações');
 
 const classFields = {
-  grade: z.coerce.number().int().min(1).max(2),
+  grade: z.coerce.number().int().min(0).max(2),
   shift: z.enum(['M', 'T']),
   name: z.string().trim().min(1).max(30).transform((value) => value.toUpperCase()),
   enabledAssessments: enabledAssessmentsSchema.default(['A0', 'A1', 'A2', 'A3']),
 };
 
-export const adminClassSchema = z.object({
-  schoolId: uuid,
-  ...classFields,
-});
+export const publicClassItemSchema = z.object(classFields);
 
-export const publicClassSchema = z.object(classFields);
+export const publicClassSchema = z.union([
+  publicClassItemSchema,
+  z.object({
+    classes: z.array(publicClassItemSchema).min(1, 'Informe ao menos uma turma').max(50),
+  }),
+  z.array(publicClassItemSchema).min(1, 'Informe ao menos uma turma').max(50),
+]);
+
+export const adminClassSchema = z.union([
+  z.object({
+    schoolId: uuid,
+    ...classFields,
+  }),
+  z.object({
+    schoolId: uuid,
+    classes: z.array(publicClassItemSchema).min(1, 'Informe ao menos uma turma').max(50),
+  }),
+]);
 
 export const updateClassSchema = z.object(classFields).partial().refine(
   (value) => Object.keys(value).length > 0,

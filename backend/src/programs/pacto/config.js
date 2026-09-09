@@ -69,10 +69,17 @@ const A0_SECOND_GRADE_SKILLS = [
   ['CODIFICACAO', 'Codificação'],
 ].map(([code, label]) => ({ code, label, levels: DEVELOPMENT_LEVELS }));
 
+const PII_SKILLS = [
+  ['COMPREENSAO_HISTORIA', 'Compreensão de história'],
+  ['PRINCIPIO_ALFABETICO', 'Princípio alfabético'],
+  ['CONSCIENCIA_FONOLOGICA', 'Consciência fonológica'],
+].map(([code, label]) => ({ code, label, levels: DEVELOPMENT_LEVELS }));
+
 export const PACTO_CONFIG = Object.freeze({
   programCode: PACTO_PROGRAM_CODE,
   year: PACTO_PROGRAM_YEAR,
   grades: [
+    { value: 0, label: 'PII' },
     { value: 1, label: '1º ano' },
     { value: 2, label: '2º ano' },
   ],
@@ -85,7 +92,20 @@ export const PACTO_CONFIG = Object.freeze({
 
 export function getAssessmentDefinition(grade, code) {
   const numericGrade = Number(grade);
-  if (![1, 2].includes(numericGrade) || !ASSESSMENT_CODES.includes(code)) return null;
+  if (![0, 1, 2].includes(numericGrade) || !ASSESSMENT_CODES.includes(code)) return null;
+  if (numericGrade === 0) {
+    return {
+      code,
+      label: `Avaliação ${code} — PII`,
+      components: [
+        {
+          code: 'INICIAL',
+          label: 'Educação Infantil (PII)',
+          skills: PII_SKILLS,
+        },
+      ],
+    };
+  }
   if (code === 'A0') {
     return {
       code,

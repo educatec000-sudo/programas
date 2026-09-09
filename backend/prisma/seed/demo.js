@@ -109,6 +109,12 @@ const PROGRAMS = [
     globalGoal: 70, periodLabel: 'Anual', schools: [0, 17],
     indicators: [['IND-012', 1, 80], ['IND-011', 1, 70], ['IND-005', 2, 90]],
   },
+  {
+    code: 'CNCA-2026', name: 'Compromisso Nacional Criança Alfabetizada', year: 2026, status: 'EM_EXECUCAO', organ: 'MEC / SEMED',
+    objective: 'Garantir a alfabetização de todas as crianças na idade certa com avaliação por escola',
+    globalGoal: 85, periodLabel: 'Ciclo 2026', schools: [0, 11],
+    indicators: [],
+  },
 ];
 
 export const DEMO_CATEGORY_NAMES = CATEGORIES.map(([name]) => name);
@@ -143,6 +149,53 @@ async function upsertDemoGoal(prisma, data) {
 export async function seedDemoData(prisma) {
   const rand = rng(20250825);
   console.log('>> populando dados de demonstração...');
+
+  // 0. Limpeza preventiva de programas ou catálogos legados (como PARC)
+  const legacyCatalogs = await prisma.programCatalog.findMany({
+    where: {
+      OR: [
+        { code: { in: ['PARC', 'PARC-2026', 'PARC_2026'] } },
+        { name: { contains: 'PARC' } },
+        { name: { contains: 'Programa de Avaliação da Rede' } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (legacyCatalogs.length) {
+    const legacyCatIds = legacyCatalogs.map((c) => c.id);
+    const legacyPrograms = await prisma.program.findMany({
+      where: { catalogId: { in: legacyCatIds } },
+      select: { id: true },
+    });
+    const legacyProgIds = legacyPrograms.map((p) => p.id);
+    if (legacyProgIds.length) {
+      await prisma.programSchool.deleteMany({ where: { programId: { in: legacyProgIds } } });
+      await prisma.programIndicator.deleteMany({ where: { programId: { in: legacyProgIds } } });
+      await prisma.result.deleteMany({ where: { programId: { in: legacyProgIds } } });
+      await prisma.goal.deleteMany({ where: { programId: { in: legacyProgIds } } });
+      await prisma.program.deleteMany({ where: { id: { in: legacyProgIds } } });
+    }
+    await prisma.programCatalog.deleteMany({ where: { id: { in: legacyCatIds } } });
+  }
+
+  const directLegacyPrograms = await prisma.program.findMany({
+    where: {
+      OR: [
+        { code: { startsWith: 'PARC' } },
+        { name: { contains: 'PARC' } },
+        { name: { contains: 'Programa de Avaliação da Rede' } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (directLegacyPrograms.length) {
+    const ids = directLegacyPrograms.map((p) => p.id);
+    await prisma.programSchool.deleteMany({ where: { programId: { in: ids } } });
+    await prisma.programIndicator.deleteMany({ where: { programId: { in: ids } } });
+    await prisma.result.deleteMany({ where: { programId: { in: ids } } });
+    await prisma.goal.deleteMany({ where: { programId: { in: ids } } });
+    await prisma.program.deleteMany({ where: { id: { in: ids } } });
+  }
 
   // Escolas
   const schools = [];
@@ -336,6 +389,174 @@ export async function seedDemoData(prisma) {
   }
   await prisma.result.createMany({ data: results, skipDuplicates: true });
   console.log(`   ${results.length} resultados lançados (2024-2025, 1º/2º semestre)`);
+
+  // Resultados consolidados do CNCA (Compromisso Nacional Criança Alfabetizada)
+  const cncaProgram = programs.find((p) => p.code === 'CNCA-2026');
+  if (cncaProgram) {
+    const cncaResults = [];
+    for (let sIdx = 0; sIdx <= 11; sIdx++) {
+      const school = schools[sIdx];
+      const enrolled = Math.round(45 + rand() * 40);
+      const evaluated = Math.round(enrolled * (0.88 + rand() * 0.11));
+      const partRate = Math.round((evaluated / enrolled) * 1000) / 10;
+      const q = quality[sIdx];
+
+      // 1. Fluência
+      const pcpm = Math.round((50 + q * 25 + rand() * 10) * 10) / 10;
+      const ppcpm = Math.round((20 + q * 15 + rand() * 5) * 10) / 10;
+      const accuracy = Math.round((88 + q * 9 + rand() * 2) * 10) / 10;
+      const fluentRate = Math.round((55 + q * 35 + rand() * 8) * 10) / 10;
+      const preLeitorPct = Math.max(2, Math.round((100 - fluentRate) * 0.35 * 10) / 10);
+      const iniciantePct = Math.round((100 - fluentRate - preLeitorPct) * 10) / 10;
+
+      cncaResults.push({
+        programId: cncaProgram.id,
+        schoolId: school.id,
+        year: 2026,
+        grade: '2º Ano',
+        assessment: 'Diagnóstica',
+        component: 'FLUENCIA',
+        enrolled,
+        evaluated,
+        participationRate: partRate,
+        averageScore: Math.round((210 + q * 40) * 10) / 10,
+        pcpm,
+        ppcpm,
+        accuracyRate: accuracy,
+        fluentRate,
+        performanceLevels: [
+          { level: 'Pré-leitor', percentage: preLeitorPct, count: Math.round((preLeitorPct * evaluated) / 100) },
+          { level: 'Leitor Iniciante', percentage: iniciantePct, count: Math.round((iniciantePct * evaluated) / 100) },
+          { level: 'Leitor Fluente', percentage: fluentRate, count: Math.round((fluentRate * evaluated) / 100) },
+        ],
+        skills: [
+          { code: 'H01', name: 'Leitura de Palavras', percentage: Math.round(65 + q * 25) },
+          { code: 'H02', name: 'Leitura de Pseudopalavras', percentage: Math.round(58 + q * 28) },
+          { code: 'H03', name: 'Leitura de Texto Fluente', percentage: Math.round(52 + q * 35) },
+        ],
+        rawDetails: {},
+        source: 'IMPORTACAO',
+      });
+
+      // 2. Matemática
+      const matScore = Math.round((200 + q * 55 + rand() * 15) * 10) / 10;
+      const matAdeq = Math.round((50 + q * 38) * 10) / 10;
+      cncaResults.push({
+        programId: cncaProgram.id,
+        schoolId: school.id,
+        year: 2026,
+        grade: '2º Ano',
+        assessment: 'Diagnóstica',
+        component: 'MATEMATICA',
+        enrolled,
+        evaluated,
+        participationRate: partRate,
+        averageScore: matScore,
+        pcpm: null,
+        ppcpm: null,
+        accuracyRate: null,
+        fluentRate: null,
+        performanceLevels: [
+          { level: 'Abaixo do Básico', percentage: Math.round((100 - matAdeq) * 0.4 * 10) / 10, count: Math.round(((100 - matAdeq) * 0.4 * evaluated) / 100) },
+          { level: 'Básico', percentage: Math.round((100 - matAdeq) * 0.6 * 10) / 10, count: Math.round(((100 - matAdeq) * 0.6 * evaluated) / 100) },
+          { level: 'Adequado', percentage: Math.round(matAdeq * 0.7 * 10) / 10, count: Math.round((matAdeq * 0.7 * evaluated) / 100) },
+          { level: 'Avançado', percentage: Math.round(matAdeq * 0.3 * 10) / 10, count: Math.round((matAdeq * 0.3 * evaluated) / 100) },
+        ],
+        skills: [
+          { code: 'H01', name: 'Leitura e Escrita de Números', percentage: Math.round(60 + q * 30) },
+          { code: 'H02', name: 'Operações de Adição', percentage: Math.round(68 + q * 25) },
+          { code: 'H03', name: 'Operações de Subtração', percentage: Math.round(55 + q * 30) },
+          { code: 'H04', name: 'Resolução de Problemas', percentage: Math.round(48 + q * 35) },
+          { code: 'H05', name: 'Espaço e Formas Geométricas', percentage: Math.round(62 + q * 28) },
+        ],
+        rawDetails: {},
+        source: 'IMPORTACAO',
+      });
+
+      // 3. Leitura
+      const leitScore = Math.round((195 + q * 58 + rand() * 12) * 10) / 10;
+      const leitAdeq = Math.round((48 + q * 40) * 10) / 10;
+      cncaResults.push({
+        programId: cncaProgram.id,
+        schoolId: school.id,
+        year: 2026,
+        grade: '2º Ano',
+        assessment: 'Diagnóstica',
+        component: 'LEITURA',
+        enrolled,
+        evaluated,
+        participationRate: partRate,
+        averageScore: leitScore,
+        pcpm: null,
+        ppcpm: null,
+        accuracyRate: null,
+        fluentRate: null,
+        performanceLevels: [
+          { level: 'Abaixo do Básico', percentage: Math.round((100 - leitAdeq) * 0.45 * 10) / 10, count: Math.round(((100 - leitAdeq) * 0.45 * evaluated) / 100) },
+          { level: 'Básico', percentage: Math.round((100 - leitAdeq) * 0.55 * 10) / 10, count: Math.round(((100 - leitAdeq) * 0.55 * evaluated) / 100) },
+          { level: 'Adequado', percentage: Math.round(leitAdeq * 0.65 * 10) / 10, count: Math.round((leitAdeq * 0.65 * evaluated) / 100) },
+          { level: 'Avançado', percentage: Math.round(leitAdeq * 0.35 * 10) / 10, count: Math.round((leitAdeq * 0.35 * evaluated) / 100) },
+        ],
+        skills: [
+          { code: 'H01', name: 'Localização de Informação Explícita', percentage: Math.round(64 + q * 28) },
+          { code: 'H02', name: 'Inferência do Sentido Global', percentage: Math.round(50 + q * 32) },
+          { code: 'H03', name: 'Identificação da Finalidade do Texto', percentage: Math.round(58 + q * 30) },
+        ],
+        rawDetails: {},
+        source: 'IMPORTACAO',
+      });
+
+      // 4. Escrita
+      const escScore = Math.round((205 + q * 50 + rand() * 10) * 10) / 10;
+      const escAlfa = Math.round((58 + q * 36) * 10) / 10;
+      cncaResults.push({
+        programId: cncaProgram.id,
+        schoolId: school.id,
+        year: 2026,
+        grade: '2º Ano',
+        assessment: 'Diagnóstica',
+        component: 'ESCRITA',
+        enrolled,
+        evaluated,
+        participationRate: partRate,
+        averageScore: escScore,
+        pcpm: null,
+        ppcpm: null,
+        accuracyRate: null,
+        fluentRate: escAlfa,
+        performanceLevels: [
+          { level: 'Pré-silábico', percentage: Math.round((100 - escAlfa) * 0.25 * 10) / 10, count: Math.round(((100 - escAlfa) * 0.25 * evaluated) / 100) },
+          { level: 'Silábico', percentage: Math.round((100 - escAlfa) * 0.40 * 10) / 10, count: Math.round(((100 - escAlfa) * 0.40 * evaluated) / 100) },
+          { level: 'Silábico-Alfabético', percentage: Math.round((100 - escAlfa) * 0.35 * 10) / 10, count: Math.round(((100 - escAlfa) * 0.35 * evaluated) / 100) },
+          { level: 'Alfabético', percentage: escAlfa, count: Math.round((escAlfa * evaluated) / 100) },
+        ],
+        skills: [
+          { code: 'H01', name: 'Escrita de Palavras com Correspondência Grafofonêmica', percentage: Math.round(66 + q * 26) },
+          { code: 'H02', name: 'Produção de Frases e Pequenos Textos', percentage: Math.round(54 + q * 34) },
+        ],
+        rawDetails: {},
+        source: 'IMPORTACAO',
+      });
+    }
+
+    for (const item of cncaResults) {
+      await prisma.cncaSchoolResult.upsert({
+        where: {
+          programId_schoolId_year_assessment_grade_component: {
+            programId: item.programId,
+            schoolId: item.schoolId,
+            year: item.year,
+            assessment: item.assessment,
+            grade: item.grade,
+            component: item.component,
+          },
+        },
+        create: item,
+        update: item,
+      });
+    }
+    console.log(`   ${cncaResults.length} resultados do CNCA garantidos (Escrita, Leitura, Matemática e Fluência)`);
+  }
 
   // Notificações de boas-vindas (sem duplicar em novas execuções do seed)
   if (admin) {

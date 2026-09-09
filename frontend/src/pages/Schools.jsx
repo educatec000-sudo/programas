@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi, useDebounce } from '../hooks/useApi.js';
 import { schoolsApi, techniciansApi } from '../services/resources.js';

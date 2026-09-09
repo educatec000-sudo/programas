@@ -68,6 +68,17 @@ export const reopenAssessment = wrap(async (req, res) => {
   );
 });
 
+export const deleteAdminAssessment = wrap(async (req, res) => {
+  res.json(
+    await service.deleteAdminAssessment(
+      req.data.params.id,
+      req.data.params.assessmentId,
+      req.user,
+      getClientIp(req),
+    ),
+  );
+});
+
 export const publicBootstrap = wrap(async (req, res) => {
   res.json(await service.getPublicBootstrap(req.data.params.token));
 });
@@ -98,6 +109,23 @@ export const saveDraft = wrap(async (req, res) => {
 export const submitAssessment = wrap(async (req, res) => {
   res.json(
     await service.submitPublicAssessment(req.data.params.token, req.data.body, getClientIp(req)),
+  );
+});
+
+export const submitAllAssessments = wrap(async (req, res) => {
+  res.json(
+    await service.submitAllPublicAssessments(req.data.params.token, getClientIp(req)),
+  );
+});
+
+export const deletePublicDraft = wrap(async (req, res) => {
+  res.json(
+    await service.deletePublicDraft(
+      req.data.params.token,
+      req.data.params.classId,
+      req.data.params.code,
+      getClientIp(req),
+    ),
   );
 });
 
@@ -172,6 +200,7 @@ export const confirmImport = wrap(async (req, res) => {
           mapping: parseImportMapping(req.body?.mapping),
           previewDigest,
           confirmReplace: req.body?.confirmReplace === true || req.body?.confirmReplace === 'true',
+          submitAll: req.body?.submitAll === true || req.body?.submitAll === 'true',
         },
         getClientIp(req),
       ),

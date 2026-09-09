@@ -4,6 +4,12 @@ import { useApi } from '../hooks/useApi.js';
 import { pactoPublicApi } from '../services/resources.js';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { Badge, Button, Field, Input, LoadingBlock, Modal, Select } from '../components/ui.jsx';
+import { formatGradeLabel } from '../programs/pacto/dashboard.js';
+import {
+  filterMappingFieldsByMode,
+  getCompatibleColumnsForField,
+  getCompatibleResultColumns,
+} from '../programs/pacto/mapping.js';
 
 const ALL_ASSESSMENTS = ['A0', 'A1', 'A2', 'A3'];
 
@@ -117,7 +123,7 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
     setMappingDirty(true);
   };
 
-  const confirm = async () => {
+  const confirm = async (submitAll = false) => {
     if (!file || !preview?.canConfirm || mappingDirty) return;
     setBusy(true);
     try {
@@ -125,8 +131,13 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
         mapping,
         previewDigest: preview.previewDigest,
         confirmReplace,
+        submitAll,
       });
-      notifySuccess(`${result.count} avaliação(ões) importada(s) como rascunho.`);
+      notifySuccess(
+        submitAll
+          ? `${result.count} avaliação(ões) importada(s) e enviada(s) definitivamente com sucesso!`
+          : `${result.count} avaliação(ões) importada(s) como rascunho.`,
+      );
       reset();
       onClose();
       onImported();
@@ -139,6 +150,12 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
 
   const hasReplacements = preview?.groups?.some((group) => group.replacesDraft);
   const sourceOptions = preview?.availableColumns || [];
+  const [showAllColumns, setShowAllColumns] = useState({});
+
+  const visibleMappingFields = useMemo(() => {
+    if (!preview?.mappingFields) return [];
+    return filterMappingFieldsByMode(preview.mappingFields, mapping.mode || 'long');
+  }, [preview?.mappingFields, mapping.mode]);
 
   return (
     <Modal
@@ -155,11 +172,18 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
             </Button>
           )}
           <Button
-            variant="success"
-            onClick={confirm}
+            variant="secondary"
+            onClick={() => confirm(false)}
             disabled={busy || !preview?.canConfirm || mappingDirty || (hasReplacements && !confirmReplace)}
           >
-            {busy ? 'Importando...' : 'Confirmar e salvar rascunhos'}
+            {busy ? 'Importando...' : `Salvar ${preview?.summary?.validGroups ? `${preview.summary.validGroups} grupo(s)` : ''} como rascunho`}
+          </Button>
+          <Button
+            variant="success"
+            onClick={() => confirm(true)}
+            disabled={busy || !preview?.canConfirm || mappingDirty || (hasReplacements && !confirmReplace)}
+          >
+            {busy ? 'Enviando...' : `🚀 Confirmar e enviar ${preview?.summary?.validGroups ? `${preview.summary.validGroups} grupo(s)` : ''} definitivamente`}
           </Button>
         </>
       }
@@ -167,7 +191,7 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
       <div className="pacto-import-intro">
         <strong>CSV ou XLSX estruturado</strong>
         <span>O arquivo será apenas lido nesta etapa. Nenhum dado é salvo antes da confirmação.</span>
-        <span>Arquivos separados de Língua Portuguesa ou Matemática também são aceitos; o componente ausente permanece pendente no rascunho.</span>
+        <span>Planilhas de PII, 1º Ano e 2º Ano (Língua Portuguesa, Matemática e Habilidades Iniciais) são reconhecidas e importadas automaticamente. Registros válidos são importados mesmo que outros grupos possuam pendências.</span>
       </div>
 
       <Field label="1. Selecione o arquivo exportado" required hint="Formatos aceitos: .csv e .xlsx. Não use PDF ou imagem.">
@@ -184,6 +208,7 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
           }}
         />
       </Field>
+
       {!preview && (
         <Button onClick={() => loadPreview({})} disabled={!file || busy}>
           {busy ? 'Lendo arquivo...' : 'Ler arquivo e gerar prévia'}
@@ -192,22 +217,40 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
 
       {preview && (
         <>
-          <div className="pacto-import-summary">
-            <div><strong>{preview.file.rows}</strong><span>linhas lidas</span></div>
-            <div><strong>{preview.file.tables}</strong><span>tabelas</span></div>
-            <div><strong>{preview.summary.groups}</strong><span>grupos detectados</span></div>
-            <div><strong>{preview.summary.validGroups}</strong><span>grupos válidos</span></div>
-            <div><strong>{preview.summary.errors}</strong><span>bloqueios</span></div>
-            <div><strong>{preview.summary.warnings}</strong><span>alertas</span></div>
+          <div className="pacto-import-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, margin: '14px 0' }}>
+            <div className="stat-card" style={{ padding: '10px 14px', background: '#f8fafc' }}>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{preview.file.rows}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>linhas no arquivo</div>
+            </div>
+            <div className="stat-card" style={{ padding: '10px 14px', background: '#f8fafc' }}>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{preview.summary.groups}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>grupos detectados</div>
+            </div>
+            <div className="stat-card" style={{ padding: '10px 14px', background: '#ecfdf5', borderColor: '#a7f3d0' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#16a34a' }}>{preview.summary.validGroups}</div>
+              <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600 }}>🟢 grupos válidos</div>
+            </div>
+            {preview.summary.pendingGroups > 0 && (
+              <div className="stat-card" style={{ padding: '10px 14px', background: '#fffbeb', borderColor: '#fde68a' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#d97706' }}>{preview.summary.pendingGroups}</div>
+                <div style={{ fontSize: 11, color: '#b45309', fontWeight: 600 }}>🟡 com pendências</div>
+              </div>
+            )}
+            {preview.summary.errors > 0 && (
+              <div className="stat-card" style={{ padding: '10px 14px', background: '#fef2f2', borderColor: '#fecaca' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#dc2626' }}>{preview.summary.errors}</div>
+                <div style={{ fontSize: 11, color: '#b91c1c', fontWeight: 600 }}>🔴 erros críticos</div>
+              </div>
+            )}
           </div>
 
           <section className="pacto-import-section">
             <div className="card-title">2. Mapeamento de colunas</div>
             <div className="card-subtitle">
-              O sistema preenche o que reconheceu. Corrija seleções incompletas e clique em “Atualizar prévia”.
+              O sistema sugere automaticamente as colunas compatíveis. Ajuste se necessário e clique em “Atualizar prévia”.
             </div>
             <div className="form-grid">
-              <Field label="Formato dos resultados">
+              <Field label="Formato dos resultados" hint="Escolha o layout correspondente à estrutura da sua planilha.">
                 <Select
                   value={mapping.mode || 'long'}
                   onChange={(event) => {
@@ -220,47 +263,82 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
                 </Select>
               </Field>
               <div />
-              {preview.mappingFields.map((field) => (
-                <Field key={field.key} label={field.label} required={field.required}>
-                  <Select
-                    value={mapping.columns?.[field.key] || ''}
-                    onChange={(event) => changeMapping('columns', field.key, event.target.value)}
-                  >
-                    <option value="">Não mapear</option>
-                    {sourceOptions.map((column) => (
-                      <option key={column.key} value={column.key}>
-                        {column.label}{column.samples?.length ? ` — ex.: ${column.samples.slice(0, 2).join(', ')}` : ''}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              ))}
+              {visibleMappingFields.map((field) => {
+                const currentValue = mapping.columns?.[field.key] || '';
+                const seeAll = Boolean(showAllColumns[field.key]);
+                const compatibleOptions = seeAll
+                  ? sourceOptions
+                  : getCompatibleColumnsForField(field.key, sourceOptions, currentValue);
+
+                return (
+                  <Field key={field.key} label={field.label} required={field.required} hint={field.hint}>
+                    <Select
+                      value={currentValue}
+                      onChange={(event) => changeMapping('columns', field.key, event.target.value)}
+                    >
+                      <option value="">Não mapear</option>
+                      {compatibleOptions.map((column) => (
+                        <option key={column.key} value={column.key}>
+                          {column.label}{column.samples?.length ? ` — ex.: ${column.samples.slice(0, 2).join(', ')}` : ''}
+                        </option>
+                      ))}
+                    </Select>
+                    {sourceOptions.length > compatibleOptions.length && (
+                      <div style={{ textAlign: 'right', marginTop: 2 }}>
+                        <button
+                          type="button"
+                          className="btn-link"
+                          style={{ fontSize: 11, color: 'var(--primary)', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+                          onClick={() => setShowAllColumns((prev) => ({ ...prev, [field.key]: !prev[field.key] }))}
+                        >
+                          {seeAll ? 'Mostrar apenas colunas sugeridas' : `+ Ver todas as ${sourceOptions.length} colunas`}
+                        </button>
+                      </div>
+                    )}
+                  </Field>
+                );
+              })}
             </div>
 
             {(mapping.mode === 'wide') && (
               <details className="pacto-import-details">
                 <summary>Mapear colunas de quantidades por habilidade e nível</summary>
                 <div className="form-grid pacto-import-result-mapping">
-                  {preview.resultFields.map((field) => (
-                    <Field key={field.key} label={`${field.componentLabel} · ${field.skillLabel} · ${field.levelLabel}`}>
-                      <span className="pacto-import-map-label">Quantidade</span>
-                      <Select
-                        value={mapping.results?.[field.key] || ''}
-                        onChange={(event) => changeMapping('results', field.key, event.target.value)}
-                      >
-                        <option value="">Não mapear</option>
-                        {sourceOptions.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
-                      </Select>
-                      <span className="pacto-import-map-label">Percentual do arquivo (opcional)</span>
-                      <Select
-                        value={mapping.resultPercentages?.[field.key] || ''}
-                        onChange={(event) => changeMapping('resultPercentages', field.key, event.target.value)}
-                      >
-                        <option value="">Não mapear</option>
-                        {sourceOptions.map((column) => <option key={column.key} value={column.key}>{column.label}</option>)}
-                      </Select>
-                    </Field>
-                  ))}
+                  {preview.resultFields.map((field) => {
+                    const currentCount = mapping.results?.[field.key] || '';
+                    const currentPerc = mapping.resultPercentages?.[field.key] || '';
+                    const countOptions = getCompatibleResultColumns(field, sourceOptions, false, currentCount);
+                    const percOptions = getCompatibleResultColumns(field, sourceOptions, true, currentPerc);
+
+                    return (
+                      <Field key={field.key} label={`${field.componentLabel} · ${field.skillLabel} · ${field.levelLabel}`}>
+                        <span className="pacto-import-map-label">Quantidade</span>
+                        <Select
+                          value={currentCount}
+                          onChange={(event) => changeMapping('results', field.key, event.target.value)}
+                        >
+                          <option value="">Não mapear</option>
+                          {countOptions.map((column) => (
+                            <option key={column.key} value={column.key}>
+                              {column.label}{column.samples?.length ? ` — ex.: ${column.samples.slice(0, 2).join(', ')}` : ''}
+                            </option>
+                          ))}
+                        </Select>
+                        <span className="pacto-import-map-label">Percentual do arquivo (opcional)</span>
+                        <Select
+                          value={currentPerc}
+                          onChange={(event) => changeMapping('resultPercentages', field.key, event.target.value)}
+                        >
+                          <option value="">Não mapear</option>
+                          {percOptions.map((column) => (
+                            <option key={column.key} value={column.key}>
+                              {column.label}{column.samples?.length ? ` — ex.: ${column.samples.slice(0, 2).join(', ')}` : ''}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    );
+                  })}
                 </div>
               </details>
             )}
@@ -270,7 +348,7 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
                 <strong>Correspondência com turmas desta escola</strong>
                 <div className="form-grid">
                   {preview.classMatches.map((source) => (
-                    <Field key={source.key} label={`${source.grade}º ano · ${source.shift || 'turno não informado'} · ${source.className}`} required>
+                    <Field key={source.key} label={`${formatGradeLabel(source.grade)} · ${source.shift || 'turno não informado'} · ${source.className}`} required>
                       <Select
                         value={mapping.classes?.[source.key] || ''}
                         onChange={(event) => changeMapping('classes', source.key, event.target.value)}
@@ -289,23 +367,25 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
           <section className="pacto-import-section">
             <div className="card-title">3. Prévia dos dados</div>
             <div className="card-subtitle">Confira todos os grupos e todas as quantidades. Percentuais são recalculados pelo sistema.</div>
-            <ImportIssues title="Pendências que bloqueiam a importação" items={preview.errors} />
-            <ImportIssues title="Alertas para conferência" items={preview.warnings} warning />
+            {preview.globalErrors?.length > 0 && <ImportIssues title="Pendências críticas do arquivo" items={preview.globalErrors} />}
+            <ImportIssues title="Alertas gerais para conferência" items={preview.warnings} warning />
 
             {preview.groups.map((group) => (
               <article key={group.id} className={`pacto-import-group ${group.valid ? 'valid' : 'invalid'}`}>
                 <div className="card-header-row">
                   <div>
-                    <strong>{group.grade}º ano · Turma {group.className} · {group.assessment}</strong>
+                    <strong>{formatGradeLabel(group.grade)} · Turma {group.className} · {group.assessment}</strong>
                     <div className="card-subtitle">
                       {group.classLabel || 'Turma do sistema ainda não selecionada'} · linhas {group.sourceRows.slice(0, 10).join(', ')}
                       {group.sourceRowCount > 10 ? ` e mais ${group.sourceRowCount - 10}` : ''}
                     </div>
                   </div>
-                  <Badge cls={group.valid ? 'badge-green' : 'badge-red'}>{group.valid ? 'Válido' : 'Revisar'}</Badge>
+                  <Badge cls={group.valid ? 'badge-green' : 'badge-yellow'}>
+                    {group.valid ? '🟢 Válido para importação' : '🟡 Pendência (Não será importado)'}
+                  </Badge>
                 </div>
                 {group.replacesDraft && <div className="alert alert-warn">Existe um rascunho desta avaliação. Os componentes presentes no arquivo serão atualizados somente após confirmação explícita; os demais serão preservados.</div>}
-                <ImportIssues title="Bloqueios deste grupo" items={group.errors} />
+                <ImportIssues title="Pendências deste grupo" items={group.errors} warning={!group.valid} />
                 <ImportIssues title="Alertas deste grupo" items={group.warnings} warning />
                 {group.components.map((component) => (
                   <div key={component.component} className="table-wrap pacto-import-table">
@@ -339,13 +419,115 @@ function PactoImportModal({ open, onClose, token, onImported, notifyError, notif
               <span>Confirmo que revisei a prévia e autorizo atualizar os componentes importados nos rascunhos indicados.</span>
             </label>
           )}
-          <div className={`alert ${preview.canConfirm ? 'alert-success' : 'alert-warn'}`}>
-            {preview.canConfirm
-              ? 'Prévia válida. Ao confirmar, todas as avaliações serão gravadas juntas como RASCUNHO e ainda precisarão do envio final.'
-              : 'A confirmação permanece bloqueada até que todas as pendências sejam corrigidas.'}
+          <div className={`alert ${preview.canConfirm ? (preview.summary.pendingGroups > 0 ? 'alert-info' : 'alert-success') : 'alert-warn'}`}>
+            {preview.canConfirm ? (
+              preview.summary.pendingGroups > 0 ? (
+                <div>
+                  <strong>🟢 {preview.summary.validGroups} grupo(s) válidos serão importados.</strong>
+                  <div style={{ marginTop: 4 }}>
+                    🟡 {preview.summary.pendingGroups} grupo(s) possuem pendências e não serão importados nesta etapa, permitindo que os válidos sejam salvos sem bloqueio.
+                  </div>
+                </div>
+              ) : (
+                'Todos os grupos estão válidos! Você pode salvar como rascunhos para revisar depois ou enviar tudo definitivamente agora.'
+              )
+            ) : (
+              'A confirmação permanece bloqueada porque nenhum grupo válido foi encontrado ou há erro crítico no mapeamento do arquivo.'
+            )}
           </div>
         </>
       )}
+    </Modal>
+  );
+}
+
+function SubmitAllConfirmModal({ open, onClose, drafts, token, onSubmitted, notifyError, notifySuccess }) {
+  const [busy, setBusy] = useState(false);
+  const [errorDetails, setErrorDetails] = useState(null);
+
+  const handleSubmitAll = async () => {
+    setBusy(true);
+    setErrorDetails(null);
+    try {
+      const result = await pactoPublicApi.submitAll(token);
+      notifySuccess(`${result.count} avaliação(ões) enviada(s) definitivamente com sucesso!`);
+      onClose();
+      onSubmitted();
+    } catch (err) {
+      if (err.details && Array.isArray(err.details)) {
+        setErrorDetails(err.details);
+      } else {
+        notifyError(err.message);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => !busy && onClose()}
+      title="📤 Enviar todas as avaliações definitivamente"
+      size="lg"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancelar</Button>
+          <Button variant="success" onClick={handleSubmitAll} disabled={busy || !drafts.length}>
+            {busy ? 'Enviando...' : `Confirmar envio de ${drafts.length} avaliações`}
+          </Button>
+        </>
+      }
+    >
+      <div className="alert alert-info" style={{ marginTop: 0 }}>
+        Todas as turmas e avaliações listadas abaixo serão validadas e enviadas definitivamente ao sistema. Correções futuras exigirão reabertura pelo administrador do programa.
+      </div>
+
+      {errorDetails && (
+        <div className="alert alert-error">
+          <strong>Pendências que impedem o envio conjunto:</strong>
+          <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+            {errorDetails.map((item, index) => (
+              <li key={index}>
+                <strong>{item.className} · {item.assessment}:</strong> {item.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 9, marginTop: 12 }}>
+        <table className="table" style={{ margin: 0 }}>
+          <thead>
+            <tr>
+              <th>Turma</th>
+              <th>Avaliação</th>
+              <th>Componentes</th>
+              <th>Status atual</th>
+            </tr>
+          </thead>
+          <tbody>
+            {drafts.map((d) => (
+              <tr key={`${d.pactoClass.id}-${d.code}`}>
+                <td>
+                  <strong>{formatGradeLabel(d.pactoClass.grade)} {d.pactoClass.shift}</strong> — Turma {d.pactoClass.name}
+                </td>
+                <td><Badge cls="badge-blue">{d.code}</Badge></td>
+                <td>
+                  {d.components?.map((c) => `${c.component} (${c.evaluated || 0} avaliados)`).join(' · ') || 'Sem componentes'}
+                </td>
+                <td>
+                  <Badge cls={STATUS[d.status]?.cls || 'badge-yellow'}>
+                    {STATUS[d.status]?.label || d.status}
+                  </Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Modal>
   );
 }
@@ -418,10 +600,14 @@ export default function PactoCollection() {
   const [busy, setBusy] = useState(false);
   const [classModal, setClassModal] = useState(false);
   const [importModal, setImportModal] = useState(false);
+  const [submitAllModal, setSubmitAllModal] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
   const [classForm, setClassForm] = useState({
     grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS,
   });
+  const [classRows, setClassRows] = useState([
+    { grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS },
+  ]);
 
   const selectedClass = useMemo(
     () => data?.classes?.find((item) => item.id === selectedClassId) || null,
@@ -444,6 +630,16 @@ export default function PactoCollection() {
   const selectedClassIdentificationLocked = Boolean(
     selectedClass?.assessments.some((assessment) => assessment.status === 'ENVIADO'),
   );
+
+  const allDrafts = useMemo(() => {
+    if (!data?.classes) return [];
+    return data.classes.flatMap((c) => (
+      (c.assessments || [])
+        .filter((a) => (c.enabledAssessments || ALL_ASSESSMENTS).includes(a.code))
+        .filter((a) => a.status === 'RASCUNHO' || a.status === 'REABERTO')
+        .map((a) => ({ ...a, pactoClass: c }))
+    ));
+  }, [data]);
 
   useEffect(() => {
     if (!selectedClassId && data?.classes?.length) setSelectedClassId(data.classes[0].id);
@@ -520,10 +716,70 @@ export default function PactoCollection() {
     }
   };
 
+  const handleDeleteDraft = async () => {
+    if (!selectedClass || !assessmentCode) return;
+    if (!window.confirm(`Tem certeza que deseja apagar o rascunho da avaliação ${assessmentCode} da turma ${selectedClass.name}? Todos os dados salvos nesta etapa serão removidos.`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await pactoPublicApi.deleteDraft(token, selectedClass.id, assessmentCode);
+      success(`Rascunho de ${assessmentCode} apagado com sucesso.`);
+      if (definition) {
+        setForm(emptyForm(definition, null));
+      }
+      refresh();
+    } catch (err) {
+      toastError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openNewClass = () => {
     setEditingClass(null);
-    setClassForm({ grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS });
+    setClassRows([
+      { grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS },
+    ]);
     setClassModal(true);
+  };
+
+  const addClassRow = () => {
+    setClassRows((current) => [
+      ...current,
+      { grade: 1, shift: 'M', name: '', enabledAssessments: ALL_ASSESSMENTS },
+    ]);
+  };
+
+  const removeClassRow = (index) => {
+    setClassRows((current) => current.filter((_, i) => i !== index));
+  };
+
+  const updateClassRow = (index, field, value) => {
+    setClassRows((current) => current.map((row, i) => (
+      i === index ? { ...row, [field]: value } : row
+    )));
+  };
+
+  const toggleRowAssessment = (index, code) => {
+    setClassRows((current) => current.map((row, i) => {
+      if (i !== index) return row;
+      const enabled = row.enabledAssessments.includes(code)
+        ? row.enabledAssessments.filter((c) => c !== code)
+        : ALL_ASSESSMENTS.filter((c) => c === code || row.enabledAssessments.includes(c));
+      return { ...row, enabledAssessments: enabled };
+    }));
+  };
+
+  const applyDefaultPreset = () => {
+    setClassRows([
+      { grade: 0, shift: 'M', name: 'A', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 0, shift: 'T', name: 'B', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 1, shift: 'M', name: 'A', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 1, shift: 'T', name: 'B', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 2, shift: 'M', name: 'A', enabledAssessments: ALL_ASSESSMENTS },
+      { grade: 2, shift: 'T', name: 'B', enabledAssessments: ALL_ASSESSMENTS },
+    ]);
   };
 
   const openEditClass = () => {
@@ -550,13 +806,49 @@ export default function PactoCollection() {
   const saveClass = async () => {
     setBusy(true);
     try {
-      const payload = { ...classForm, grade: Number(classForm.grade) };
-      const saved = editingClass
-        ? await pactoPublicApi.updateClass(token, editingClass.id, payload)
-        : await pactoPublicApi.createClass(token, payload);
-      success(editingClass ? 'Turma atualizada.' : 'Turma adicionada.');
-      setClassModal(false);
-      setSelectedClassId(saved.id);
+      if (editingClass) {
+        const payload = { ...classForm, grade: Number(classForm.grade) };
+        const saved = await pactoPublicApi.updateClass(token, editingClass.id, payload);
+        success('Turma atualizada com sucesso.');
+        setClassModal(false);
+        setSelectedClassId(saved.id);
+      } else {
+        const validRows = classRows
+          .filter((row) => row.name && row.name.trim().length > 0)
+          .map((row) => ({
+            grade: Number(row.grade),
+            shift: row.shift,
+            name: row.name.trim().toUpperCase(),
+            enabledAssessments: row.enabledAssessments?.length ? row.enabledAssessments : ALL_ASSESSMENTS,
+          }));
+
+        if (!validRows.length) {
+          toastError('Preencha o nome de pelo menos uma turma.');
+          setBusy(false);
+          return;
+        }
+
+        const keys = new Set();
+        for (const row of validRows) {
+          const k = `${row.grade}-${row.shift}-${row.name}`;
+          if (keys.has(k)) {
+            toastError(`A turma ${formatGradeLabel(row.grade)} ${row.shift} - ${row.name} está duplicada no formulário.`);
+            setBusy(false);
+            return;
+          }
+          keys.add(k);
+        }
+
+        const saved = await pactoPublicApi.createClass(token, { classes: validRows });
+        const count = Array.isArray(saved) ? saved.length : 1;
+        success(`${count} turma(s) adicionada(s) com sucesso!`);
+        setClassModal(false);
+        if (Array.isArray(saved) && saved.length > 0) {
+          setSelectedClassId(saved[0].id);
+        } else if (saved?.id) {
+          setSelectedClassId(saved.id);
+        }
+      }
       refresh();
     } catch (err) {
       toastError(err.details?.map((item) => item.message).join(' · ') || err.message);
@@ -585,14 +877,39 @@ export default function PactoCollection() {
           <Badge cls="badge-green">Link verificado</Badge>
         </section>
 
+        {allDrafts.length > 0 && (
+          <section className="card card-pad" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 65%)', border: '1px solid #86efac', marginBottom: 16 }}>
+            <div className="card-header-row" style={{ alignItems: 'center' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <strong style={{ color: '#166534', fontSize: 15 }}>
+                    📤 {allDrafts.length} avaliação(ões) em rascunho prontas para envio
+                  </strong>
+                  <Badge cls="badge-yellow">{allDrafts.length} rascunho(s)</Badge>
+                </div>
+                <div style={{ color: 'var(--text-2)', fontSize: 12.5, marginTop: 4 }}>
+                  Após a importação ou preenchimento, envie todas as turmas e avaliações juntas sem precisar entrar uma a uma.
+                </div>
+              </div>
+              <Button
+                variant="success"
+                onClick={() => setSubmitAllModal(true)}
+                disabled={busy}
+              >
+                🚀 Enviar todas ({allDrafts.length})
+              </Button>
+            </div>
+          </section>
+        )}
+
         <div className="alert alert-info">
-          Preencha uma avaliação por vez. Os percentuais são calculados automaticamente e os dados podem ser salvos como rascunho antes do envio.
+          Preencha uma avaliação por vez ou utilize a importação do Power BI. Os percentuais são calculados automaticamente e os dados podem ser salvos como rascunho antes do envio definitivo.
         </div>
 
         <section className="pacto-import-callout">
           <div>
             <strong>Já possui os resultados exportados do Power BI?</strong>
-            <span>Importe CSV/XLSX, confira o mapeamento e a prévia e salve A0, A1, A2 e A3 como rascunhos. O preenchimento manual continua disponível.</span>
+            <span>Importe CSV/XLSX, confira a prévia e salve como rascunhos ou envie tudo de uma só vez. O preenchimento manual continua disponível.</span>
           </div>
           <Button variant="secondary" onClick={() => setImportModal(true)}>Importar resultados do Power BI</Button>
         </section>
@@ -620,7 +937,7 @@ export default function PactoCollection() {
           {data.classes.length ? (
             <Select value={selectedClassId} onChange={(event) => setSelectedClassId(event.target.value)}>
               {data.classes.map((item) => (
-                <option key={item.id} value={item.id}>{item.grade}º ano · Turno {item.shift} · Turma {item.name}</option>
+                <option key={item.id} value={item.id}>{formatGradeLabel(item.grade)} · Turno {item.shift} · Turma {item.name}</option>
               ))}
             </Select>
           ) : (
@@ -721,6 +1038,11 @@ export default function PactoCollection() {
 
                 {!locked && (
                   <div className="public-collection-actions">
+                    {existing && (existing.status === 'RASCUNHO' || existing.status === 'REABERTO') && (
+                      <Button variant="danger" onClick={handleDeleteDraft} disabled={busy}>
+                        {busy ? 'Apagando...' : 'Apagar rascunho'}
+                      </Button>
+                    )}
                     <Button variant="secondary" onClick={() => persist(false)} disabled={busy}>{busy ? 'Salvando...' : 'Salvar rascunho'}</Button>
                     <Button variant="success" onClick={() => persist(true)} disabled={busy}>{busy ? 'Enviando...' : `Conferir e enviar ${assessmentCode}`}</Button>
                   </div>
@@ -747,52 +1069,139 @@ export default function PactoCollection() {
         notifySuccess={success}
       />
 
+      <SubmitAllConfirmModal
+        open={submitAllModal}
+        onClose={() => setSubmitAllModal(false)}
+        drafts={allDrafts}
+        token={token}
+        onSubmitted={refresh}
+        notifyError={toastError}
+        notifySuccess={success}
+      />
+
       <Modal
         open={classModal}
         onClose={() => setClassModal(false)}
-        title={editingClass ? 'Corrigir identificação da turma' : 'Adicionar turma'}
-        size="sm"
+        title={editingClass ? 'Corrigir identificação da turma' : 'Adicionar turmas'}
+        size={editingClass ? 'sm' : 'lg'}
         footer={
           <>
             <Button variant="secondary" onClick={() => setClassModal(false)}>Cancelar</Button>
-            <Button onClick={saveClass} disabled={busy || !classForm.name || !classForm.enabledAssessments.length}>{busy ? 'Salvando...' : 'Salvar turma'}</Button>
+            {editingClass ? (
+              <Button onClick={saveClass} disabled={busy || !classForm.name || !classForm.enabledAssessments.length}>
+                {busy ? 'Salvando...' : 'Salvar turma'}
+              </Button>
+            ) : (
+              <Button onClick={saveClass} disabled={busy || !classRows.some((r) => r.name.trim().length > 0)}>
+                {busy ? 'Salvando...' : `Salvar ${classRows.filter((r) => r.name.trim().length > 0).length > 1 ? `${classRows.filter((r) => r.name.trim().length > 0).length} turmas` : 'turma'}`}
+              </Button>
+            )}
           </>
         }
       >
-        {editingClass && selectedClassIdentificationLocked && (
-          <div className="alert alert-info">Ano, turno e turma estão bloqueados porque há envio concluído. Ainda é possível acrescentar avaliações ao link.</div>
-        )}
-        <Field label="Ano" required>
-          <Select disabled={Boolean(editingClass && selectedClassIdentificationLocked)} value={classForm.grade} onChange={(event) => setClassForm((current) => ({ ...current, grade: event.target.value }))}>
-            <option value="1">1º ano</option><option value="2">2º ano</option>
-          </Select>
-        </Field>
-        <Field label="Turno" required>
-          <Select disabled={Boolean(editingClass && selectedClassIdentificationLocked)} value={classForm.shift} onChange={(event) => setClassForm((current) => ({ ...current, shift: event.target.value }))}>
-            <option value="M">M</option><option value="T">T</option>
-          </Select>
-        </Field>
-        <Field label="Turma" required>
-          <Input disabled={Boolean(editingClass && selectedClassIdentificationLocked)} maxLength={30} value={classForm.name} onChange={(event) => setClassForm((current) => ({ ...current, name: event.target.value.toUpperCase() }))} placeholder="Ex.: A" />
-        </Field>
-        <Field label="Avaliações disponíveis" required hint="A página mostrará somente as avaliações selecionadas para esta turma.">
-          <div className="pacto-assessment-checks">
-            {ALL_ASSESSMENTS.map((code) => {
-              const started = editingClass?.assessments?.some((assessment) => assessment.code === code);
-              return (
-                <label key={code} className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={classForm.enabledAssessments.includes(code)}
-                    disabled={started}
-                    onChange={() => toggleClassAssessment(code)}
-                  />
-                  <span><strong>{code}</strong>{started ? ' · já iniciada' : ''}</span>
-                </label>
-              );
-            })}
+        {editingClass ? (
+          <>
+            {selectedClassIdentificationLocked && (
+              <div className="alert alert-info">Ano, turno e turma estão bloqueados porque há envio concluído. Ainda é possível acrescentar avaliações ao link.</div>
+            )}
+            <Field label="Etapa / Ano" required>
+              <Select disabled={Boolean(selectedClassIdentificationLocked)} value={classForm.grade} onChange={(event) => setClassForm((current) => ({ ...current, grade: event.target.value }))}>
+                <option value="0">PII</option><option value="1">1º ano</option><option value="2">2º ano</option>
+              </Select>
+            </Field>
+            <Field label="Turno" required>
+              <Select disabled={Boolean(selectedClassIdentificationLocked)} value={classForm.shift} onChange={(event) => setClassForm((current) => ({ ...current, shift: event.target.value }))}>
+                <option value="M">M</option><option value="T">T</option>
+              </Select>
+            </Field>
+            <Field label="Turma" required>
+              <Input disabled={Boolean(selectedClassIdentificationLocked)} maxLength={30} value={classForm.name} onChange={(event) => setClassForm((current) => ({ ...current, name: event.target.value.toUpperCase() }))} placeholder="Ex.: A" />
+            </Field>
+            <Field label="Avaliações disponíveis" required hint="A página mostrará somente as avaliações selecionadas para esta turma.">
+              <div className="pacto-assessment-checks">
+                {ALL_ASSESSMENTS.map((code) => {
+                  const started = editingClass?.assessments?.some((assessment) => assessment.code === code);
+                  return (
+                    <label key={code} className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={classForm.enabledAssessments.includes(code)}
+                        disabled={started}
+                        onChange={() => toggleClassAssessment(code)}
+                      />
+                      <span><strong>{code}</strong>{started ? ' · já iniciada' : ''}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+          </>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <span style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>Adição rápida de turmas</span>
+                <div style={{ fontSize: 12, color: '#64748b' }}>Cadastre várias turmas em uma única etapa.</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button size="sm" variant="secondary" onClick={applyDefaultPreset}>⚡ Padrão (PII, 1º e 2º A, B)</Button>
+                <Button size="sm" onClick={addClassRow}>+ Adicionar linha</Button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '55vh', overflowY: 'auto', paddingRight: 4 }}>
+              {classRows.map((row, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                  <div style={{ width: 110 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Etapa / Ano</label>
+                    <Select value={row.grade} onChange={(e) => updateClassRow(idx, 'grade', e.target.value)}>
+                      <option value="0">PII</option>
+                      <option value="1">1º ano</option>
+                      <option value="2">2º ano</option>
+                    </Select>
+                  </div>
+                  <div style={{ width: 90 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Turno</label>
+                    <Select value={row.shift} onChange={(e) => updateClassRow(idx, 'shift', e.target.value)}>
+                      <option value="M">M</option>
+                      <option value="T">T</option>
+                    </Select>
+                  </div>
+                  <div style={{ width: 130 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Turma *</label>
+                    <Input maxLength={30} value={row.name} onChange={(e) => updateClassRow(idx, 'name', e.target.value.toUpperCase())} placeholder="Ex.: A" />
+                  </div>
+                  <div style={{ flex: '1 1 200px' }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Avaliações</label>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                      {ALL_ASSESSMENTS.map((code) => (
+                        <label key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={row.enabledAssessments.includes(code)}
+                            onChange={() => toggleRowAssessment(idx, code)}
+                          />
+                          <strong>{code}</strong>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {classRows.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => removeClassRow(idx)}
+                      title="Remover linha"
+                      style={{ marginTop: 22, color: '#dc2626', borderColor: '#fca5a5' }}
+                    >
+                      🗑
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </Field>
+        )}
       </Modal>
     </div>
   );

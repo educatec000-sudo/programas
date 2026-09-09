@@ -117,11 +117,11 @@ function installInMemoryPactoDatabase(t) {
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-        return assessment;
+        return hydratedAssessment();
       },
       update: async ({ data }) => {
         assessment = { ...assessment, ...data, updatedAt: new Date() };
-        return assessment;
+        return hydratedAssessment();
       },
       findUnique: async () => hydratedAssessment(),
     },
@@ -158,6 +158,7 @@ function installInMemoryPactoDatabase(t) {
     },
   };
 
+  const createdClasses = [];
   replace(prisma.program, 'findFirst', async () => program);
   replace(prisma.programSchool, 'findUnique', async () => ({ active: true, school }));
   replace(prisma.programCollectionLink, 'findUnique', async ({ where }) => (
@@ -167,11 +168,29 @@ function installInMemoryPactoDatabase(t) {
     collectionLink = { ...collectionLink, ...data };
     return collectionLink;
   });
-  replace(prisma.pactoClass, 'findMany', async () => [hydratedClass()]);
+  replace(prisma.pactoClass, 'create', async ({ data }) => {
+    const item = {
+      id: `30000000-0000-4000-8000-${String(createdClasses.length + 10).padStart(12, '0')}`,
+      ...data,
+      active: true,
+      assessments: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    createdClasses.push(item);
+    return item;
+  });
+  replace(prisma.pactoClass, 'findMany', async () => [hydratedClass(), ...createdClasses]);
   replace(prisma.pactoClass, 'findFirst', async () => pactoClass);
   replace(prisma.pactoAssessment, 'findUnique', async () => (
     assessment ? { id: assessment.id, status: assessment.status } : null
   ));
+  replace(prisma.pactoAssessment, 'delete', async () => {
+    assessment = null;
+    components.clear();
+    results.clear();
+    return { id: ids.assessment };
+  });
   replace(prisma.auditLog, 'create', async () => ({}));
   replace(prisma, '$transaction', async (operation) => (
     typeof operation === 'function' ? operation(tx) : Promise.all(operation)
@@ -239,17 +258,41 @@ test('fluxo público real: link exclusivo, escola, rascunho, envio e recarga', a
   assert.equal(result.payload.classes[0].assessments[0].code, 'A1');
   assert.equal(result.payload.classes[0].assessments[0].components.length, 2);
 
-  result = await jsonRequest(`${api}/assessments/submit`, {
-    method: 'POST',
+  // Testar exclusão de rascunho
+  result = await jsonRequest(`${api}/assessments/${ids.pactoClass}/A1`, {
+    method: 'DELETE',
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.payload.success, true);
+
+  result = await jsonRequest(api);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.payload.classes[0].assessments.length, 0);
+
+  // Recriar rascunho e testar envio em lote (submit-all)
+  result = await jsonRequest(`${api}/assessments/draft`, {
+    method: 'PUT',
     body: JSON.stringify(payload),
   });
   assert.equal(result.response.status, 200);
-  assert.equal(result.payload.assessment.status, 'ENVIADO');
+
+  result = await jsonRequest(`${api}/assessments/submit-all`, {
+    method: 'POST',
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.payload.count, 1);
+  assert.equal(result.payload.submitted[0].status, 'ENVIADO');
 
   result = await jsonRequest(api);
   assert.equal(result.response.status, 200);
   assert.equal(result.payload.classes[0].assessments[0].status, 'ENVIADO');
   assert.equal(result.payload.classes[0].assessments[0].components[0].results[0].percentage, 50);
+
+  // Tentativa de apagar avaliação já enviada deve ser recusada com conflito 409
+  result = await jsonRequest(`${api}/assessments/${ids.pactoClass}/A1`, {
+    method: 'DELETE',
+  });
+  assert.equal(result.response.status, 409);
 
   result = await jsonRequest(`${api}/assessments/draft`, {
     method: 'PUT',
@@ -257,4 +300,24 @@ test('fluxo público real: link exclusivo, escola, rascunho, envio e recarga', a
   });
   assert.equal(result.response.status, 422);
   assert.equal(result.payload.error.code, 'ASSESSMENT_NOT_ENABLED');
+
+  // Testar criação de múltiplas turmas em lote (batch class creation)
+  result = await jsonRequest(`${api}/classes`, {
+    method: 'POST',
+    body: JSON.stringify({
+      classes: [
+        { grade: 1, shift: 'M', name: 'TURMA B', enabledAssessments: ['A0', 'A1'] },
+        { grade: 2, shift: 'T', name: 'TURMA C', enabledAssessments: ['A1', 'A2'] },
+      ],
+    }),
+  });
+  assert.equal(result.response.status, 201);
+  assert.equal(Array.isArray(result.payload), true);
+  assert.equal(result.payload.length, 2);
+  assert.equal(result.payload[0].name, 'TURMA B');
+  assert.equal(result.payload[1].name, 'TURMA C');
+
+  result = await jsonRequest(api);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.payload.classes.length, 3);
 });

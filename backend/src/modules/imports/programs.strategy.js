@@ -146,7 +146,7 @@ export const programsStrategy = {
           created++;
         }
       }
-    });
+    }, { maxWait: 20_000, timeout: 60_000 });
     return { created, updated };
   },
 };

@@ -44,7 +44,14 @@ export default function Reports() {
   };
 
   const chooseProgram = (programId) => {
-    setFilters((current) => ({ ...current, programId, schoolId: '', indicatorId: '' }));
+    const p = (programs?.data || []).find((item) => item.id === programId);
+    setFilters((current) => ({
+      ...current,
+      programId,
+      schoolId: '',
+      indicatorId: '',
+      year: p?.year ? String(p.year) : current.year,
+    }));
   };
 
   const generate = async () => {

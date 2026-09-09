@@ -56,5 +56,11 @@ router.post(
   validate({ params: programAssessmentParamsSchema }),
   controller.reopenAssessment,
 );
+router.delete(
+  '/assessments/:assessmentId',
+  requirePermission('evaluations:write'),
+  validate({ params: programAssessmentParamsSchema }),
+  controller.deleteAdminAssessment,
+);
 
 export default router;

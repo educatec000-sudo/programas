@@ -47,6 +47,14 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
     indicator: { deletedAt: null },
   };
 
+  const programWhere = programId ? { id: programId, deletedAt: null } : { deletedAt: null };
+  const indicatorWhere = programId
+    ? { deletedAt: null, programs: { some: { programId, active: true } } }
+    : { deletedAt: null };
+  const schoolWhere = programId
+    ? { deletedAt: null, programs: { some: { programId, active: true } } }
+    : (schoolId ? { id: schoolId, deletedAt: null } : { deletedAt: null });
+
   const [results, goals, programIndicators, programSchools, indicatorsRaw, schoolsRaw, programsRaw] = await Promise.all([
     prisma.result.findMany({
       where: resultWhere,
@@ -100,15 +108,15 @@ export async function loadScope({ programId, indicatorId, year, schoolId }) {
       select: { programId: true, schoolId: true },
     }),
     prisma.indicator.findMany({
-      where: { deletedAt: null },
+      where: indicatorWhere,
       select: { id: true, code: true, name: true, unit: true, polarity: true },
     }),
     prisma.school.findMany({
-      where: { deletedAt: null },
+      where: schoolWhere,
       select: { id: true, inep: true, name: true },
     }),
     prisma.program.findMany({
-      where: { deletedAt: null },
+      where: programWhere,
       select: { id: true, code: true, name: true, year: true, status: true, catalog: { select: { code: true } } },
     }),
   ]);
@@ -245,12 +253,16 @@ async function getScoringProgram(programId) {
   return program;
 }
 
+async function assertSharedScoringAvailable(programId) {
+  if (programId) await getScoringProgram(programId);
+}
+
 /**
  * Ranking completo com evolução (posição e pontuação no período anterior).
  * Escopos: por programa (programId), por indicador (indicatorId) ou geral.
  */
 export async function computeRanking(params) {
-  const { programId, indicatorId, period, schoolId, limit } = params;
+  const { programId, indicatorId, period, schoolId, limit, scope: preloadedScope } = params;
   if (!programId) {
     throw new HttpError(
       422,
@@ -258,7 +270,8 @@ export async function computeRanking(params) {
       'PROGRAM_REQUIRED',
     );
   }
-  const program = await getScoringProgram(programId);
+  const program = preloadedScope?.programById?.get(programId) || await getScoringProgram(programId);
+  if (!program) throw new HttpError(404, 'Ciclo do programa não encontrado', 'NOT_FOUND');
   if (params.year && Number(params.year) !== program.year) {
     throw new HttpError(
       422,
@@ -267,7 +280,7 @@ export async function computeRanking(params) {
     );
   }
   const year = program.year;
-  const scope = await loadScope({ programId, indicatorId, year, schoolId });
+  const scope = preloadedScope || await loadScope({ programId, indicatorId, year, schoolId });
 
   // períodos disponíveis no escopo (p/ evolução)
   const periodSet = new Set(scope.results.map((r) => `${r.year}|${r.period}`));
@@ -380,9 +393,10 @@ export async function computeRanking(params) {
 }
 
 /** Série de evolução temporal (pontuação média por período). */
-export async function evolutionSeries({ programId, indicatorId, year, schoolId }) {
+export async function evolutionSeries(params) {
+  const { programId, indicatorId, year, schoolId, scope: preloadedScope } = params;
   await assertSharedScoringAvailable(programId);
-  const scope = await loadScope({ programId, indicatorId, year, schoolId });
+  const scope = preloadedScope || await loadScope({ programId, indicatorId, year, schoolId });
   const periodSet = new Set(scope.results.map((r) => `${r.year}|${r.period}`));
   const periods = [...periodSet]
     .map((s) => {
@@ -416,17 +430,17 @@ export async function evolutionSeries({ programId, indicatorId, year, schoolId }
 
 /** Distribuição de classificações A-E das escolas. */
 export async function classificationDistribution(params) {
-  const ranking = await computeRanking(params);
+  const ranking = params.ranking || await computeRanking(params);
   const dist = { A: 0, B: 0, C: 0, D: 0, E: 0 };
   for (const row of ranking.rows) dist[row.classification] = (dist[row.classification] || 0) + 1;
   return { period: ranking.period, year: ranking.year, total: ranking.rows.length, distribution: dist, rows: ranking.rows };
 }
 
 /** Comparação entre escolas (série por período). */
-export async function compareSchools({ schoolIds, programId, year }) {
+export async function compareSchools({ schoolIds, programId, year, scope: preloadedScope }) {
   if (!schoolIds?.length) return [];
   await assertSharedScoringAvailable(programId);
-  const scope = await loadScope({ programId, year });
+  const scope = preloadedScope || await loadScope({ programId, year });
   const periodSet = new Set(scope.results.filter((r) => schoolIds.includes(r.schoolId)).map((r) => `${r.year}|${r.period}`));
   const periods = [...periodSet]
     .map((s) => {
@@ -450,8 +464,8 @@ export async function compareSchools({ schoolIds, programId, year }) {
 }
 
 /** Comparação entre programas em um ano/período. */
-export async function comparePrograms({ year, period }) {
-  const scope = await loadScope({ year });
+export async function comparePrograms({ year, period, scope: preloadedScope }) {
+  const scope = preloadedScope || await loadScope({ year });
   const periodSet = new Set(scope.results.map((r) => `${r.year}|${r.period}`));
   const periods = [...periodSet]
     .map((s) => {
@@ -492,8 +506,8 @@ export async function comparePrograms({ year, period }) {
 }
 
 /** Metas x Resultados: por escola/indicador, acima ou abaixo da meta. */
-export async function goalsStatus({ programId, year, period, indicatorId }) {
-  const ranking = await computeRanking({ programId, year, period, indicatorId });
+export async function goalsStatus(params) {
+  const ranking = params.ranking || await computeRanking(params);
   const perIndicator = [];
   const indicatorMap = new Map();
 

@@ -5,6 +5,7 @@ import { uploadImportFile } from '../../middlewares/upload.js';
 import * as controller from './controller.js';
 import {
   assessmentPayloadSchema,
+  publicAssessmentParamsSchema,
   publicClassParamsSchema,
   publicClassSchema,
   publicTokenParamsSchema,
@@ -68,6 +69,16 @@ router.post(
   '/:token/assessments/submit',
   validate({ params: publicTokenParamsSchema, body: assessmentPayloadSchema }),
   controller.submitAssessment,
+);
+router.post(
+  '/:token/assessments/submit-all',
+  validate({ params: publicTokenParamsSchema }),
+  controller.submitAllAssessments,
+);
+router.delete(
+  '/:token/assessments/:classId/:code',
+  validate({ params: publicAssessmentParamsSchema }),
+  controller.deletePublicDraft,
 );
 
 export default router;

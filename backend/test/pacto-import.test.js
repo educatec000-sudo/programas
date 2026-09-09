@@ -44,7 +44,7 @@ function longRows({ grade, className, assessment, shift = 'M', enrolled = 10, ev
   const definition = getAssessmentDefinition(grade, assessment);
   return definition.components.flatMap((component) => component.skills.flatMap((skill) => (
     skill.levels.map((level, index) => [
-      `${grade}º ano`,
+      grade === 0 ? 'PII' : `${grade}º ano`,
       className,
       assessment,
       shift,
@@ -531,6 +531,182 @@ test('prévia pública não grava e confirmação persiste vários grupos em uma
   }
 });
 
+test('importação Pacto lê arquivo Excel oficial com 6 planilhas (A0, A1, A2, A3 para Português e Matemática)', () => {
+  const file = temporaryFile('.xlsx');
+  const wb = XLSX.utils.book_new();
+
+  // 1. Sheet: A0 - 1º ANO
+  const s1_rows = [
+    ['RESULTADO DAS AVALIAÇÕES POR TURMA DE 1 º ANO (A0)'],
+    [],
+    [
+      'RESULTADOS POR HABILIDADE e POR NÍVEL DE PROFICIÊNCIA', '', '', '', '', '',
+      'COORDENAÇÃO MOTORA', '', '', 'CONSCIÊNCIA FONOLÓGICA - ALITERAÇÃO', '', '',
+      'CONSCIÊNCIA FONOLÓGICA - SÍLABAS', '', '', 'CONSCIÊNCIA FONOLÓGICA - RIMAS', '', '',
+      'PRINCÍPIO ALFABÉTICO', '', '', 'COMPREENSÃO ORAL', '', '', 'ORALIDADE', '', '',
+    ],
+    [
+      'Ano', 'Turno', 'Turma', 'Nº avaliação', 'Nº de alunos matriculados', 'Nº de alunos avaliados',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+    ],
+    [
+      '1º Ano', 'M', 'A', 'A0', 20, 20,
+      10, 5, 5, 10, 5, 5, 10, 5, 5, 10, 5, 5, 10, 5, 5, 10, 5, 5, 10, 5, 5,
+    ],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s1_rows), 'A0 - 1º ANO');
+
+  // 2. Sheet: A1-A3 PT 1ANO
+  const s2_rows = [
+    ['RESULTADO DAS AVALIAÇÕES DE LÍNGUA PORTUGUESA POR TURMA DE 1 º ANO (A1-A3)'],
+    [],
+    [
+      'RESULTADOS POR HABILIDADE e POR NÍVEL DE PROFICIÊNCIA', '', '', '', '', '',
+      'LEITURA', '', '', 'COMPREENSÃO DE TEXTO', '', '', 'ESCRITA', '', '',
+    ],
+    [
+      'Ano', 'Turno', 'Turma', 'Nº avaliação', 'Nº de alunos matriculados', 'Nº de alunos avaliados',
+      'Nº de alunos PRÉ-LEITORES', 'Nº de alunos LEITORES INICIAL', 'Nº de alunos LEITORES FLUENTES',
+      'Nº de alunos NÃO COMPREENDE', 'Nº de alunos COMPREENDE POR ORALIDADE', 'Nº de alunos COMPREENDE AUTONOMAMENTE',
+      'Nº de alunos PRÉ-ALFABÉTICO', 'Nº de alunos ALFABÉTICO INICIAL', 'Nº de alunos ALFABÉTICO COMPLETO',
+      '%', '%', '%', '%', '%', '%', '%', '%', '%',
+    ],
+    ['1º Ano', 'M', 'A', 'A1', 20, 20, 10, 5, 5, 10, 5, 5, 10, 5, 5, 50, 25, 25, 50, 25, 25, 50, 25, 25],
+    ['', '', '', 'A2', 20, 20, 5, 10, 5, 5, 10, 5, 5, 10, 5, 25, 50, 25, 25, 50, 25, 25, 50, 25],
+    ['', '', '', 'A3', 20, 20, 2, 8, 10, 2, 8, 10, 2, 8, 10, 10, 40, 50, 10, 40, 50, 10, 40, 50],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s2_rows), 'A1-A3 PT 1ANO');
+
+  // 3. Sheet: A1-A3 MAT 1ANO
+  const s3_rows = [
+    ['RESULTADO DAS AVALIAÇÕES DE MATEMÁTICA POR TURMA DE 1 º ANO (A1-A3)'],
+    [],
+    [
+      'RESULTADOS POR HABILIDADE e POR NÍVEL DE PROFICIÊNCIA', '', '', '', '', '',
+      'NÃO PROFICIENTE', 'PROFICIENTE INICIAL', 'PROFICIENTE', '%', '%', '%',
+    ],
+    [
+      'Ano', 'Turno', 'Turma', 'Nº avaliação', 'Nº de alunos matriculados', 'Nº de alunos avaliados',
+      'Nº de alunos com até 4 pontos', 'Nº de alunos com 5 a 6 pontos', 'Nº de alunos com 7 a 10 pontos',
+      '%', '%', '%',
+    ],
+    ['1º Ano', 'M', 'A', 'A1', 20, 20, 5, 5, 10, '25%', '25%', '50%'],
+    ['', '', '', 'A2', 20, 20, 3, 7, 10, '15%', '35%', '50%'],
+    ['', '', '', 'A3', 20, 20, 1, 4, 15, '5%', '20%', '75%'],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s3_rows), 'A1-A3 MAT 1ANO');
+
+  // 4. Sheet: A0 - 2º ANO
+  const s4_rows = [
+    ['RESULTADO DAS AVALIAÇÕES POR TURMA DE 2 º ANO (A0)'],
+    [],
+    [
+      'RESULTADOS POR HABILIDADE e POR NÍVEL DE PROFICIÊNCIA', '', '', '', '', '',
+      'PRINCÍPIO ALFABÉTICO', '', '', 'DECODIFICAÇÃO', '', '', 'GRAFIA DE LETRAS MINÚSCULAS', '', '', 'CODIFICAÇÃO', '', '',
+    ],
+    [
+      'Ano', 'Turno', 'Turma', 'Nº avaliação', 'Nº de alunos matriculados', 'Nº de alunos avaliados',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+      'Nº de alunos POR DESENVOLVER', 'Nº de alunos EM DESENVOLVI-MENTO', 'Nº de alunos DESENVOLVIDOS',
+    ],
+    ['2º Ano', 'M', 'B', 'A0', 18, 18, 2, 6, 10, 2, 6, 10, 2, 6, 10, 2, 6, 10],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s4_rows), 'A0 - 2º ANO');
+
+  // 5. Sheet: A1-A3 PT 2ANO
+  const s5_rows = [
+    ['RESULTADO DAS AVALIAÇÕES DE LÍNGUA PORTUGUESA POR TURMA DE 2 º ANO (A1-A3)'],
+    [],
+    [
+      'RESULTADOS POR HABILIDADE e POR NÍVEL DE PROFICIÊNCIA', '', '', '', '', '',
+      'LEITURA', '', '', 'COMPREENSÃO DE TEXTO', '', '', 'ESCRITA', '', '',
+    ],
+    [
+      'Ano', 'Turno', 'Turma', 'Nº avaliação', 'Nº de alunos matriculados', 'Nº de alunos avaliados',
+      'Nº de alunos PRÉ-LEITORES', 'Nº de alunos LEITORES INICIAL', 'Nº de alunos LEITORES FLUENTES',
+      'Nº de alunos NÃO COMPREENDE', 'Nº de alunos COMPREENDE POR ORALIDADE', 'Nº de alunos COMPREENDE AUTONOMAMENTE',
+      'Nº de alunos PRÉ-ALFABÉTICO', 'Nº de alunos ALFABÉTICO INICIAL', 'Nº de alunos ALFABÉTICO COMPLETO',
+      '%', '%', '%', '%', '%', '%', '%', '%', '%',
+    ],
+    ['2º Ano', 'M', 'B', 'A1', 18, 18, 5, 5, 8, 5, 5, 8, 5, 5, 8, 28, 28, 44, 28, 28, 44, 28, 28, 44],
+    ['', '', '', 'A2', 18, 18, 2, 6, 10, 2, 6, 10, 2, 6, 10, 11, 33, 56, 11, 33, 56, 11, 33, 56],
+    ['', '', '', 'A3', 18, 18, 0, 4, 14, 0, 4, 14, 0, 4, 14, 0, 22, 78, 0, 22, 78, 0, 22, 78],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s5_rows), 'A1-A3 PT 2ANO');
+
+  // 6. Sheet: A1-A3 MAT 2ANO
+  const s6_rows = [
+    ['RESULTADO DAS AVALIAÇÕES DE MATEMÁTICA POR TURMA DE 2 º ANO (A1-A3)'],
+    [],
+    [
+      'RESULTADOS POR HABILIDADE e POR NÍVEL DE PROFICIÊNCIA', '', '', '', '', '',
+      'NÃO PROFICIENTE', 'PROFICIENTE INICIAL', 'PROFICIENTE', '%', '%', '%',
+    ],
+    [
+      'Ano', 'Turno', 'Turma', 'Nº avaliação', 'Nº de alunos matriculados', 'Nº de alunos avaliados',
+      'Nº de alunos com até 4 pontos', 'Nº de alunos com 5 a 6 pontos', 'Nº de alunos com 7 a 10 pontos',
+      '%', '%', '%',
+    ],
+    ['2º Ano', 'M', 'B', 'A1', 18, 18, 2, 6, 10, '11%', '33%', '56%'],
+    ['', '', '', 'A2', 18, 18, 1, 5, 12, '6%', '28%', '67%'],
+    ['', '', '', 'A3', 18, 18, 0, 3, 15, '0%', '17%', '83%'],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s6_rows), 'A1-A3 MAT 2ANO');
+
+  fs.writeFileSync(file, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+
+  try {
+    const parsed = readPactoImportFile(file, 'pacto-6-planilhas.xlsx');
+    const classes = [
+      classFixture('c1', 1, 'A', 'M'),
+      classFixture('c2', 2, 'B', 'M'),
+    ];
+    const preview = analyzePactoImport(parsed, classes);
+    assert.equal(parsed.sheetNames.length, 6);
+    assert.equal(parsed.tables.length, 6);
+    assert.equal(preview.summary.groups, 8);
+    assert.equal(preview.summary.validGroups, 8);
+    assert.equal(preview.canConfirm, true, JSON.stringify(preview.errors));
+
+    // Conferir que A1, A2, A3 do 1º ano têm ambos PORTUGUES e MATEMATICA integrados
+    const a1_1 = preview.groups.find((g) => g.grade === 1 && g.assessment === 'A1');
+    assert.ok(a1_1);
+    assert.equal(a1_1.components.length, 2);
+    assert.deepEqual(a1_1.components.map((c) => c.component), ['PORTUGUES', 'MATEMATICA']);
+
+    // Conferir que A0 do 1º ano tem 7 habilidades
+    const a0_1 = preview.groups.find((g) => g.grade === 1 && g.assessment === 'A0');
+    assert.ok(a0_1);
+    assert.equal(a0_1.components[0].skills.length, 7);
+
+    // Conferir que A0 do 2º ano tem 4 habilidades
+    const a0_2 = preview.groups.find((g) => g.grade === 2 && g.assessment === 'A0');
+    assert.ok(a0_2);
+    assert.equal(a0_2.components[0].skills.length, 4);
+
+    // Conferir que passar mapping manual ou parcial da UI preserva todas as 6 abas
+    const table1Columns = parsed.tables[0].autoMapping.columns;
+    const suppliedMapping = {
+      columns: { ...table1Columns },
+      results: {},
+      classes: {},
+    };
+    const uiPreview = analyzePactoImport(parsed, classes, suppliedMapping);
+    assert.equal(uiPreview.summary.validGroups, 8);
+    assert.equal(uiPreview.canConfirm, true);
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
 test('importação Pacto bloqueia conflitos, soma divergente e avaliação enviada, mantendo alerta de avaliados', () => {
   const file = temporaryFile('.csv');
   const rows = longRows({ grade: 1, className: 'A', assessment: 'A1', enrolled: 8, evaluated: 9 });
@@ -550,6 +726,139 @@ test('importação Pacto bloqueia conflitos, soma divergente e avaliação envia
     assert.ok(codes.has('LEVEL_SUM_MISMATCH'));
     assert.ok(codes.has('ASSESSMENT_LOCKED'));
     assert.ok(preview.warnings.some((item) => item.code === 'EVALUATED_ABOVE_ENROLLED'));
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+test('importação Pacto cria turmas automaticamente quando a escola não possui turmas pré-cadastradas', () => {
+  const file = temporaryFile('.csv');
+  // Criar dados para 1º A (Manhã) e 2º B (Tarde)
+  const rows1 = longRows({ grade: 1, className: 'A', assessment: 'A1', shift: 'M', enrolled: 15, evaluated: 15 });
+  const rows2 = longRows({ grade: 2, className: 'B', assessment: 'A2', shift: 'T', enrolled: 20, evaluated: 20 });
+  writeCsv(file, LONG_HEADERS, [...rows1, ...rows2]);
+
+  try {
+    const parsed = readPactoImportFile(file, 'turmas-novas.csv');
+    // Escola não possui nenhuma turma cadastrada ainda (classes = [])
+    const emptyClasses = [];
+    const preview = analyzePactoImport(parsed, emptyClasses);
+
+    // Validação bem-sucedida com auto-criação
+    assert.equal(preview.summary.groups, 2);
+    assert.equal(preview.summary.validGroups, 2);
+    assert.equal(preview.canConfirm, true);
+    assert.equal(preview.summary.errors, 0);
+
+    // Alertas de criação automática de turmas presentes
+    assert.ok(preview.warnings.some((item) => item.code === 'CLASS_WILL_BE_CREATED'));
+
+    // Grupos marcados com IDs virtuais de auto-criação
+    assert.ok(preview.groups[0].classId.startsWith('auto:1:M:A'));
+    assert.ok(preview.groups[1].classId.startsWith('auto:2:T:B'));
+
+    // Opções de match indicam auto-criação
+    assert.equal(preview.classMatches.length, 2);
+    assert.equal(preview.classMatches[0].isAutoCreate, true);
+    assert.equal(preview.classMatches[1].isAutoCreate, true);
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+test('importação Pacto lê arquivo real CSV de Pré-Escola II (PII - A1/A2) e reconhece habilidades iniciais', () => {
+  const uploadPath = '/home/user/uploads/E M E I E F TOMAZ LOURENCO NEGRAO 15065359_ABAETETUBA_2026.CSV';
+  if (!fs.existsSync(uploadPath)) return;
+
+  const parsed = readPactoImportFile(uploadPath, 'E M E I E F TOMAZ LOURENCO NEGRAO 15065359_ABAETETUBA_2026.CSV');
+  const classes = [];
+  const preview = analyzePactoImport(parsed, classes);
+
+  assert.equal(preview.canConfirm, true);
+  assert.equal(preview.summary.errors, 0);
+  assert.ok(preview.summary.groups > 0);
+
+  // Verifica se todas as turmas identificadas foram associadas à etapa PII (grade 0) e componente INICIAL
+  for (const group of preview.groups) {
+    assert.equal(group.grade, 0);
+    assert.ok(['A1', 'A2'].includes(group.assessment));
+    assert.equal(group.components.length, 1);
+    const comp = group.components[0];
+    assert.equal(comp.component, 'INICIAL');
+    assert.ok(comp.skills.length > 0);
+    // Assegura que as 3 habilidades da Educação Infantil foram mapeadas
+    const skills = new Set(comp.skills.map((s) => s.skill));
+    assert.ok(skills.has('COMPREENSAO_HISTORIA'));
+    assert.ok(skills.has('PRINCIPIO_ALFABETICO'));
+    assert.ok(skills.has('CONSCIENCIA_FONOLOGICA'));
+    // Assegura que os 3 níveis foram preenchidos
+    for (const skill of comp.skills) {
+      for (const lvl of skill.levels) {
+        assert.ok(['POR_DESENVOLVER', 'EM_DESENVOLVIMENTO', 'DESENVOLVIDO'].includes(lvl.level));
+      }
+    }
+  }
+});
+
+test('importação Pacto suporta conjunto multi-etapa com PII, 1º ano e 2º ano sem conflitos', () => {
+  const file = temporaryFile('.csv');
+  // Linhas para PII (grade 0), 1º ano (grade 1) e 2º ano (grade 2)
+  const rows0 = longRows({ grade: 0, className: 'UNICA', assessment: 'A1', shift: 'M', enrolled: 10, evaluated: 10 });
+  const rows1 = longRows({ grade: 1, className: 'A', assessment: 'A1', shift: 'M', enrolled: 12, evaluated: 12 });
+  const rows2 = longRows({ grade: 2, className: 'B', assessment: 'A2', shift: 'T', enrolled: 18, evaluated: 18 });
+  writeCsv(file, LONG_HEADERS, [...rows0, ...rows1, ...rows2]);
+
+  try {
+    const parsed = readPactoImportFile(file, 'multi-etapa.csv');
+    const classes = [
+      classFixture('c0', 0, 'UNICA', 'M'),
+      classFixture('c1', 1, 'A', 'M'),
+      classFixture('c2', 2, 'B', 'T'),
+    ];
+    const preview = analyzePactoImport(parsed, classes);
+
+    assert.equal(preview.summary.errors, 0);
+    assert.equal(preview.canConfirm, true);
+    assert.equal(preview.summary.groups, 3);
+    assert.equal(preview.summary.validGroups, 3);
+
+    const grades = preview.groups.map((g) => g.grade).sort();
+    assert.deepEqual(grades, [0, 1, 2]);
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+test('importação Pacto permite importar grupos válidos mesmo quando outros grupos possuem pendências', () => {
+  const file = temporaryFile('.csv');
+  // Criar 3 grupos: 2 válidos (1º A e 2º B) e 1 grupo com pendência (1º C com avaliação A0 desabilitada)
+  const rows1 = longRows({ grade: 1, className: 'A', assessment: 'A1', shift: 'M', enrolled: 10, evaluated: 10 });
+  const rows2 = longRows({ grade: 2, className: 'B', assessment: 'A2', shift: 'T', enrolled: 15, evaluated: 15 });
+  const rows3 = longRows({ grade: 1, className: 'C', assessment: 'A0', shift: 'M', enrolled: 12, evaluated: 12 });
+  writeCsv(file, LONG_HEADERS, [...rows1, ...rows2, ...rows3]);
+
+  try {
+    const parsed = readPactoImportFile(file, 'parcial.csv');
+    const classes = [
+      classFixture('c1', 1, 'A', 'M'),
+      classFixture('c2', 2, 'B', 'T'),
+      { id: 'c3', grade: 1, name: 'C', shift: 'M', enabledAssessments: ['A1', 'A2', 'A3'], assessments: [] }, // A0 desabilitada
+    ];
+    const preview = analyzePactoImport(parsed, classes);
+
+    // Deve permitir confirmar a importação dos válidos
+    assert.equal(preview.canConfirm, true);
+    assert.equal(preview.summary.groups, 3);
+    assert.equal(preview.summary.validGroups, 2);
+    assert.equal(preview.summary.pendingGroups, 1);
+
+    const validGroupIds = preview.groups.filter((g) => g.valid).map((g) => g.id);
+    assert.ok(validGroupIds.includes('1|A|M|A1'));
+    assert.ok(validGroupIds.includes('2|B|T|A2'));
+
+    const pendingGroup = preview.groups.find((g) => !g.valid);
+    assert.equal(pendingGroup.id, '1|C|M|A0');
+    assert.ok(pendingGroup.errors.some((e) => e.code === 'ASSESSMENT_NOT_ENABLED'));
   } finally {
     fs.rmSync(file, { force: true });
   }

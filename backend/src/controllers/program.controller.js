@@ -78,9 +78,25 @@ export const updateSchoolLink = wrap(async (req, res) => {
   res.json({ message: 'Vínculo atualizado' });
 });
 
+export const schoolDeletionImpact = wrap(async (req, res) => {
+  res.json(
+    await programService.getSchoolProgramDeletionImpact(
+      parseIdParams(req),
+      req.params.schoolId,
+    ),
+  );
+});
+
 export const removeSchool = wrap(async (req, res) => {
-  await programService.removeSchool(parseIdParams(req), req.params.schoolId, req.user, getClientIp(req));
-  res.json({ message: 'Escola removida do programa' });
+  const purgeData = req.query.purgeData === 'true' || req.body?.purgeData === true;
+  const result = await programService.removeSchool(
+    parseIdParams(req),
+    req.params.schoolId,
+    { purgeData },
+    req.user,
+    getClientIp(req),
+  );
+  res.json({ message: 'Escola removida do programa', ...result });
 });
 
 export const addIndicators = wrap(async (req, res) => {

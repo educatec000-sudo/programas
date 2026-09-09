@@ -235,6 +235,14 @@ export function buildPactoAnalytics(classes) {
     .sort((a, b) => a.grade - b.grade || a.assessment.localeCompare(b.assessment) || a.skillLabel.localeCompare(b.skillLabel));
 }
 
+export function formatGradeLabel(grade) {
+  const g = Number(grade);
+  if (g === 0) return 'PII';
+  if (g === 1) return '1º ano';
+  if (g === 2) return '2º ano';
+  return `${grade}º ano`;
+}
+
 export function buildSchoolStatus(classes) {
   const expectedByClass = classes.map((item) => new Set(item.enabledAssessments || ASSESSMENT_CODES));
   const assessments = classes.flatMap((item, index) => (
@@ -372,7 +380,7 @@ export async function exportPactoReport(programId, actor, ip) {
           rows.push([
             item.school.name,
             item.school.inep,
-            `${item.grade}º ano`,
+            formatGradeLabel(item.grade),
             item.shift,
             item.name,
             assessment.code,
@@ -483,29 +491,38 @@ async function createClass({ programId, schoolId, data, source }) {
 
 export async function createAdminClass(programId, data, actor, ip) {
   await assertPactoProgram(programId);
-  const item = await createClass({
-    programId,
-    schoolId: data.schoolId,
-    data: { grade: data.grade, shift: data.shift, name: data.name },
-    source: 'ADMINISTRADOR',
-  });
+  const schoolId = data.schoolId;
+  const items = Array.isArray(data.classes)
+    ? data.classes
+    : [{ grade: data.grade, shift: data.shift, name: data.name, enabledAssessments: data.enabledAssessments }];
+
+  const created = [];
+  for (const item of items) {
+    const row = await createClass({
+      programId,
+      schoolId,
+      data: { grade: item.grade, shift: item.shift, name: item.name, enabledAssessments: item.enabledAssessments },
+      source: 'ADMINISTRADOR',
+    });
+    created.push(row);
+  }
+
   await audit({
     userId: actor.id,
     userName: actor.name,
     action: AuditAction.CREATE,
     entity: 'PactoClass',
-    entityId: item.id,
+    entityId: created[0].id,
     metadata: {
       programId,
-      schoolId: data.schoolId,
-      grade: data.grade,
-      shift: data.shift,
-      name: data.name,
-      enabledAssessments: data.enabledAssessments,
+      schoolId,
+      count: created.length,
+      classes: created.map((c) => `${formatGradeLabel(c.grade)} ${c.shift} - ${c.name}`),
     },
     ip,
   });
-  return item;
+
+  return Array.isArray(data.classes) ? created : created[0];
 }
 
 async function updateClass(classId, programId, schoolId, data) {
@@ -600,6 +617,7 @@ export async function getPublicBootstrap(token) {
     link: { expiresAt: link.expiresAt },
     config: PACTO_CONFIG,
     definitions: {
+      0: listDefinitionsForGrade(0),
       1: listDefinitionsForGrade(1),
       2: listDefinitionsForGrade(2),
     },
@@ -609,26 +627,39 @@ export async function getPublicBootstrap(token) {
 
 export async function createPublicClass(token, data, ip) {
   const link = await resolvePublicAccess(token);
-  const item = await createClass({
-    programId: link.programId,
-    schoolId: link.schoolId,
-    data,
-    source: 'ESCOLA',
-  });
+  const items = Array.isArray(data)
+    ? data
+    : Array.isArray(data.classes)
+      ? data.classes
+      : [data];
+
+  const created = [];
+  for (const item of items) {
+    const row = await createClass({
+      programId: link.programId,
+      schoolId: link.schoolId,
+      data: item,
+      source: 'ESCOLA',
+    });
+    created.push(row);
+  }
+
   await audit({
     action: AuditAction.CREATE,
     entity: 'PactoClass',
-    entityId: item.id,
+    entityId: created[0].id,
     userName: 'Coleta externa',
     metadata: {
       programId: link.programId,
       schoolId: link.schoolId,
       source: 'ESCOLA',
-      enabledAssessments: data.enabledAssessments,
+      count: created.length,
+      classes: created.map((c) => `${formatGradeLabel(c.grade)} ${c.shift} - ${c.name}`),
     },
     ip,
   });
-  return item;
+
+  return Array.isArray(data) || Array.isArray(data.classes) ? created : created[0];
 }
 
 export async function updatePublicClass(token, classId, data, ip) {
@@ -689,13 +720,23 @@ export async function confirmPublicImport(token, file, data, ip) {
   if (!preview.canConfirm) {
     throw new HttpError(
       422,
-      'A importação possui pendências bloqueantes. Corrija o arquivo ou o mapeamento e gere uma nova prévia.',
+      'A importação possui erros impeditivos de arquivo ou nenhum grupo válido foi encontrado. Corrija o arquivo ou o mapeamento e gere uma nova prévia.',
       'PACTO_IMPORT_VALIDATION_ERROR',
       preview.errors,
     );
   }
 
-  const replacementGroups = preview.groups.filter((group) => group.replacesDraft);
+  const validGroups = preview.groups.filter((group) => group.valid);
+  if (!validGroups.length) {
+    throw new HttpError(
+      422,
+      'Não há registros válidos para importação no arquivo.',
+      'PACTO_IMPORT_NO_VALID_GROUPS',
+      preview.errors,
+    );
+  }
+
+  const replacementGroups = validGroups.filter((group) => group.replacesDraft);
   if (replacementGroups.length && !data.confirmReplace) {
     throw new HttpError(
       409,
@@ -705,22 +746,64 @@ export async function confirmPublicImport(token, file, data, ip) {
     );
   }
 
-  const classById = new Map(classes.map((item) => [item.id, item]));
-  const prepared = preview.groups.map((group) => {
-    const pactoClass = classById.get(group.classId);
-    if (!pactoClass) throw notFound(`Turma não encontrada para o grupo ${group.id}`);
-    const payload = previewGroupToPayload(group);
-    const checked = validateAssessmentPayload(pactoClass, payload, {
-      submit: true,
-      requireAllComponents: false,
-    });
-    return { group, pactoClass, payload, checked };
-  });
-
+  const submit = data.submitAll === true;
   let assessments;
+  let createdClassesCount = 0;
+
   try {
     assessments = await prisma.$transaction(
       async (tx) => {
+        const classById = new Map(classes.map((item) => [item.id, item]));
+        const autoMap = new Map();
+
+        for (const group of validGroups) {
+          if (group.classId && String(group.classId).startsWith('auto:')) {
+            if (!autoMap.has(group.classId)) {
+              const parts = String(group.classId).split(':');
+              const grade = Number(parts[1]);
+              const shift = parts[2] || 'M';
+              const name = parts.slice(3).join(':');
+              const newClass = await tx.pactoClass.upsert({
+                where: {
+                  programId_schoolId_grade_shift_name: {
+                    programId: link.programId,
+                    schoolId: link.schoolId,
+                    grade,
+                    shift,
+                    name,
+                  },
+                },
+                create: {
+                  programId: link.programId,
+                  schoolId: link.schoolId,
+                  grade,
+                  shift,
+                  name,
+                  source: 'ESCOLA',
+                  enabledAssessments: ['A0', 'A1', 'A2', 'A3'],
+                },
+                update: {},
+                include: classInclude,
+              });
+              autoMap.set(group.classId, newClass);
+              classById.set(group.classId, newClass);
+              createdClassesCount += 1;
+            }
+          }
+        }
+
+        const prepared = validGroups.map((group) => {
+          const pactoClass = classById.get(group.classId) || autoMap.get(group.classId);
+          if (!pactoClass) throw notFound(`Turma não encontrada para o grupo ${group.id}`);
+          const payload = previewGroupToPayload(group);
+          payload.classId = pactoClass.id;
+          const checked = validateAssessmentPayload(pactoClass, payload, {
+            submit: true,
+            requireAllComponents: false,
+          });
+          return { group, pactoClass, payload, checked };
+        });
+
         const rows = [];
         for (const item of prepared) {
           rows.push(await persistAssessmentRecord(
@@ -729,8 +812,8 @@ export async function confirmPublicImport(token, file, data, ip) {
             item.payload,
             item.checked,
             {
-              submit: false,
-              forceDraft: true,
+              submit,
+              forceDraft: !submit,
               expectedExisting: item.group.existingId
                 ? {
                     id: item.group.existingId,
@@ -743,7 +826,7 @@ export async function confirmPublicImport(token, file, data, ip) {
             },
           ));
         }
-        return rows;
+        return { rows, prepared };
       },
       { isolationLevel: 'Serializable', maxWait: 10_000, timeout: 60_000 },
     );
@@ -759,15 +842,16 @@ export async function confirmPublicImport(token, file, data, ip) {
   }
 
   await audit({
-    action: AuditAction.IMPORT_CONFIRM,
+    action: submit ? AuditAction.CREATE : AuditAction.IMPORT_CONFIRM,
     entity: 'PactoAssessment',
     userName: 'Coleta externa',
     metadata: {
-      operation: 'IMPORT_POWER_BI_DRAFTS',
+      operation: submit ? 'IMPORT_POWER_BI_SUBMIT_ALL' : 'IMPORT_POWER_BI_DRAFTS',
       programId: link.programId,
       schoolId: link.schoolId,
       source: preview.file,
-      groups: prepared.map(({ group }) => ({
+      createdClassesCount,
+      groups: assessments.prepared.map(({ group }) => ({
         classId: group.classId,
         code: group.assessment,
         replacedDraft: group.replacesDraft,
@@ -777,11 +861,14 @@ export async function confirmPublicImport(token, file, data, ip) {
   });
 
   return {
-    imported: assessments.map((assessment, index) => (
-      serializeAssessment(assessment, prepared[index].pactoClass.grade)
+    imported: assessments.rows.map((assessment, index) => (
+      serializeAssessment(assessment, assessments.prepared[index].pactoClass.grade)
     )),
-    count: assessments.length,
-    status: 'RASCUNHO',
+    count: assessments.rows.length,
+    validCount: validGroups.length,
+    pendingCount: preview.groups.length - validGroups.length,
+    createdClassesCount,
+    status: submit ? 'ENVIADO' : 'RASCUNHO',
     warnings: preview.warnings,
   };
 }
@@ -975,9 +1062,10 @@ async function saveAssessment(token, payload, { submit, ip }) {
   }
 
   const checked = validateAssessmentPayload(pactoClass, payload, { submit });
-  const assessment = await prisma.$transaction((tx) => (
-    persistAssessmentRecord(tx, pactoClass, payload, checked, { submit })
-  ));
+  const assessment = await prisma.$transaction(
+    (tx) => persistAssessmentRecord(tx, pactoClass, payload, checked, { submit }),
+    { maxWait: 15_000, timeout: 60_000 },
+  );
 
   await audit({
     action: submit ? AuditAction.CREATE : AuditAction.UPDATE,
@@ -1007,4 +1095,186 @@ export function savePublicAssessment(token, payload, ip) {
 
 export function submitPublicAssessment(token, payload, ip) {
   return saveAssessment(token, payload, { submit: true, ip });
+}
+
+export async function submitAllPublicAssessments(token, ip) {
+  const link = await resolvePublicAccess(token);
+  const classes = await prisma.pactoClass.findMany({
+    where: { programId: link.programId, schoolId: link.schoolId, active: true },
+    include: classInclude,
+    orderBy: [{ grade: 'asc' }, { shift: 'asc' }, { name: 'asc' }],
+  });
+
+  const drafts = [];
+  for (const pactoClass of classes) {
+    const enabledCodes = new Set(pactoClass.enabledAssessments || ASSESSMENT_CODES);
+    for (const assessment of pactoClass.assessments || []) {
+      if (!enabledCodes.has(assessment.code)) continue;
+      if (assessment.status === 'RASCUNHO' || assessment.status === 'REABERTO') {
+        drafts.push({ pactoClass, assessment });
+      }
+    }
+  }
+
+  if (drafts.length === 0) {
+    return { count: 0, submitted: [], message: 'Nenhum rascunho pendente de envio encontrado.' };
+  }
+
+  const errors = [];
+  const prepared = [];
+
+  for (const { pactoClass, assessment } of drafts) {
+    const payload = {
+      classId: pactoClass.id,
+      code: assessment.code,
+      components: assessment.components.map((c) => ({
+        component: c.component,
+        enrolled: c.enrolled,
+        evaluated: c.evaluated,
+        results: c.results.map((r) => ({
+          skill: r.skill,
+          level: r.level,
+          count: r.count,
+        })),
+      })),
+    };
+
+    try {
+      const checked = validateAssessmentPayload(pactoClass, payload, { submit: true });
+      prepared.push({ pactoClass, assessment, payload, checked });
+    } catch (err) {
+      errors.push({
+        classId: pactoClass.id,
+        className: `${formatGradeLabel(pactoClass.grade)} ${pactoClass.shift} - Turma ${pactoClass.name}`,
+        assessment: assessment.code,
+        message: err.message,
+        details: err.details,
+      });
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new HttpError(
+      422,
+      `Existem ${errors.length} avaliação(ões) com pendências que impedem o envio total. Corrija-as antes de enviar tudo.`,
+      'PACTO_BULK_SUBMIT_VALIDATION_ERROR',
+      errors,
+    );
+  }
+
+  const now = new Date();
+  const submittedAssessments = await prisma.$transaction(
+    async (tx) => {
+      const updated = [];
+      for (const item of prepared) {
+        const saved = await tx.pactoAssessment.update({
+          where: { id: item.assessment.id },
+          data: {
+            status: 'ENVIADO',
+            submittedAt: now,
+          },
+          include: classInclude.assessments.include,
+        });
+        updated.push(serializeAssessment(saved, item.pactoClass.grade));
+      }
+      return updated;
+    },
+    { maxWait: 20_000, timeout: 120_000 },
+  );
+
+  await audit({
+    action: AuditAction.CREATE,
+    entity: 'PactoAssessment',
+    userName: 'Coleta externa',
+    metadata: {
+      operation: 'SUBMIT_ALL_ASSESSMENTS',
+      programId: link.programId,
+      schoolId: link.schoolId,
+      count: submittedAssessments.length,
+      assessments: prepared.map((p) => ({
+        classId: p.pactoClass.id,
+        code: p.assessment.code,
+        className: p.pactoClass.name,
+      })),
+    },
+    ip,
+  });
+
+  return {
+    count: submittedAssessments.length,
+    submitted: submittedAssessments,
+    message: `${submittedAssessments.length} avaliação(ões) enviada(s) com sucesso.`,
+  };
+}
+
+export async function deletePublicDraft(token, classId, code, ip) {
+  const link = await resolvePublicAccess(token);
+  const pactoClass = await prisma.pactoClass.findFirst({
+    where: { id: classId, programId: link.programId, schoolId: link.schoolId, active: true },
+  });
+  if (!pactoClass) throw notFound('Turma não encontrada para esta escola');
+
+  const assessment = await prisma.pactoAssessment.findUnique({
+    where: { classId_code: { classId, code } },
+  });
+  if (!assessment) {
+    return { success: true, message: 'Nenhum rascunho encontrado para esta avaliação' };
+  }
+  if (assessment.status === 'ENVIADO') {
+    throw conflict('Esta avaliação já foi enviada e não pode ser apagada. Solicite a reabertura ao administrador.');
+  }
+
+  await prisma.pactoAssessment.delete({
+    where: { id: assessment.id },
+  });
+
+  await audit({
+    action: AuditAction.DELETE,
+    entity: 'PactoAssessment',
+    entityId: assessment.id,
+    userName: 'Coleta externa',
+    metadata: {
+      operation: 'DELETE_DRAFT',
+      programId: link.programId,
+      schoolId: link.schoolId,
+      classId,
+      code,
+      previousStatus: assessment.status,
+    },
+    ip,
+  });
+
+  return { success: true, message: 'Rascunho apagado com sucesso' };
+}
+
+export async function deleteAdminAssessment(programId, assessmentId, actor, ip) {
+  await assertPactoProgram(programId);
+  const assessment = await prisma.pactoAssessment.findFirst({
+    where: { id: assessmentId, class: { programId } },
+    include: { class: { select: { id: true, name: true, grade: true, schoolId: true } } },
+  });
+  if (!assessment) throw notFound('Avaliação não encontrada');
+
+  await prisma.pactoAssessment.delete({
+    where: { id: assessmentId },
+  });
+
+  await audit({
+    userId: actor.id,
+    userName: actor.name,
+    action: AuditAction.DELETE,
+    entity: 'PactoAssessment',
+    entityId: assessmentId,
+    metadata: {
+      operation: 'DELETE_ASSESSMENT',
+      programId,
+      schoolId: assessment.class.schoolId,
+      classId: assessment.class.id,
+      code: assessment.code,
+      status: assessment.status,
+    },
+    ip,
+  });
+
+  return { success: true, message: 'Avaliação excluída com sucesso' };
 }

@@ -4,6 +4,7 @@ import { str } from './base.js';
 import { IMPORT_ROW_STATUS, PERIODS } from '../../lib/constants.js';
 import { HttpError } from '../../lib/errors.js';
 import { PACTO_CATALOG_CODE } from '../../programs/pacto/config.js';
+import { CNCA_CATALOG_CODE } from '../../programs/cnca/config.js';
 
 const PERIOD_ALIASES = (() => {
   const map = new Map();
@@ -105,6 +106,11 @@ export const resultsStrategy = {
         field: 'programa',
         message: 'O Pacto usa a coleta específica por turma e não aceita importação de resultados genéricos',
       });
+    } else if (program.catalog.code === CNCA_CATALOG_CODE) {
+      errors.push({
+        field: 'programa',
+        message: 'O CNCA possui importador oficial próprio por escola (com proficiência, fluência, leitura e escrita). Utilize a importação oficial do CNCA.',
+      });
     }
 
     const school = inep ? ctx.schoolByInep.get(inep) : undefined;
@@ -180,6 +186,23 @@ export const resultsStrategy = {
         'PROGRAM_COLLECTION_REQUIRED',
       );
     }
+    const cncaProgram = programIds.length
+      ? await prisma.program.findFirst({
+          where: {
+            id: { in: programIds },
+            deletedAt: null,
+            catalog: { code: CNCA_CATALOG_CODE },
+          },
+          select: { id: true },
+        })
+      : null;
+    if (cncaProgram) {
+      throw new HttpError(
+        422,
+        'O CNCA possui importador oficial próprio por escola. Utilize a importação oficial do CNCA.',
+        'PROGRAM_COLLECTION_REQUIRED',
+      );
+    }
 
     let created = 0;
     let updated = 0;
@@ -211,7 +234,7 @@ export const resultsStrategy = {
         });
         ctx.existing.has(row.key) ? updated++ : created++;
       }
-    });
+    }, { maxWait: 20_000, timeout: 60_000 });
     return { created, updated };
   },
 };

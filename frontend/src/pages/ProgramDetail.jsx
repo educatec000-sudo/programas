@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi.js';
 import { programsApi, schoolsApi, rankingsApi, analyticsApi, resultsApi, goalsApi, reportsApi } from '../services/resources.js';
@@ -22,6 +22,7 @@ const DELETION_IMPACT_LABELS = {
   pactoAssessments: 'Avaliações do Pacto',
   pactoComponents: 'Componentes avaliados',
   pactoSkillResults: 'Resultados por habilidade',
+  cncaResults: 'Resultados do CNCA',
   documents: 'Documentos vinculados',
 };
 
@@ -129,7 +130,11 @@ export default function ProgramDetail() {
     <>
       <PageHeader
         title={program.catalog?.name || program.name}
-        subtitle={`${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`}
+        subtitle={
+          implementation?.catalogCode === 'CNCA' || implementation?.code?.startsWith('CNCA') || implementation?.code === 'CNCA-2026'
+            ? `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || 'MEC / SEMED'} · ${program.schools.length} escolas participantes`
+            : `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`
+        }
         actions={
           <>
             <Badge cls={statusInfo?.cls} >{statusInfo?.label}</Badge>
@@ -164,13 +169,13 @@ export default function ProgramDetail() {
         tabs={[
           { key: 'resumo', label: 'Visão geral' },
           ...specificTabs.map((item) => ({ key: item.key, label: item.label })),
-          { key: 'escolas', label: 'Escolas participantes', count: program.schools.length },
+          sharedTabEnabled('escolas') ? { key: 'escolas', label: 'Escolas participantes', count: program.schools.length } : null,
           sharedTabEnabled('criterios') && can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators.length } : null,
           sharedTabEnabled('avaliacoes') && can('rankings:read') ? { key: 'avaliacoes', label: 'Avaliações', count: program.evaluationsCount } : null,
           sharedTabEnabled('resultados') && can('results:read') ? { key: 'resultados', label: 'Resultados' } : null,
           sharedTabEnabled('ranking') && can('rankings:read') ? { key: 'ranking', label: 'Ranking' } : null,
           sharedTabEnabled('graficos') && can('analytics:read') ? { key: 'graficos', label: 'Gráficos' } : null,
-          { key: 'historico', label: 'Histórico' },
+          sharedTabEnabled('historico') ? { key: 'historico', label: 'Histórico' } : null,
           sharedTabEnabled('relatorios') && can('reports:read') ? { key: 'relatorios', label: 'Relatórios' } : null,
         ].filter(Boolean)}
       />
@@ -390,37 +395,223 @@ function InfoTab({ program, implementation }) {
   );
 }
 
+function RemoveSchoolModal({ program, school, open, onClose, onSuccess, notifyError }) {
+  const [busy, setBusy] = useState(false);
+  const [impact, setImpact] = useState(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState(false);
+
+  useEffect(() => {
+    if (!open || !school) {
+      setImpact(null);
+      setConfirmPurge(false);
+      return;
+    }
+    let isMounted = true;
+    setLoadingImpact(true);
+    programsApi.schoolDeletionImpact(program.id, school.id)
+      .then((data) => {
+        if (isMounted) setImpact(data);
+      })
+      .catch((err) => {
+        if (isMounted) notifyError(err.message);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingImpact(false);
+      });
+    return () => { isMounted = false; };
+  }, [open, school, program.id]);
+
+  if (!open || !school) return null;
+
+  const handleDeactivate = async () => {
+    setBusy(true);
+    try {
+      await programsApi.updateSchoolLink(program.id, school.id, false);
+      onSuccess(`Participação da escola "${school.name}" desativada. Os dados históricos foram preservados.`);
+      onClose();
+    } catch (err) {
+      notifyError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async (purge = false) => {
+    setBusy(true);
+    try {
+      await programsApi.removeSchool(program.id, school.id, { purgeData: purge });
+      onSuccess(
+        purge
+          ? `Escola "${school.name}" e todos os seus dados vinculados foram excluídos do programa com sucesso.`
+          : `Escola "${school.name}" desvinculada do programa.`,
+      );
+      onClose();
+    } catch (err) {
+      notifyError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => !busy && onClose()}
+      title={`Remover escola — ${school.name}`}
+      size="md"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancelar</Button>
+          {impact?.hasData ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={handleDeactivate}
+                disabled={busy}
+                title="Mantém todos os resultados e histórico salvos, apenas inativando novos lançamentos"
+              >
+                {busy ? 'Processando...' : 'Apenas desativar participação'}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => handleRemove(true)}
+                disabled={busy || !confirmPurge}
+              >
+                {busy ? 'Excluindo...' : '🗑 Excluir escola e todos os dados'}
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="danger"
+              onClick={() => handleRemove(false)}
+              disabled={busy || loadingImpact}
+            >
+              {busy ? 'Removendo...' : 'Remover escola'}
+            </Button>
+          )}
+        </>
+      }
+    >
+      {loadingImpact ? (
+        <LoadingBlock label="Verificando registros vinculados a esta escola..." />
+      ) : impact?.hasData ? (
+        <>
+          <div className="alert alert-warn" style={{ marginTop: 0 }}>
+            <strong>Atenção:</strong> A escola <strong>{school.name}</strong> já possui <strong>{impact.totalRelated} registros cadastrados</strong> neste ciclo do programa ({program.year}).
+          </div>
+
+          <div className="program-delete-impact" style={{ marginTop: 12, marginBottom: 16 }}>
+            {impact.counts.results > 0 && (
+              <div><strong>{impact.counts.results}</strong><span>Resultados lançados</span></div>
+            )}
+            {impact.counts.pactoClasses > 0 && (
+              <div><strong>{impact.counts.pactoClasses}</strong><span>Turmas do Pacto</span></div>
+            )}
+            {impact.counts.pactoAssessments > 0 && (
+              <div><strong>{impact.counts.pactoAssessments}</strong><span>Avaliações do Pacto</span></div>
+            )}
+            {impact.counts.cncaResults > 0 && (
+              <div><strong>{impact.counts.cncaResults}</strong><span>Resultados do CNCA</span></div>
+            )}
+            {impact.counts.goals > 0 && (
+              <div><strong>{impact.counts.goals}</strong><span>Metas vinculadas</span></div>
+            )}
+            {impact.counts.evaluations > 0 && (
+              <div><strong>{impact.counts.evaluations}</strong><span>Avaliações consolidadas</span></div>
+            )}
+            {impact.counts.collectionLinks > 0 && (
+              <div><strong>{impact.counts.collectionLinks}</strong><span>Links de coleta</span></div>
+            )}
+          </div>
+
+          <p style={{ fontSize: 13, color: 'var(--text-2)' }}>
+            O que você deseja fazer com esta escola?
+          </p>
+          <ul style={{ fontSize: 12.5, color: 'var(--text-2)', paddingLeft: 20, margin: '8px 0 14px' }}>
+            <li><strong>Apenas desativar:</strong> bloqueia novos preenchimentos e coletas, mas <em>preserva integralmente</em> o histórico e os resultados salvos.</li>
+            <li><strong>Excluir tudo:</strong> apaga permanentemente a escola e <em>todos os seus resultados, turmas e avaliações</em> deste ciclo.</li>
+          </ul>
+
+          <label className="checkbox-row" style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              style={{ width: 17, height: 17, accentColor: '#dc2626' }}
+              checked={confirmPurge}
+              onChange={(e) => setConfirmPurge(e.target.checked)}
+            />
+            <span style={{ color: '#991b1b', fontWeight: 600, fontSize: 12.5 }}>
+              Confirmar exclusão permanente: desejo apagar a escola e TODOS os dados cadastrados listados acima.
+            </span>
+          </label>
+        </>
+      ) : (
+        <p style={{ margin: 0, fontSize: 13.5 }}>
+          Deseja remover <strong>"{school.name}"</strong> deste programa? Nenhum dado ou avaliação foi lançado para esta escola neste ciclo, portanto a remoção é segura.
+        </p>
+      )}
+    </Modal>
+  );
+}
+
 function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, error, genericEvaluationEnabled }) {
-  const { data: allSchools } = useApi(() => schoolsApi.list({ pageSize: 200 }), []);
+  const { data: allSchools, loading: loadingSchools } = useApi(() => (modalOpen ? schoolsApi.list({ pageSize: 1000 }) : Promise.resolve(null)), [modalOpen]);
   const [selected, setSelected] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('available'); // 'available' | 'all' | 'linked'
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(null);
 
-  const linkedIds = new Set(program.schools.map((s) => s.id));
-  const available = (allSchools?.data || []).filter((s) => !linkedIds.has(s.id));
+  const linkedIds = useMemo(() => new Set((program?.schools || []).map((s) => s.id)), [program?.schools]);
+
+  const normalizedSearch = useMemo(
+    () => search.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+    [search],
+  );
+
+  const filteredSchools = useMemo(() => {
+    const list = allSchools?.data || [];
+    return list.filter((s) => {
+      const isLinked = linkedIds.has(s.id);
+      if (filterStatus === 'available' && isLinked) return false;
+      if (filterStatus === 'linked' && !isLinked) return false;
+      if (!normalizedSearch) return true;
+      const nameNorm = String(s.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const inep = String(s.inep || '');
+      const districtNorm = String(s.district || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const addressNorm = String(s.address || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return (
+        nameNorm.includes(normalizedSearch)
+        || inep.includes(normalizedSearch)
+        || districtNorm.includes(normalizedSearch)
+        || addressNorm.includes(normalizedSearch)
+      );
+    });
+  }, [allSchools, linkedIds, filterStatus, normalizedSearch]);
+
+  const availableFiltered = useMemo(
+    () => filteredSchools.filter((s) => !linkedIds.has(s.id)),
+    [filteredSchools, linkedIds],
+  );
+
+  const selectAllFiltered = () => {
+    const idsToAdd = availableFiltered.map((s) => s.id);
+    setSelected((current) => Array.from(new Set([...current, ...idsToAdd])));
+  };
+
+  const deselectAll = () => {
+    setSelected([]);
+  };
 
   const addSchools = async () => {
     if (!selected.length) return;
     setBusy(true);
     try {
       const res = await programsApi.addSchools(program.id, selected);
-      success(`${res.added} escola(s) vinculada(s) ao programa.`);
+      success(`${res.added} escola(s) vinculada(s) ao programa com sucesso.`);
       setModalOpen(false);
       setSelected([]);
-      refresh();
-    } catch (err) {
-      error(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeSchool = async () => {
-    setBusy(true);
-    try {
-      await programsApi.removeSchool(program.id, confirmRemove.id);
-      success('Escola removida do programa.');
-      setConfirmRemove(null);
+      setSearch('');
       refresh();
     } catch (err) {
       error(err.message);
@@ -453,13 +644,13 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
                   </Link>
                 )}
                 {can('programs:write') && (
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(s)} title="Desvincilar">🗑</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(s)} title="Desvincular escola">🗑</Button>
                 )}
               </div>
             ),
           },
         ]}
-        rows={program.schools}
+        rows={program?.schools || []}
         emptyTitle="Nenhuma escola vinculada"
         emptyHint={genericEvaluationEnabled ? 'Vincule escolas para habilitar o lançamento de resultados.' : 'Vincule escolas para habilitar a coleta específica do programa.'}
         emptyIcon="🏫"
@@ -467,46 +658,163 @@ function SchoolsTab({ program, can, refresh, modalOpen, setModalOpen, success, e
 
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setSearch(''); }}
         title="Vincular escolas ao programa"
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={busy}>Cancelar</Button>
-            <Button onClick={addSchools} disabled={busy || !selected.length}>{busy ? 'Vinculando...' : `Vincular ${selected.length} escola(s)`}</Button>
+            <Button variant="secondary" onClick={() => { setModalOpen(false); setSearch(''); }} disabled={busy}>Cancelar</Button>
+            <Button onClick={addSchools} disabled={busy || !selected.length}>
+              {busy ? 'Vinculando...' : `Vincular ${selected.length} escola(s)`}
+            </Button>
           </>
         }
       >
-        <div style={{ maxHeight: 420, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 9 }}>
-          {available.map((s) => (
-            <label key={s.id} className="dropdown-item" style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)' }}>
-              <input
-                type="checkbox"
-                style={{ width: 17, height: 17, accentColor: 'var(--primary)', marginTop: 2 }}
-                checked={selected.includes(s.id)}
-                onChange={(e) =>
-                  setSelected((sel) => (e.target.checked ? [...sel, s.id] : sel.filter((x) => x !== s.id)))
-                }
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <Input
+                placeholder="🔎 Pesquisar escola por nome (ex.: Santa Anastacia), INEP ou endereço..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
               />
-              <div>
-                <div style={{ fontWeight: 600 }}>{s.name}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>INEP {s.inep}</div>
-              </div>
-            </label>
-          ))}
-          {!available.length && <div className="table-empty">Todas as escolas já estão vinculadas.</div>}
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: 10,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-3)',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                  }}
+                  title="Limpar pesquisa"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ width: 220 }}>
+              <option value="available">Não vinculadas (disponíveis)</option>
+              <option value="all">Todas as escolas</option>
+              <option value="linked">Já vinculadas</option>
+            </Select>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, color: 'var(--text-2)', padding: '4px 2px' }}>
+            <span>
+              Exibindo <strong>{filteredSchools.length}</strong> de <strong>{allSchools?.data?.length || 0}</strong> escolas
+              {selected.length > 0 && <span style={{ color: 'var(--primary)', fontWeight: 600 }}> · {selected.length} selecionada(s)</span>}
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {availableFiltered.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={selectAllFiltered}
+                  style={{ fontSize: 11.5 }}
+                >
+                  Selecionar {availableFiltered.length > 1 ? `todas as ${availableFiltered.length}` : 'esta'}
+                </button>
+              )}
+              {selected.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={deselectAll}
+                  style={{ fontSize: 11.5 }}
+                >
+                  Desmarcar todas
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ maxHeight: 420, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 9, background: '#fff' }}>
+          {loadingSchools ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>Carregando escolas cadastradas...</div>
+          ) : filteredSchools.map((s) => {
+            const isLinked = linkedIds.has(s.id);
+            const isChecked = isLinked || selected.includes(s.id);
+
+            return (
+              <label
+                key={s.id}
+                className="dropdown-item"
+                style={{
+                  cursor: isLinked ? 'default' : 'pointer',
+                  borderBottom: '1px solid var(--border)',
+                  background: isLinked ? '#f8fafc' : selected.includes(s.id) ? '#eff6ff' : '#fff',
+                  opacity: isLinked ? 0.75 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '10px 14px',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  style={{ width: 18, height: 18, accentColor: 'var(--primary)', cursor: isLinked ? 'not-allowed' : 'pointer' }}
+                  checked={isChecked}
+                  disabled={isLinked}
+                  onChange={(e) => {
+                    if (isLinked) return;
+                    setSelected((sel) => (e.target.checked ? [...sel, s.id] : sel.filter((x) => x !== s.id)));
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <strong style={{ fontSize: 13.5 }}>{s.name}</strong>
+                    {isLinked ? (
+                      <Badge cls="badge-green" style={{ fontSize: 10.5 }}>🟢 Já vinculada</Badge>
+                    ) : (
+                      <Badge cls="badge-gray" style={{ fontSize: 10.5 }}>⚪ Disponível</Badge>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>
+                    INEP <span className="mono">{s.inep}</span>
+                    {s.zone ? ` · ${SCHOOL_ZONE[s.zone]?.label || s.zone}` : ''}
+                    {s.district ? ` · ${s.district}` : ''}
+                    {s.address ? ` · ${s.address}` : ''}
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+          {!loadingSchools && !filteredSchools.length && (
+            <div className="table-empty" style={{ padding: 28, textAlign: 'center' }}>
+              {search ? (
+                <>
+                  <div style={{ fontSize: 22, marginBottom: 6 }}>🔍</div>
+                  Nenhuma escola encontrada para a pesquisa <strong>"{search}"</strong>.
+                </>
+              ) : filterStatus === 'available' ? (
+                <>Todas as escolas cadastradas já estão vinculadas ao programa.</>
+              ) : (
+                <>Nenhuma escola encontrada.</>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
 
-      <ConfirmDialog
+      <RemoveSchoolModal
+        program={program}
+        school={confirmRemove}
         open={Boolean(confirmRemove)}
         onClose={() => setConfirmRemove(null)}
-        onConfirm={removeSchool}
-        title="Desvincular escola"
-        message={`Remover "${confirmRemove?.name}" do programa? Os dados já enviados são preservados e o acesso de coleta deixa de funcionar.`}
-        danger
-        confirmLabel="Desvincular"
-        busy={busy}
+        onSuccess={(msg) => {
+          success(msg);
+          refresh();
+        }}
+        notifyError={error}
       />
     </>
   );

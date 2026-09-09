@@ -302,21 +302,22 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(9, 18, 38, 0.55);
   display: flex; align-items: flex-start; justify-content: center;
-  padding: 5vh 16px; z-index: 200; overflow-y: auto;
+  padding: 4vh 16px; z-index: 200; overflow-y: auto;
   backdrop-filter: blur(2px);
 }
 .modal {
   background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg);
   width: 100%; max-width: 640px; animation: modal-in 0.16s ease;
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.modal-lg { max-width: 900px; }
+.modal-lg { max-width: 920px; }
 .modal-sm { max-width: 440px; }
-.modal-xl { max-width: 1080px; }
+.modal-xl { max-width: 1200px; width: 95vw; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
-.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; border-bottom: 1px solid var(--border); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 22px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .modal-title { font-size: 16px; font-weight: 700; }
-.modal-body { padding: 20px 22px; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border); background: #f8fafc; border-radius: 0 0 14px 14px; }
+.modal-body { padding: 18px 22px; overflow-y: auto; overflow-x: hidden; max-height: calc(88vh - 125px); }
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border); background: #f8fafc; border-radius: 0 0 14px 14px; flex-shrink: 0; }
 
 /* ---------- Toasts ---------- */
 .toast-stack { position: fixed; top: 18px; right: 18px; z-index: 500; display: flex; flex-direction: column; gap: 10px; }
@@ -577,7 +578,7 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   margin-top: 16px;
 }
 .pacto-dashboard-filter-grid .field { margin-bottom: 0; }
-.pacto-dashboard-metrics { grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); }
+.pacto-dashboard-metrics { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 16px; }
 .pacto-dashboard-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -590,8 +591,524 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .pacto-chart-legend i { width: 9px; height: 9px; border-radius: 3px; }
 .pacto-dashboard-results { display: block; min-width: 330px; max-width: 620px; color: var(--text-2); font-size: 11.5px; line-height: 1.45; white-space: normal; }
 .pacto-table-subtitle { display: block; margin-top: 2px; color: var(--text-3); font-size: 10.5px; }
-.pacto-dashboard-section-title { color: var(--text); font-size: 17px; font-weight: 750; }
-.pacto-dashboard-section-subtitle { margin-top: 3px; color: var(--text-3); font-size: 12px; }
+.pacto-dashboard-section-title { color: var(--text); font-size: 16px; font-weight: 750; }
+.pacto-dashboard-section-subtitle { margin-top: 2px; color: var(--text-3); font-size: 12px; }
+
+/* Pacto Executive Dashboard Components */
+.pacto-section { margin-top: 22px; }
+.pacto-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.pacto-progress-card {
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+.pacto-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.pacto-progress-header strong { font-size: 14px; color: var(--text); }
+.pacto-progress-bar {
+  display: flex;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+.pacto-progress-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.pacto-progress-segment.green { background: #16a34a; }
+.pacto-progress-segment.yellow { background: #eab308; }
+.pacto-progress-segment.gray { background: #cbd5e1; }
+.pacto-progress-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.pacto-progress-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pacto-progress-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.pacto-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.pacto-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.pacto-filter-chip button {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.pacto-filter-chip button:hover { color: #1d4ed8; }
+
+/* Ranking Cards */
+.pacto-ranking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+.pacto-ranking-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.pacto-ranking-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+.pacto-ranking-card.rank-1 {
+  border-color: #fde047;
+  background: linear-gradient(180deg, #fefce8 0%, #ffffff 45%);
+}
+.pacto-ranking-card.rank-2 {
+  border-color: #cbd5e1;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 45%);
+}
+.pacto-ranking-card.rank-3 {
+  border-color: #fed7aa;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 45%);
+}
+.pacto-rank-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.pacto-rank-badge {
+  font-size: 15px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pacto-rank-score {
+  font-size: 13px;
+  font-weight: 750;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.pacto-ranking-card h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+.pacto-rank-stats {
+  margin: 12px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+/* Attention Points */
+.pacto-attention-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.pacto-attention-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+}
+.pacto-attention-card.critical {
+  border-color: #fecaca;
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+.pacto-attention-card.warning {
+  border-color: #fde68a;
+  border-left-color: #eab308;
+  background: #fffbeb;
+}
+.pacto-attention-card.info {
+  border-color: #bfdbfe;
+  border-left-color: #2563eb;
+  background: #eff6ff;
+}
+.pacto-attention-card.success {
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+.pacto-attention-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.pacto-attention-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.pacto-attention-msg { font-size: 12px; color: var(--text-2); line-height: 1.4; margin: 0; }
+.pacto-attention-rec {
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-style: italic;
+  margin: 4px 0 0;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+/* Modern Skill Card */
+.pacto-skill-card-modern {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.pacto-skill-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.pacto-skill-header-row strong { font-size: 14px; color: var(--text); }
+.pacto-skill-levels-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 14px;
+}
+.pacto-skill-level-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.pacto-skill-level-row .level-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.pacto-skill-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+/* Modal and Drilldown Styles */
+.pacto-modal-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.pacto-modal-kpi-item {
+  padding: 11px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+}
+.pacto-modal-kpi-item strong { font-size: 17px; color: var(--text); }
+.pacto-modal-kpi-item span { font-size: 11px; color: var(--text-3); }
+
+/* Mini Performance Progress Bar */
+.pacto-mini-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pacto-mini-progress-bar {
+  flex: 1;
+  height: 7px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 50px;
+}
+.pacto-mini-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+/* ---------- Dashboard — CNCA (Compromisso Nacional Criança Alfabetizada) ---------- */
+.cnca-overview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.cnca-header-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cnca-header-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+}
+.cnca-header-subtitle {
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.cnca-filter-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.cnca-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.cnca-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.cnca-kpi-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cnca-kpi-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+.cnca-kpi-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.cnca-kpi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+.cnca-kpi-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.cnca-kpi-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+  margin: 2px 0 6px;
+}
+.cnca-kpi-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cnca-component-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.cnca-component-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+.cnca-component-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  border-color: #93c5fd;
+}
+.cnca-component-card.active-filter {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  background: #f8fbff;
+}
+.cnca-stacked-bar-container {
+  display: flex;
+  width: 100%;
+  height: 22px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
+}
+.cnca-stacked-segment {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  transition: width 0.3s ease;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  position: relative;
+}
+.cnca-levels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.cnca-level-item {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cnca-skills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cnca-skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.cnca-skill-row:hover {
+  background: #f1f5f9;
+}
+.cnca-skill-bar-track {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.cnca-attention-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.cnca-attention-card {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #fecaca;
+  border-left-width: 4px;
+  border-left-color: #dc2626;
+  background: #fef2f2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (max-width: 1100px) {
+  .cnca-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cnca-component-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cnca-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .cnca-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cnca-kpi-grid { grid-template-columns: 1fr; }
+  .cnca-component-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .cnca-filter-grid { grid-template-columns: 1fr; }
+}
 
 /* ---------- Coleta pública — Pacto pela Alfabetização ---------- */
 .public-collection-page { min-height: 100vh; background: #f1f5f9; color: var(--text); }
@@ -706,6 +1223,8 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .pacto-assessment-selector { grid-template-columns: repeat(2, 1fr); }
   .pacto-assessment-checks { grid-template-columns: 1fr; }
   .pacto-import-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pacto-ranking-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pacto-attention-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {
@@ -717,6 +1236,8 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .program-delete-impact { grid-template-columns: 1fr; }
   .pacto-dashboard-filter-grid { grid-template-columns: 1fr; }
   .pacto-dashboard-filters .card-header-row { align-items: stretch; flex-direction: column; }
+  .pacto-section-header { align-items: flex-start; flex-direction: column; }
+  .pacto-ranking-grid { grid-template-columns: 1fr; }
   .public-collection-shell { width: min(100% - 20px, 1120px); margin: 12px auto; }
   .public-school-card, .public-collection-actions, .pacto-import-callout { align-items: stretch; flex-direction: column; }
   .public-collection-actions .btn, .pacto-import-callout .btn { width: 100%; }

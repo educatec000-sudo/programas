@@ -87,7 +87,12 @@ export async function request(path, { method = 'GET', body, params, retry = true
       /* resposta sem json */
     }
     const err = payload?.error || {};
-    throw new ApiError(err.code || 'ERROR', err.message || `Erro ${res.status}`, err.details, res.status);
+    throw new ApiError(
+      err.code || payload?.code || 'ERROR',
+      err.message || payload?.message || (typeof payload === 'string' ? payload : `Erro ${res.status}`),
+      err.details || payload?.details,
+      res.status
+    );
   }
 
   if (res.status === 204) return null;

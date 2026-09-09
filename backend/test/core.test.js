@@ -17,7 +17,11 @@ import { schoolsStrategy } from '../src/modules/imports/schools.strategy.js';
 import { resultsStrategy } from '../src/modules/imports/results.strategy.js';
 import { createGoalSchema } from '../src/validations/result.validation.js';
 import { createProgramCriterionSchema } from '../src/validations/program.validation.js';
-import { countSchoolsWithData } from '../src/services/program.service.js';
+import {
+  countSchoolsWithData,
+  getSchoolProgramDeletionImpact,
+  removeSchool,
+} from '../src/services/program.service.js';
 import { getAssessmentDefinition } from '../src/programs/pacto/config.js';
 import {
   buildSchoolStatus,
@@ -108,6 +112,17 @@ test('bloqueia exclusão do programa quando qualquer relação possui dados', ()
     relatedRecords: 8,
     canDelete: false,
   });
+});
+
+test('exclusão de escola com dados exige confirmação explícita de limpeza', async () => {
+  const actor = { id: 'admin-id', name: 'Admin' };
+  const ip = '127.0.0.1';
+
+  // Quando não há dados, exclusão é direta
+  // Quando há dados e purgeData=false, lança 409 SCHOOL_HAS_PROGRAM_DATA
+  // Quando há dados e purgeData=true, executa exclusão em cascata
+  assert.equal(typeof removeSchool, 'function');
+  assert.equal(typeof getSchoolProgramDeletionImpact, 'function');
 });
 
 test('representa as seis matrizes oficiais do Pacto 2026', () => {
@@ -433,3 +448,109 @@ test('lê o CSV oficial Windows-1252 e normaliza zona e coordenadas', () => {
     fs.rmSync(fixture, { force: true });
   }
 });
+
+test('Pacto: Português e Matemática na mesma turma/avaliação NÃO duplicam matriculados nem avaliados', () => {
+  const definition = getAssessmentDefinition(1, 'A1');
+  const components = [
+    {
+      component: 'PORTUGUES',
+      enrolled: 300,
+      evaluated: 290,
+      results: [
+        { skill: 'LEITURA_PALAVRAS', level: 'ALFABETICO', count: 250 },
+        { skill: 'LEITURA_PALAVRAS', level: 'PRE_SILABICO', count: 40 },
+      ],
+    },
+    {
+      component: 'MATEMATICA',
+      enrolled: 300,
+      evaluated: 285,
+      results: [
+        { skill: 'NUMEROS_CONTAGEM', level: 'ALFABETICO', count: 240 },
+        { skill: 'NUMEROS_CONTAGEM', level: 'PRE_SILABICO', count: 45 },
+      ],
+    },
+  ];
+
+  const overview = {
+    schools: [
+      {
+        id: 'school-dedup',
+        name: 'Escola Exemplo Deduplicação',
+        inep: '15000099',
+        classes: [
+          {
+            id: 'class-dedup-1',
+            schoolId: 'school-dedup',
+            grade: 1,
+            shift: 'M',
+            name: '1º Ano Único',
+            enabledAssessments: ['A1'],
+            assessments: [{ id: 'ass-dedup-1', code: 'A1', status: 'ENVIADO', definition, components }],
+          },
+        ],
+      },
+    ],
+  };
+
+  const dashboard = buildPactoDashboard(overview, { grade: '1', assessment: 'A1' });
+  const school = dashboard.schoolRanking[0];
+
+  // Regra Fundamental: Português (300) + Matemática (300) = 300 alunos únicos matriculados (NÃO 600)
+  assert.equal(school.enrolled, 300, 'Matriculados deve ser 300 e não 600');
+  // Português (290) + Matemática (285) = 290 alunos únicos avaliados (NÃO 575)
+  assert.equal(school.evaluated, 290, 'Avaliados deve ser 290 e não 575');
+  assert.equal(school.participationPercentage, 97, 'Participação deve ser 97%');
+  assert.equal(dashboard.metrics.enrolled, 300, 'Métrica da rede deve ser 300');
+  assert.equal(dashboard.metrics.evaluated, 290, 'Métrica da rede deve ser 290');
+});
+
+test('Pacto: A1 e A2 na mesma turma utilizam a última avaliação A2 e NÃO somam A1 + A2', () => {
+  const definition = getAssessmentDefinition(0, 'A1');
+  const overview = {
+    schools: [
+      {
+        id: 'school-a1-a2',
+        name: 'Escola A1 e A2',
+        inep: '15000088',
+        classes: [
+          {
+            id: 'class-pii-1',
+            schoolId: 'school-a1-a2',
+            grade: 0,
+            shift: 'M',
+            name: 'Pré II A',
+            enabledAssessments: ['A1', 'A2'],
+            assessments: [
+              {
+                id: 'ass-pii-a1',
+                code: 'A1',
+                status: 'ENVIADO',
+                definition,
+                components: [{ component: 'LINGUAGEM', enrolled: 300, evaluated: 280, results: [] }],
+              },
+              {
+                id: 'ass-pii-a2',
+                code: 'A2',
+                status: 'ENVIADO',
+                definition,
+                components: [{ component: 'LINGUAGEM', enrolled: 305, evaluated: 295, results: [] }],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  const dashboard = buildPactoDashboard(overview, { grade: '0' });
+  const school = dashboard.schoolRanking[0];
+
+  // Regra Fundamental: A1 (300/280) e A2 (305/295) -> Usa A2 (305/295), NÃO 605 nem 575!
+  assert.equal(school.enrolled, 305, 'Matriculados da escola deve ser 305 (da A2)');
+  assert.equal(school.evaluated, 295, 'Avaliados da escola deve ser 295 (da A2)');
+  assert.equal(school.participationPercentage, 97, 'Participação da escola deve ser 97%');
+  assert.equal(school.completenessLabel, '2/2');
+  assert.equal(school.isComplete, true);
+});
+

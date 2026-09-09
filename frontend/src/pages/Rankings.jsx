@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi.js';
 import { rankingsApi, programsApi } from '../services/resources.js';
@@ -26,6 +26,13 @@ export default function Rankings() {
     () => (programId ? programsApi.get(programId) : Promise.resolve(null)),
     [programId],
   );
+
+  React.useEffect(() => {
+    if (program?.year && program.year !== year) {
+      setYear(program.year);
+    }
+  }, [program?.id, program?.year]);
+
   const { data, loading, refresh } = useApi(
     () => programId
       ? rankingsApi.get({ programId, indicatorId: indicatorId || undefined, year, period: period || undefined })
@@ -102,7 +109,17 @@ export default function Rankings() {
 
       <div className="filter-bar">
         <Field label="Programa" required>
-          <Select value={programId} onChange={(event) => { setProgramId(event.target.value); setIndicatorId(''); setPeriod(''); }}>
+          <Select
+            value={programId}
+            onChange={(event) => {
+              const newId = event.target.value;
+              setProgramId(newId);
+              setIndicatorId('');
+              setPeriod('');
+              const p = (programs?.data || []).find((item) => item.id === newId);
+              if (p?.year) setYear(p.year);
+            }}
+          >
             <option value="">Selecione um programa...</option>
             {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'ranking')).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
           </Select>

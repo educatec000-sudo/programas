@@ -17,6 +17,7 @@ import {
 import { paginationQuery } from '../validations/common.validation.js';
 import { z } from 'zod';
 import pactoAdminRoutes from '../programs/pacto/admin.routes.js';
+import cncaRoutes from '../programs/cnca/routes.js';
 
 const router = Router();
 router.use(authenticate);
@@ -43,6 +44,7 @@ router.get('/:id/deletion-impact', requirePermission('programs:delete'), control
 router.delete('/:id', requirePermission('programs:delete'), controller.remove);
 router.get('/:id/history', requirePermission('programs:read'), validate({ query: paginationQuery }), controller.history);
 router.use('/:id/pacto', pactoAdminRoutes);
+router.use('/:id/cnca', cncaRoutes);
 router.get(
   '/:id/schools/:schoolId/evaluation',
   requirePermission('programs:read'),
@@ -70,6 +72,11 @@ router.put(
   requirePermission('programs:write'),
   validate({ body: updateProgramSchoolSchema }),
   controller.updateSchoolLink,
+);
+router.get(
+  '/:id/schools/:schoolId/deletion-impact',
+  requirePermission('programs:read'),
+  controller.schoolDeletionImpact,
 );
 router.delete('/:id/schools/:schoolId', requirePermission('programs:write'), controller.removeSchool);
 
