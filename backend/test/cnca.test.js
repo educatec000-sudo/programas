@@ -347,6 +347,10 @@ test('CNCA Gerenciamento: salvar como rascunho, exclusão individual, exclusão 
 
   const originalProgramFindFirst = prisma.program.findFirst;
   const originalSchoolFindFirst = prisma.school.findFirst;
+  const originalProgramSchoolCreateMany = prisma.programSchool.createMany;
+  const originalProgramSchoolUpdateMany = prisma.programSchool.updateMany;
+  const originalProgramSchoolUpsert = prisma.programSchool.upsert;
+  const originalCncaResultFindMany = prisma.cncaSchoolResult.findMany;
   const originalCncaResultFindFirst = prisma.cncaSchoolResult.findFirst;
   const originalCncaResultCount = prisma.cncaSchoolResult.count;
   const originalCncaResultDelete = prisma.cncaSchoolResult.delete;
@@ -357,6 +361,10 @@ test('CNCA Gerenciamento: salvar como rascunho, exclusão individual, exclusão 
 
   try {
     prisma.program.findFirst = async () => mockProgram;
+    prisma.programSchool.createMany = async () => ({ count: 2 });
+    prisma.programSchool.updateMany = async () => ({ count: 0 });
+    prisma.programSchool.upsert = async ({ create }) => ({ id: 'ps-1', ...create });
+    prisma.cncaSchoolResult.findMany = async () => [];
     prisma.auditLog.create = async () => ({ id: 'audit-1' });
 
     prisma.$transaction = async (callback) => {
@@ -432,6 +440,10 @@ test('CNCA Gerenciamento: salvar como rascunho, exclusão individual, exclusão 
   } finally {
     prisma.program.findFirst = originalProgramFindFirst;
     prisma.school.findFirst = originalSchoolFindFirst;
+    prisma.programSchool.createMany = originalProgramSchoolCreateMany;
+    prisma.programSchool.updateMany = originalProgramSchoolUpdateMany;
+    prisma.programSchool.upsert = originalProgramSchoolUpsert;
+    prisma.cncaSchoolResult.findMany = originalCncaResultFindMany;
     prisma.cncaSchoolResult.findFirst = originalCncaResultFindFirst;
     prisma.cncaSchoolResult.count = originalCncaResultCount;
     prisma.cncaSchoolResult.delete = originalCncaResultDelete;
@@ -508,6 +520,8 @@ test('CNCA Pipeline: prévia, conciliação por INEP/Nome, idempotência e trata
   const originalSchoolFindFirst = prisma.school.findFirst;
   const originalSchoolCount = prisma.school.count;
   const originalProgramFindFirst = prisma.program.findFirst;
+  const originalProgramSchoolCreateMany = prisma.programSchool.createMany;
+  const originalProgramSchoolUpdateMany = prisma.programSchool.updateMany;
   const originalProgramSchoolUpsert = prisma.programSchool.upsert;
   const originalProgramSchoolFindMany = prisma.programSchool.findMany;
   const originalProgramSchoolFindUnique = prisma.programSchool.findUnique;
@@ -522,6 +536,9 @@ test('CNCA Pipeline: prévia, conciliação por INEP/Nome, idempotência e trata
     prisma.school.findMany = async () => mockSchools;
     prisma.school.findFirst = async ({ where }) => mockSchools.find((s) => s.id === where.id) || null;
     prisma.program.findFirst = async () => mockProgram;
+    prisma.programSchool.createMany = async () => ({ count: 2 });
+    prisma.programSchool.updateMany = async () => ({ count: 0 });
+    prisma.programSchool.upsert = async ({ create }) => ({ id: 'ps-1', ...create });
     prisma.cncaSchoolResult.findMany = async () => [];
     prisma.auditLog.create = async () => ({ id: 'audit-1' });
 
@@ -577,6 +594,14 @@ test('CNCA Pipeline: prévia, conciliação por INEP/Nome, idempotência e trata
           },
           update: async ({ data }) => {
             return { id: 'existing-result', ...data };
+          },
+          upsert: async ({ where, create, update }) => {
+            const key = `${where.programId_schoolId_year_assessment_grade_component.schoolId}_${where.programId_schoolId_year_assessment_grade_component.component}`;
+            if (updatedItems.includes(key)) {
+              return { id: 'existing-result', ...update };
+            }
+            createdItems.push(`${create.schoolId}_${create.component}`);
+            return { id: `new-${createdItems.length}`, ...create };
           },
         },
       };
@@ -690,12 +715,120 @@ test('CNCA Pipeline: prévia, conciliação por INEP/Nome, idempotência e trata
     prisma.school.findMany = originalSchoolFindMany;
     prisma.school.findFirst = originalSchoolFindFirst;
     prisma.program.findFirst = originalProgramFindFirst;
+    prisma.programSchool.createMany = originalProgramSchoolCreateMany;
+    prisma.programSchool.updateMany = originalProgramSchoolUpdateMany;
     prisma.programSchool.upsert = originalProgramSchoolUpsert;
     prisma.programSchool.findMany = originalProgramSchoolFindMany;
     prisma.programSchool.findUnique = originalProgramSchoolFindUnique;
     prisma.programSchool.delete = originalProgramSchoolDelete;
     prisma.cncaSchoolResult.findMany = originalCncaResultFindMany;
     prisma.cncaSchoolResult.findUnique = originalCncaResultFindUnique;
+    prisma.$transaction = originalTransaction;
+    prisma.auditLog.create = originalAudit;
+  }
+});
+
+test('CNCA Persistência: executa importação em lotes curtos (chunks) com pre-fetch e sem timeouts em banco remoto', async () => {
+  const mockProgram = {
+    id: 'cnca-2026-prod',
+    code: 'CNCA-2026',
+    name: 'Compromisso Nacional Criança Alfabetizada',
+    year: 2026,
+    catalog: { id: 'cat-cnca', code: 'CNCA', name: 'CNCA' },
+  };
+
+  // Simula 120 escolas para testar múltiplos chunks (CHUNK_SIZE = 50 -> 3 chunks: 50, 50, 20)
+  const totalSchools = 120;
+  const records = [];
+  for (let i = 1; i <= totalSchools; i++) {
+    records.push({
+      status: 'VALIDO',
+      matchedSchool: { id: `school-${i}`, inep: `150000${String(i).padStart(3, '0')}`, name: `Escola ${i}` },
+      grade: '2º Ano',
+      assessment: 'Diagnóstica',
+      component: 'MATEMATICA',
+      enrolled: 40 + (i % 10),
+      evaluated: 38 + (i % 10),
+      participationRate: 95.0,
+      averageScore: 230.0 + (i % 30),
+      skills: [{ code: 'H01', percentage: 75.0 }],
+    });
+  }
+
+  const existingSchoolIdsInDb = new Set(['school-1', 'school-2', 'school-3']); // 3 registros já existem previamente
+
+  const originalProgramFindFirst = prisma.program.findFirst;
+  const originalProgramSchoolCreateMany = prisma.programSchool.createMany;
+  const originalProgramSchoolUpdateMany = prisma.programSchool.updateMany;
+  const originalCncaResultFindMany = prisma.cncaSchoolResult.findMany;
+  const originalTransaction = prisma.$transaction;
+  const originalAudit = prisma.auditLog.create;
+
+  let findManyCalledCount = 0;
+  let transactionCallCount = 0;
+  let totalRecordsProcessedInTx = 0;
+  const createdInTx = [];
+  const updatedInTx = [];
+
+  try {
+    prisma.program.findFirst = async () => mockProgram;
+    prisma.programSchool.createMany = async ({ data }) => {
+      assert.equal(data.length, totalSchools);
+      return { count: totalSchools };
+    };
+    prisma.programSchool.updateMany = async () => ({ count: 0 });
+    prisma.auditLog.create = async () => ({ id: 'audit-1' });
+
+    // Pre-fetch deve ser chamado apenas 1 vez fora da transação
+    prisma.cncaSchoolResult.findMany = async ({ where }) => {
+      findManyCalledCount++;
+      assert.equal(where.programId, mockProgram.id);
+      return [
+        { id: 'res-school-1', schoolId: 'school-1', grade: '2º Ano', component: 'MATEMATICA', assessment: 'Diagnóstica' },
+        { id: 'res-school-2', schoolId: 'school-2', grade: '2º Ano', component: 'MATEMATICA', assessment: 'Diagnóstica' },
+        { id: 'res-school-3', schoolId: 'school-3', grade: '2º Ano', component: 'MATEMATICA', assessment: 'Diagnóstica' },
+      ];
+    };
+
+    // Prisma $transaction deve receber lotes curtos (<= 50) e nunca chamar findUnique dentro do loop
+    prisma.$transaction = async (callback, options) => {
+      transactionCallCount++;
+      assert.ok(options.timeout >= 20000);
+      const tx = {
+        cncaSchoolResult: {
+          findUnique: async () => {
+            throw new Error('findUnique NÃO deve ser chamado dentro da transação quando pre-fetch foi realizado!');
+          },
+          update: async ({ where, data }) => {
+            updatedInTx.push({ where, data });
+            totalRecordsProcessedInTx++;
+            return { id: where.id, ...data };
+          },
+          upsert: async ({ where, create, update }) => {
+            createdInTx.push({ where, create });
+            totalRecordsProcessedInTx++;
+            return { id: `new-res-${createdInTx.length}`, ...create };
+          },
+        },
+      };
+      return callback(tx);
+    };
+
+    const result = await confirmCncaImport(mockProgram.id, records, 2026, { id: 'user-1', name: 'Admin' }, '127.0.0.1', false);
+
+    assert.equal(result.total, 120);
+    assert.equal(result.createdCount, 117);
+    assert.equal(result.updatedCount, 3);
+    assert.equal(findManyCalledCount, 1, 'Pre-fetch findMany deve ser executado exatamente 1 vez');
+    assert.equal(transactionCallCount, 3, '120 registros divididos em CHUNK_SIZE=50 devem resultar em exatamente 3 transações');
+    assert.equal(totalRecordsProcessedInTx, 120);
+    assert.equal(updatedInTx.length, 3);
+    assert.equal(createdInTx.length, 117);
+  } finally {
+    prisma.program.findFirst = originalProgramFindFirst;
+    prisma.programSchool.createMany = originalProgramSchoolCreateMany;
+    prisma.programSchool.updateMany = originalProgramSchoolUpdateMany;
+    prisma.cncaSchoolResult.findMany = originalCncaResultFindMany;
     prisma.$transaction = originalTransaction;
     prisma.auditLog.create = originalAudit;
   }
