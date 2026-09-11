@@ -27,66 +27,18 @@ export function countSchoolsWithData(activeLinks, resultGroups) {
 }
 
 let lastSyncTimestamp = 0;
-export async function ensureCncaAndCleanLegacy() {
+export async function ensureCncaAndParc() {
   const now = Date.now();
   if (now - lastSyncTimestamp < 15_000) return;
   lastSyncTimestamp = now;
 
   try {
-    // 1. Remove qualquer resquício de PARC no banco
-    const legacyCatalogs = await prisma.programCatalog.findMany({
-      where: {
-        OR: [
-          { code: { in: ['PARC', 'PARC-2026', 'PARC_2026'] } },
-          { code: { startsWith: 'PARC' } },
-          { name: { contains: 'PARC' } },
-          { name: { contains: 'Programa de Avaliação da Rede' } },
-        ],
-      },
-      select: { id: true },
-    });
-    if (legacyCatalogs.length) {
-      const legacyCatIds = legacyCatalogs.map((c) => c.id);
-      const legacyPrograms = await prisma.program.findMany({
-        where: { catalogId: { in: legacyCatIds } },
-        select: { id: true },
-      });
-      const legacyProgIds = legacyPrograms.map((p) => p.id);
-      if (legacyProgIds.length) {
-        await prisma.programSchool.deleteMany({ where: { programId: { in: legacyProgIds } } });
-        await prisma.programIndicator.deleteMany({ where: { programId: { in: legacyProgIds } } });
-        await prisma.result.deleteMany({ where: { programId: { in: legacyProgIds } } });
-        await prisma.goal.deleteMany({ where: { programId: { in: legacyProgIds } } });
-        await prisma.program.deleteMany({ where: { id: { in: legacyProgIds } } });
-      }
-      await prisma.programCatalog.deleteMany({ where: { id: { in: legacyCatIds } } });
-    }
-
-    const directLegacyPrograms = await prisma.program.findMany({
-      where: {
-        OR: [
-          { code: { startsWith: 'PARC' } },
-          { name: { contains: 'PARC' } },
-          { name: { contains: 'Programa de Avaliação da Rede' } },
-        ],
-      },
-      select: { id: true },
-    });
-    if (directLegacyPrograms.length) {
-      const ids = directLegacyPrograms.map((p) => p.id);
-      await prisma.programSchool.deleteMany({ where: { programId: { in: ids } } });
-      await prisma.programIndicator.deleteMany({ where: { programId: { in: ids } } });
-      await prisma.result.deleteMany({ where: { programId: { in: ids } } });
-      await prisma.goal.deleteMany({ where: { programId: { in: ids } } });
-      await prisma.program.deleteMany({ where: { id: { in: ids } } });
-    }
-
-    // 2. Garante existência do catálogo e programa CNCA
-    let catalog = await prisma.programCatalog.findFirst({
+    // 1. Garante existência do catálogo e programa CNCA
+    let cncaCatalog = await prisma.programCatalog.findFirst({
       where: { code: 'CNCA', deletedAt: null },
     });
-    if (!catalog) {
-      catalog = await prisma.programCatalog.create({
+    if (!cncaCatalog) {
+      cncaCatalog = await prisma.programCatalog.create({
         data: {
           code: 'CNCA',
           name: 'Compromisso Nacional Criança Alfabetizada',
@@ -97,13 +49,13 @@ export async function ensureCncaAndCleanLegacy() {
       });
     }
 
-    let program = await prisma.program.findFirst({
-      where: { catalogId: catalog.id, year: 2026, deletedAt: null },
+    let cncaProgram = await prisma.program.findFirst({
+      where: { catalogId: cncaCatalog.id, year: 2026, deletedAt: null },
     });
-    if (!program) {
-      program = await prisma.program.create({
+    if (!cncaProgram) {
+      cncaProgram = await prisma.program.create({
         data: {
-          catalogId: catalog.id,
+          catalogId: cncaCatalog.id,
           code: 'CNCA-2026',
           name: 'Compromisso Nacional Criança Alfabetizada',
           year: 2026,
@@ -117,14 +69,50 @@ export async function ensureCncaAndCleanLegacy() {
       });
     }
 
+    // 2. Garante existência do catálogo e programa PARC
+    let parcCatalog = await prisma.programCatalog.findFirst({
+      where: { code: 'PARC', deletedAt: null },
+    });
+    if (!parcCatalog) {
+      parcCatalog = await prisma.programCatalog.create({
+        data: {
+          code: 'PARC',
+          name: 'Parceria pela Alfabetização em Regime de Colaboração',
+          objective: 'Acompanhamento do desenvolvimento da Fluência Leitora em Regime de Colaboração (2º Ano)',
+          organ: 'SEDUC / SEMED',
+          description: 'Parceria pela Alfabetização em Regime de Colaboração (PARC) — Avaliação de Fluência Leitora do 2º Ano do Ensino Fundamental (Ciclos de Entrada e Saída).',
+        },
+      });
+    }
+
+    let parcProgram = await prisma.program.findFirst({
+      where: { catalogId: parcCatalog.id, year: 2026, deletedAt: null },
+    });
+    if (!parcProgram) {
+      parcProgram = await prisma.program.create({
+        data: {
+          catalogId: parcCatalog.id,
+          code: 'PARC-2026',
+          name: 'Parceria pela Alfabetização em Regime de Colaboração',
+          year: 2026,
+          status: 'EM_EXECUCAO',
+          organ: 'SEDUC / SEMED',
+          objective: 'Acompanhamento da Fluência Leitora do 2º Ano (Entrada e Saída)',
+          globalGoal: 80,
+          periodLabel: 'Ciclo 2026',
+          description: 'PARC 2026 — Fluência Leitora 2º Ano (Entrada e Saída).',
+        },
+      });
+    }
+
     // Se o CNCA-2026 estiver com TODAS as escolas da rede vinculadas sem resultados gravados (resíduo anterior),
     // limpa os vínculos em massa para permitir o controle dinâmico correto de participantes.
     const totalSchoolsCount = await prisma.school.count({ where: { deletedAt: null } });
     if (totalSchoolsCount > 0) {
-      const cncaLinksCount = await prisma.programSchool.count({ where: { programId: program.id } });
-      const cncaResultsCount = await prisma.cncaSchoolResult.count({ where: { programId: program.id } });
+      const cncaLinksCount = await prisma.programSchool.count({ where: { programId: cncaProgram.id } });
+      const cncaResultsCount = await prisma.cncaSchoolResult.count({ where: { programId: cncaProgram.id } });
       if (cncaLinksCount >= totalSchoolsCount && cncaResultsCount === 0) {
-        await prisma.programSchool.deleteMany({ where: { programId: program.id } });
+        await prisma.programSchool.deleteMany({ where: { programId: cncaProgram.id } });
       }
     }
   } catch (err) {
@@ -135,7 +123,7 @@ export async function ensureCncaAndCleanLegacy() {
 }
 
 export async function listProgramCatalogs(query) {
-  await ensureCncaAndCleanLegacy();
+  await ensureCncaAndParc();
   const { page, pageSize, skip, take } = parsePagination(query);
   const { search, status } = query;
   const where = {
@@ -175,7 +163,7 @@ export async function listProgramCatalogs(query) {
   const includeCoverage = Boolean(query.includeCoverage);
   const cycles = catalogs.flatMap((catalog) => catalog.cycles);
   const cycleIds = cycles.map((cycle) => cycle.id);
-  const [activeLinks, resultGroups, pactoSubmissions, cncaResults] = includeCoverage && cycleIds.length
+  const [activeLinks, resultGroups, pactoSubmissions, cncaResults, parcResults] = includeCoverage && cycleIds.length
     ? await Promise.all([
         prisma.programSchool.findMany({
           where: { programId: { in: cycleIds }, active: true, school: { deletedAt: null } },
@@ -193,12 +181,17 @@ export async function listProgramCatalogs(query) {
           where: { programId: { in: cycleIds }, school: { deletedAt: null } },
           select: { programId: true, schoolId: true },
         }),
+        prisma.parcSchoolResult.findMany({
+          where: { programId: { in: cycleIds }, school: { deletedAt: null } },
+          select: { programId: true, schoolId: true },
+        }),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], []];
   const schoolsWithData = countSchoolsWithData(activeLinks, [
     ...resultGroups,
     ...pactoSubmissions.map((item) => item.class),
     ...cncaResults,
+    ...parcResults,
   ]);
 
   const serialized = catalogs.map((catalog) => {
@@ -258,7 +251,7 @@ export async function listProgramCatalogs(query) {
  * O catálogo público de entrada usa listProgramCatalogs e não aceita filtro anual.
  */
 export async function listPrograms(query) {
-  await ensureCncaAndCleanLegacy();
+  await ensureCncaAndParc();
   const { page, pageSize, skip, take } = parsePagination(query);
   const { search, year, status } = query;
 
@@ -295,7 +288,7 @@ export async function listPrograms(query) {
 
   const includeCoverage = Boolean(query.includeCoverage);
   const programIds = programs.map((program) => program.id);
-  const [activeLinks, resultGroups, pactoSubmissions, cncaResults] = includeCoverage && programIds.length
+  const [activeLinks, resultGroups, pactoSubmissions, cncaResults, parcResults] = includeCoverage && programIds.length
     ? await Promise.all([
         prisma.programSchool.findMany({
           where: { programId: { in: programIds }, active: true, school: { deletedAt: null } },
@@ -313,13 +306,18 @@ export async function listPrograms(query) {
           where: { programId: { in: programIds }, school: { deletedAt: null } },
           select: { programId: true, schoolId: true },
         }),
+        prisma.parcSchoolResult.findMany({
+          where: { programId: { in: programIds }, school: { deletedAt: null } },
+          select: { programId: true, schoolId: true },
+        }),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], []];
 
   const coverageGroups = [
     ...resultGroups,
     ...pactoSubmissions.map((item) => item.class),
     ...cncaResults,
+    ...parcResults,
   ];
   const schoolsWithData = countSchoolsWithData(activeLinks, coverageGroups);
 
@@ -624,6 +622,7 @@ async function buildProgramDeletionImpact(id, db = prisma) {
     pactoComponents,
     pactoSkillResults,
     cncaResults,
+    parcResults,
     documents,
   ] = await Promise.all([
     db.programSchool.count({ where: { programId: { in: cycleIds } } }),
@@ -637,6 +636,7 @@ async function buildProgramDeletionImpact(id, db = prisma) {
     db.pactoAssessmentComponent.count({ where: { assessment: { class: { programId: { in: cycleIds } } } } }),
     db.pactoSkillResult.count({ where: { component: { assessment: { class: { programId: { in: cycleIds } } } } } }),
     db.cncaSchoolResult.count({ where: { programId: { in: cycleIds } } }),
+    db.parcSchoolResult.count({ where: { programId: { in: cycleIds } } }),
     db.document.count({
       where: {
         deletedAt: null,
@@ -659,6 +659,7 @@ async function buildProgramDeletionImpact(id, db = prisma) {
     pactoComponents,
     pactoSkillResults,
     cncaResults,
+    parcResults,
     documents,
   };
   return {
@@ -1014,6 +1015,7 @@ export async function getSchoolProgramDeletionImpact(programId, schoolId) {
     pactoClasses,
     pactoAssessments,
     cncaResults,
+    parcResults,
   ] = await Promise.all([
     prisma.result.count({ where: { programId, schoolId } }),
     prisma.goal.count({ where: { programId, schoolId } }),
@@ -1022,6 +1024,7 @@ export async function getSchoolProgramDeletionImpact(programId, schoolId) {
     prisma.pactoClass.count({ where: { programId, schoolId } }),
     prisma.pactoAssessment.count({ where: { class: { programId, schoolId } } }),
     prisma.cncaSchoolResult.count({ where: { programId, schoolId } }),
+    prisma.parcSchoolResult.count({ where: { programId, schoolId } }),
   ]);
 
   const counts = {
@@ -1032,6 +1035,7 @@ export async function getSchoolProgramDeletionImpact(programId, schoolId) {
     pactoClasses,
     pactoAssessments,
     cncaResults,
+    parcResults,
   };
 
   const totalRelated = Object.values(counts).reduce((sum, val) => sum + val, 0);
@@ -1081,6 +1085,9 @@ export async function removeSchool(id, schoolId, options = {}, actor, ip) {
         where: { programId: id, schoolId },
       });
       await tx.cncaSchoolResult.deleteMany({
+        where: { programId: id, schoolId },
+      });
+      await tx.parcSchoolResult.deleteMany({
         where: { programId: id, schoolId },
       });
       await tx.evaluation.deleteMany({

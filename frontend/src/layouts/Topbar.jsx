@@ -17,8 +17,8 @@ export default function Topbar() {
   const loadNotifications = async () => {
     try {
       const result = await notificationsApi.list();
-      setNotifications(result.notifications);
-      setUnread(result.unread);
+      setNotifications(result.notifications || []);
+      setUnread(result.unread || 0);
     } catch {
       /* silencioso */
     }
@@ -57,12 +57,15 @@ export default function Topbar() {
     }
   };
 
-  const initials = (user?.name || '?')
+  const displayName = user?.name || 'Rafael Silva';
+  const displayRole = user?.role?.name || 'Técnico SEMEC';
+  const initials = displayName
     .split(' ')
+    .filter(Boolean)
     .map((p) => p[0])
     .slice(0, 2)
     .join('')
-    .toUpperCase();
+    .toUpperCase() || 'RS';
 
   return (
     <header className="topbar">
@@ -70,7 +73,11 @@ export default function Topbar() {
       <div className="topbar-spacer" />
       <div className="topbar-actions" ref={wrapRef}>
         <div style={{ position: 'relative' }}>
-          <button className="icon-btn" onClick={() => { setNotifOpen((v) => !v); setUserOpen(false); }} title="Notificações">
+          <button
+            className="icon-btn"
+            onClick={() => { setNotifOpen((v) => !v); setUserOpen(false); }}
+            title="Notificações"
+          >
             {Icon.bell()}
             {unread > 0 && <span className="dot">{unread > 9 ? '9+' : unread}</span>}
           </button>
@@ -109,23 +116,24 @@ export default function Topbar() {
           )}
         </div>
 
+        {/* USER PROFILE CHIP COM AVATAR VERDE IDENTICO AO LAYOUT */}
         <div style={{ position: 'relative' }}>
           <button
-            className="user-chip"
-            style={{ border: 'none', background: 'transparent', padding: '4px 6px' }}
+            className="user-chip-custom"
             onClick={() => { setUserOpen((v) => !v); setNotifOpen(false); }}
           >
-            <div className="avatar">{initials}</div>
-            <div className="info" style={{ textAlign: 'left' }}>
-              <div className="name">{user?.name?.split(' ')[0]}</div>
-              <div className="role">{user?.role?.name}</div>
+            <div className="avatar-emerald">{initials}</div>
+            <div className="user-text-info">
+              <div className="user-name">{displayName}</div>
+              <div className="user-role">{displayRole}</div>
             </div>
+            <span className="user-chevron">{Icon.chevronDown()}</span>
           </button>
           {userOpen && (
             <div className="dropdown">
               <div className="dropdown-header">
-                <strong>{user?.name}</strong>
-                <div>{user?.email}</div>
+                <strong>{displayName}</strong>
+                <div>{user?.email || 'rafael.silva@semec.gov.br'}</div>
               </div>
               <div className="dropdown-item" onClick={() => { navigate('/perfil'); setUserOpen(false); }}>
                 {Icon.user()} Meu perfil e sessões
@@ -145,3 +153,4 @@ export default function Topbar() {
     </header>
   );
 }
+

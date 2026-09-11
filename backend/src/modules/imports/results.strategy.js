@@ -5,6 +5,7 @@ import { IMPORT_ROW_STATUS, PERIODS } from '../../lib/constants.js';
 import { HttpError } from '../../lib/errors.js';
 import { PACTO_CATALOG_CODE } from '../../programs/pacto/config.js';
 import { CNCA_CATALOG_CODE } from '../../programs/cnca/config.js';
+import { PARC_CATALOG_CODE } from '../../programs/parc/config.js';
 
 const PERIOD_ALIASES = (() => {
   const map = new Map();
@@ -111,6 +112,11 @@ export const resultsStrategy = {
         field: 'programa',
         message: 'O CNCA possui importador oficial próprio por escola (com proficiência, fluência, leitura e escrita). Utilize a importação oficial do CNCA.',
       });
+    } else if (program.catalog.code === PARC_CATALOG_CODE) {
+      errors.push({
+        field: 'programa',
+        message: 'O PARC possui importador oficial próprio de Fluência por escola (com ciclos de Entrada e Saída). Utilize a importação oficial do PARC.',
+      });
     }
 
     const school = inep ? ctx.schoolByInep.get(inep) : undefined;
@@ -200,6 +206,23 @@ export const resultsStrategy = {
       throw new HttpError(
         422,
         'O CNCA possui importador oficial próprio por escola. Utilize a importação oficial do CNCA.',
+        'PROGRAM_COLLECTION_REQUIRED',
+      );
+    }
+    const parcProgram = programIds.length
+      ? await prisma.program.findFirst({
+          where: {
+            id: { in: programIds },
+            deletedAt: null,
+            catalog: { code: PARC_CATALOG_CODE },
+          },
+          select: { id: true },
+        })
+      : null;
+    if (parcProgram) {
+      throw new HttpError(
+        422,
+        'O PARC possui importador oficial próprio de Fluência por escola. Utilize a importação oficial do PARC.',
         'PROGRAM_COLLECTION_REQUIRED',
       );
     }

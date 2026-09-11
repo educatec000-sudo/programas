@@ -8,6 +8,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { Button, Field, Input, Modal, Badge, LoadingBlock, Tabs, Select, ConfirmDialog } from '../components/ui.jsx';
 import { EvolutionChart, ClassificationDonut } from '../components/charts.jsx';
+import { Icon } from '../components/icons.jsx';
 import { PROGRAM_STATUS, CLASSIFICATION_INFO, SCHOOL_ZONE, fmt, fmtDateTime, PERIODS } from '../utils/format.js';
 import { getProgramImplementation } from '../programs/registry.js';
 
@@ -28,8 +29,9 @@ const DELETION_IMPACT_LABELS = {
 
 export default function ProgramDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { can } = useAuth();
+  const { user, can } = useAuth();
   const { toast, success, error } = useToast();
   const [tab, setTab] = useState(searchParams.get('tab') || 'resumo');
 
@@ -126,53 +128,135 @@ export default function ProgramDetail() {
     }
   };
 
+  const isCnca =
+    implementation?.catalogCode === 'CNCA' ||
+    implementation?.code?.startsWith('CNCA') ||
+    implementation?.code === 'CNCA-2026' ||
+    program.catalog?.code === 'CNCA' ||
+    program.code?.startsWith('CNCA');
+
+  const isPacto =
+    implementation?.catalogCode === 'PACTO-ALFABETIZACAO' ||
+    implementation?.code?.startsWith('PACTO') ||
+    implementation?.code === 'PACTO-ALFABETIZACAO-2026' ||
+    program.catalog?.code === 'PACTO-ALFABETIZACAO' ||
+    program.code?.startsWith('PACTO');
+
   return (
     <>
-      <PageHeader
-        title={program.catalog?.name || program.name}
-        subtitle={
-          implementation?.catalogCode === 'CNCA' || implementation?.code?.startsWith('CNCA') || implementation?.code === 'CNCA-2026'
-            ? `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || 'MEC / SEMED'} · ${program.schools.length} escolas participantes`
-            : `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`
-        }
-        actions={
-          <>
-            <Badge cls={statusInfo?.cls} >{statusInfo?.label}</Badge>
-            <Link to="/programas" className="btn btn-secondary btn-sm">← Voltar</Link>
-          </>
-        }
-      />
+      {isPacto ? (
+        <div className="pacto-main-top-header">
+          <div className="pacto-main-title-group">
+            <div className="pacto-main-book-icon-wrap">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-0-5H20" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="pacto-main-title">Pacto pela Alfabetização</h1>
+              <div className="pacto-main-subtitle">
+                Alfabetização na idade certa, um compromisso de todos.
+              </div>
+            </div>
+          </div>
 
-      <div className="card card-pad program-cycle-context">
-        <div>
-          <div className="card-title">Ano/ciclo do programa</div>
-          <div className="card-subtitle">Cada ciclo possui escolas, turmas, avaliações e resultados independentes.</div>
+          <div className="pacto-main-header-right-controls">
+            <div className="pacto-main-year-selector-box">
+              <label className="pacto-main-year-label">ANO</label>
+              <Select
+                value={program.id}
+                onChange={(event) => navigate(`/programas/${event.target.value}`)}
+                className="pacto-main-header-year-select"
+              >
+                {(program.cycles || []).map((cycle) => (
+                  <option key={cycle.id} value={cycle.id}>
+                    {cycle.year}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
         </div>
-        <Field label="Ciclo em uso" className="program-cycle-selector">
-          <Select value={program.id} onChange={(event) => navigate(`/programas/${event.target.value}`)}>
-            {(program.cycles || []).map((cycle) => (
-              <option key={cycle.id} value={cycle.id}>
-                {cycle.year}{cycle.periodLabel ? ` · ${cycle.periodLabel}` : ''} · {PROGRAM_STATUS[cycle.status]?.label || cycle.status}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div className="program-cycle-actions">
-          {can('programs:write') && <Button size="sm" variant="secondary" onClick={openCycleModal}>+ Adicionar ciclo</Button>}
-          {can('programs:delete') && <Button size="sm" variant="danger" onClick={openDeleteModal}>Excluir programa</Button>}
+      ) : isCnca ? (
+        <div className="cnca-top-header">
+          <div className="cnca-title-group">
+            <div className="cnca-book-icon-wrap">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-0-5H20" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="cnca-main-title">CNCA – Compromisso Nacional Criança Alfabetizada</h1>
+              <div className="cnca-main-subtitle">
+                Acompanhamento dos resultados de alfabetização da rede municipal
+              </div>
+            </div>
+          </div>
+
+          <div className="cnca-header-right-controls">
+            <div className="cnca-year-selector-box">
+              <label className="cnca-year-label">ANO</label>
+              <Select
+                value={program.id}
+                onChange={(event) => navigate(`/programas/${event.target.value}`)}
+                className="cnca-header-year-select"
+              >
+                {(program.cycles || []).map((cycle) => (
+                  <option key={cycle.id} value={cycle.id}>
+                    {cycle.year}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <PageHeader
+          title={program.catalog?.name || program.name}
+          subtitle={
+            `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`
+          }
+          actions={
+            <>
+              <Badge cls={statusInfo?.cls}>{statusInfo?.label}</Badge>
+              <Link to="/programas" className="btn btn-secondary btn-sm">← Voltar</Link>
+            </>
+          }
+        />
+      )}
+
+      {!isCnca && !isPacto && (
+        <div className="card card-pad program-cycle-context">
+          <div>
+            <div className="card-title">Ano/ciclo do programa</div>
+            <div className="card-subtitle">Cada ciclo possui escolas, turmas, avaliações e resultados independentes.</div>
+          </div>
+          <Field label="Ciclo em uso" className="program-cycle-selector">
+            <Select value={program.id} onChange={(event) => navigate(`/programas/${event.target.value}`)}>
+              {(program.cycles || []).map((cycle) => (
+                <option key={cycle.id} value={cycle.id}>
+                  {cycle.year}{cycle.periodLabel ? ` · ${cycle.periodLabel}` : ''} · {PROGRAM_STATUS[cycle.status]?.label || cycle.status}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="program-cycle-actions">
+            {can('programs:write') && <Button size="sm" variant="secondary" onClick={openCycleModal}>+ Adicionar ciclo</Button>}
+            {can('programs:delete') && <Button size="sm" variant="danger" onClick={openDeleteModal}>Excluir programa</Button>}
+          </div>
+        </div>
+      )}
 
       <Tabs
         active={tab}
         onChange={setTab}
         tabs={[
-          { key: 'resumo', label: 'Visão geral' },
+          { key: 'resumo', label: (isCnca || isPacto) ? 'Visão Geral' : 'Visão geral' },
           ...specificTabs.map((item) => ({ key: item.key, label: item.label })),
           sharedTabEnabled('escolas') ? { key: 'escolas', label: 'Escolas participantes', count: program.schools.length } : null,
           sharedTabEnabled('criterios') && can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators.length } : null,
           sharedTabEnabled('avaliacoes') && can('rankings:read') ? { key: 'avaliacoes', label: 'Avaliações', count: program.evaluationsCount } : null,
-          sharedTabEnabled('resultados') && can('results:read') ? { key: 'resultados', label: 'Resultados' } : null,
+          sharedTabEnabled('resultados') && can('resultados:read') ? { key: 'resultados', label: 'Resultados' } : null,
           sharedTabEnabled('ranking') && can('rankings:read') ? { key: 'ranking', label: 'Ranking' } : null,
           sharedTabEnabled('graficos') && can('analytics:read') ? { key: 'graficos', label: 'Gráficos' } : null,
           sharedTabEnabled('historico') ? { key: 'historico', label: 'Histórico' } : null,
@@ -196,11 +280,11 @@ export default function ProgramDetail() {
 
       {tab === 'resumo' && (
         implementation?.OverviewComponent
-          ? React.createElement(implementation.OverviewComponent, { program })
+          ? React.createElement(implementation.OverviewComponent, { program, onSelectTab: setTab })
           : <InfoTab program={program} implementation={implementation} />
       )}
 
-      {activeSpecificTab && React.createElement(activeSpecificTab.Component, { program, refreshProgram: refresh })}
+      {activeSpecificTab && React.createElement(activeSpecificTab.Component, { program, refreshProgram: refresh, onSelectTab: setTab })}
 
       {tab === 'escolas' && (
         <SchoolsTab

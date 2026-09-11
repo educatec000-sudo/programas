@@ -454,8 +454,7 @@ test('CNCA Gerenciamento: salvar como rascunho, exclusão individual, exclusão 
   }
 });
 
-test('PARC: garante que nenhuma referência ativa ou quebrada permaneça no sistema', () => {
-  // O CNCA é o programa oficial e o PARC foi completamente expurgado
+test('CNCA: componentes oficiais e ranking configurados', () => {
   assert.ok(CNCA_COMPONENTS.MATEMATICA);
   assert.ok(CNCA_COMPONENTS.LEITURA);
   assert.ok(CNCA_COMPONENTS.ESCRITA);

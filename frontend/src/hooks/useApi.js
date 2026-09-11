@@ -35,7 +35,7 @@ export function useApi(fetcher, deps = [], { immediate = true } = {}) {
   }, [...deps, nonce]);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
-  return { data, loading, error, refresh, setData };
+  return { data, loading, error, refresh, reload: refresh, setData };
 }
 
 export function useDebounce(value, delay = 350) {

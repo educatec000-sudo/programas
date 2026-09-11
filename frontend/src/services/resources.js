@@ -128,6 +128,41 @@ export const cncaApi = {
     request(`/programs/${programId}/cnca/filters`),
 };
 
+export const parcApi = {
+  previewImport: (programId, form) =>
+    request(`/programs/${programId}/parc/import/preview`, { method: 'POST', body: form }),
+  confirmImport: (programId, body) =>
+    request(`/programs/${programId}/parc/import/confirm`, { method: 'POST', body }),
+  createManualResult: (programId, body) =>
+    request(`/programs/${programId}/parc/results/manual`, { method: 'POST', body }),
+  participatingSchools: (programId) =>
+    request(`/programs/${programId}/parc/schools`),
+  availableSchools: (programId) =>
+    request(`/programs/${programId}/parc/schools/available`),
+  addSchool: (programId, body) =>
+    request(`/programs/${programId}/parc/schools`, { method: 'POST', body }),
+  removeSchool: (programId, schoolId) =>
+    request(`/programs/${programId}/parc/schools/${schoolId}`, { method: 'DELETE' }),
+  bulkRemoveSchools: (programId, body) =>
+    request(`/programs/${programId}/parc/schools/bulk-remove`, { method: 'POST', body }),
+  dashboard: (programId, params) =>
+    request(`/programs/${programId}/parc/dashboard`, { params }),
+  schoolResults: (programId, params) =>
+    request(`/programs/${programId}/parc/school-results`, { params }),
+  singleSchoolDetail: (programId, schoolId, params) =>
+    request(`/programs/${programId}/parc/school-results/${schoolId}`, { params }),
+  deleteResult: (programId, resultId) =>
+    request(`/programs/${programId}/parc/results/${resultId}`, { method: 'DELETE' }),
+  bulkDeleteResults: (programId, body) =>
+    request(`/programs/${programId}/parc/results/bulk-delete`, { method: 'POST', body }),
+  publishResults: (programId, body) =>
+    request(`/programs/${programId}/parc/results/publish`, { method: 'POST', body }),
+  ranking: (programId, params) =>
+    request(`/programs/${programId}/parc/ranking`, { params }),
+  filters: (programId) =>
+    request(`/programs/${programId}/parc/filters`),
+};
+
 export const pactoPublicApi = {
   bootstrap: (token) => request(`/public/pacto/${encodeURIComponent(token)}`),
   createClass: (token, body) =>

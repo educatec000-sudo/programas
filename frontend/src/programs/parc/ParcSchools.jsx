@@ -1,29 +1,35 @@
 import React, { useState, useMemo } from 'react';
 import { useApi } from '../../hooks/useApi.js';
-import { cncaApi } from '../../services/resources.js';
+import { parcApi } from '../../services/resources.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { Badge, Button, Field, Modal, Select, StatCard, LoadingBlock, Input } from '../../components/ui.jsx';
 import { fmtInt } from '../../utils/format.js';
 
-const COMPONENT_LABELS = {
-  MATEMATICA: { label: 'Matemática', icon: '📐', cls: 'badge-blue' },
-  LEITURA: { label: 'Leitura', icon: '📖', cls: 'badge-indigo' },
-  ESCRITA: { label: 'Escrita', icon: '✍️', cls: 'badge-purple' },
-  FLUENCIA: { label: 'Fluência', icon: '🗣️', cls: 'badge-cyan' },
-};
-
-export default function CncaSchools({ program, refreshProgram }) {
+export default function ParcSchools({ program, refreshProgram }) {
   const { success, error } = useToast();
   const [search, setSearch] = useState('');
   const [zoneFilter, setZoneFilter] = useState('TODAS');
   const [dataFilter, setDataFilter] = useState('TODAS');
 
-  // Seleção múltipla
+  // Seleção múltipla para ações em lote
   const [selectedSchoolIds, setSelectedSchoolIds] = useState(new Set());
 
   // Modal de Adicionar Escola
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addMode, setAddMode] = useState('EXISTING'); // 'EXISTING' | 'NEW'
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
+  const [modalSearch, setModalSearch] = useState('');
+  const [modalZoneFilter, setModalZoneFilter] = useState('TODAS');
+
+  // Formulário para cadastrar nova escola
+  const [newSchoolForm, setNewSchoolForm] = useState({
+    inep: '',
+    name: '',
+    schoolType: 'E.M.E.F.',
+    zone: 'URBANA',
+    district: '',
+  });
+
   const [adding, setAdding] = useState(false);
 
   // Modal de Remoção Individual
@@ -35,52 +41,71 @@ export default function CncaSchools({ program, refreshProgram }) {
   const [bulkRemoveType, setBulkRemoveType] = useState('SELECTED'); // 'SELECTED' | 'WITHOUT_DATA'
   const [bulkRemoving, setBulkRemoving] = useState(false);
 
-  // Busca escolas participantes do ciclo
+  // Busca escolas participantes do PARC
   const { data: schoolsData, loading, refresh: reload } = useApi(
-    () => cncaApi.participatingSchools(program.id),
+    () => parcApi.participatingSchools(program.id),
     [program.id],
   );
 
-  // Busca escolas disponíveis na rede geral para adicionar
+  // Busca escolas disponíveis na rede geral para adicionar (sempre carregado para prontidão imediata)
   const { data: availableData, refresh: reloadAvailable } = useApi(
-    () => cncaApi.availableSchools(program.id),
+    () => parcApi.availableSchools(program.id),
     [program.id],
   );
 
-  const schools = schoolsData?.schools || [];
-  const totalNetwork = schoolsData?.totalNetworkSchools || 0;
+  const schools = schoolsData?.schools || schoolsData?.participatingSchools || [];
+  const totalNetwork = schoolsData?.totalNetworkSchools || availableData?.totalNetworkSchools || 0;
   const totalParticipating = schoolsData?.totalParticipatingSchools || schools.length;
   const withDataCount = schoolsData?.schoolsWithData || schools.filter((s) => s.hasData).length;
   const pendingCount = schoolsData?.schoolsWithoutData ?? Math.max(0, totalParticipating - withDataCount);
 
-  const availableSchools = availableData?.availableSchools || [];
+  const availableSchools = availableData?.availableSchools || availableData?.schools || [];
 
-  // Zonas disponíveis dinamicamente para o filtro
+  // Zonas disponíveis dinamicamente para o filtro principal
   const availableZones = useMemo(() => {
     const set = new Set(schoolsData?.distinctZones || []);
     schools.forEach((s) => {
-      if (s.zone) set.add(s.zone);
+      const z = s.zone || s.school?.zone;
+      if (z) set.add(z);
     });
     return Array.from(set).sort();
   }, [schoolsData, schools]);
+
+  // Lista filtrada de escolas disponíveis para seleção no Modal
+  const modalFilteredAvailable = useMemo(() => {
+    return availableSchools.filter((s) => {
+      if (modalZoneFilter !== 'TODAS' && s.zone !== modalZoneFilter) return false;
+      if (!modalSearch.trim()) return true;
+      const q = modalSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const name = (s.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const inep = String(s.inep || '');
+      const dist = String(s.district || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return name.includes(q) || inep.includes(q) || dist.includes(q);
+    });
+  }, [availableSchools, modalSearch, modalZoneFilter]);
 
   const selectedAvailableSchool = useMemo(() => {
     if (!selectedSchoolId) return null;
     return availableSchools.find((s) => s.id === selectedSchoolId) || null;
   }, [selectedSchoolId, availableSchools]);
 
+  // Filtro da tabela principal de escolas participantes
   const filteredSchools = useMemo(() => {
     return schools.filter((s) => {
-      if (zoneFilter !== 'TODAS' && s.zone !== zoneFilter) return false;
+      const schZone = s.zone || s.school?.zone;
+      const schName = s.name || s.school?.name || '';
+      const schInep = String(s.inep || s.school?.inep || '');
+      const schDist = String(s.district || s.school?.district || '');
+
+      if (zoneFilter !== 'TODAS' && schZone !== zoneFilter) return false;
       if (dataFilter === 'COM_DADOS' && !s.hasData) return false;
       if (dataFilter === 'SEM_DADOS' && s.hasData) return false;
       if (!search.trim()) return true;
 
       const q = search.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const name = (s.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      const inep = String(s.inep || '');
-      const dist = String(s.district || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      return name.includes(q) || inep.includes(q) || dist.includes(q);
+      const nameNorm = schName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const distNorm = schDist.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return nameNorm.includes(q) || schInep.includes(q) || distNorm.includes(q);
     });
   }, [schools, search, zoneFilter, dataFilter]);
 
@@ -90,7 +115,7 @@ export default function CncaSchools({ program, refreshProgram }) {
     if (selectedSchoolIds.size === filteredSchools.length) {
       setSelectedSchoolIds(new Set());
     } else {
-      setSelectedSchoolIds(new Set(filteredSchools.map((s) => s.id)));
+      setSelectedSchoolIds(new Set(filteredSchools.map((s) => s.schoolId || s.id)));
     }
   };
 
@@ -101,24 +126,51 @@ export default function CncaSchools({ program, refreshProgram }) {
     setSelectedSchoolIds(next);
   };
 
-  // Adicionar Escola
-  const handleAddSchool = async () => {
-    if (!selectedSchoolId) {
-      error('Por favor, selecione uma escola para adicionar.');
-      return;
-    }
+  // Abrir Modal de Adicionar Escola
+  const handleOpenAddModal = () => {
+    setAddMode('EXISTING');
+    setSelectedSchoolId(availableSchools[0]?.id || '');
+    setModalSearch('');
+    setModalZoneFilter('TODAS');
+    setNewSchoolForm({
+      inep: '',
+      name: '',
+      schoolType: 'E.M.E.F.',
+      zone: 'URBANA',
+      district: '',
+    });
+    setIsAddModalOpen(true);
+  };
 
+  // Adicionar Escola Participante (Existente ou Nova)
+  const handleAddSchool = async () => {
     setAdding(true);
     try {
-      const res = await cncaApi.addSchool(program.id, { schoolId: selectedSchoolId });
-      success(res.message || 'Escola participante vinculada com sucesso!');
+      if (addMode === 'EXISTING') {
+        if (!selectedSchoolId) {
+          error('Por favor, selecione uma escola da rede para vincular.');
+          setAdding(false);
+          return;
+        }
+        const res = await parcApi.addSchool(program.id, { schoolId: selectedSchoolId });
+        success(res.message || 'Escola participante vinculada com sucesso!');
+      } else {
+        if (!newSchoolForm.name.trim()) {
+          error('Por favor, informe o nome da escola.');
+          setAdding(false);
+          return;
+        }
+        const res = await parcApi.addSchool(program.id, newSchoolForm);
+        success(res.message || 'Nova escola cadastrada e vinculada com sucesso!');
+      }
+
       setIsAddModalOpen(false);
       setSelectedSchoolId('');
       reload();
       reloadAvailable();
       if (refreshProgram) refreshProgram();
     } catch (err) {
-      error(err.message || 'Erro ao adicionar escola participante.');
+      error(err.message || 'Erro ao vincular escola participante.');
     } finally {
       setAdding(false);
     }
@@ -130,12 +182,13 @@ export default function CncaSchools({ program, refreshProgram }) {
 
     setRemoving(true);
     try {
-      const res = await cncaApi.removeSchool(program.id, schoolToRemove.id);
+      const sid = schoolToRemove.schoolId || schoolToRemove.id;
+      const res = await parcApi.removeSchool(program.id, sid);
       success(res.message || 'Escola desvinculada com sucesso deste ciclo.');
       setSchoolToRemove(null);
       setSelectedSchoolIds((prev) => {
         const next = new Set(prev);
-        next.delete(schoolToRemove.id);
+        next.delete(sid);
         return next;
       });
       reload();
@@ -155,11 +208,9 @@ export default function CncaSchools({ program, refreshProgram }) {
       let payload = {};
       if (bulkRemoveType === 'SELECTED') {
         payload = { schoolIds: Array.from(selectedSchoolIds) };
-      } else if (bulkRemoveType === 'WITHOUT_DATA') {
-        payload = { onlyWithoutData: true };
       }
 
-      const res = await cncaApi.bulkRemoveSchools(program.id, payload);
+      const res = await parcApi.bulkRemoveSchools(program.id, payload);
       success(res.message || 'Escolas desvinculadas com sucesso!');
       setBulkRemoveModalOpen(false);
       setSelectedSchoolIds(new Set());
@@ -174,7 +225,7 @@ export default function CncaSchools({ program, refreshProgram }) {
   };
 
   if (loading && !schoolsData) {
-    return <LoadingBlock label="Carregando escolas participantes do CNCA..." />;
+    return <LoadingBlock label="Carregando escolas participantes do PARC..." />;
   }
 
   return (
@@ -183,32 +234,13 @@ export default function CncaSchools({ program, refreshProgram }) {
       <div className="card card-pad">
         <div className="card-header-row" style={{ alignItems: 'flex-start' }}>
           <div>
-            <div className="card-title">Escolas Participantes — CNCA {program.year}</div>
+            <div className="card-title">Escolas Participantes — PARC {program.year}</div>
             <div className="card-subtitle">
-              Conjunto dinâmico de unidades escolares vinculadas especificamente a este ciclo avaliativo do CNCA.
+              Conjunto dinâmico de escolas vinculadas à avaliação de Fluência Leitora do 2º Ano (PARC).
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {pendingCount > 0 && (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setBulkRemoveType('WITHOUT_DATA');
-                  setBulkRemoveModalOpen(true);
-                }}
-                style={{ color: '#c2410c', borderColor: '#fed7aa', fontSize: 13 }}
-                title="Desvincula do ciclo todas as escolas que não possuem resultados importados"
-              >
-                🧹 Desvincular Sem Dados ({pendingCount})
-              </Button>
-            )}
-            <Button
-              onClick={() => {
-                setSelectedSchoolId(availableSchools[0]?.id || '');
-                setIsAddModalOpen(true);
-              }}
-              disabled={availableSchools.length === 0}
-            >
+            <Button onClick={handleOpenAddModal}>
               + Adicionar escola participante
             </Button>
           </div>
@@ -295,7 +327,7 @@ export default function CncaSchools({ program, refreshProgram }) {
         )}
       </div>
 
-      {/* Barra de Ações em Massa (quando há escolas selecionadas) */}
+      {/* Barra de Ações em Massa */}
       {selectedSchoolIds.size > 0 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: 8 }}>
           <span style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>
@@ -325,7 +357,7 @@ export default function CncaSchools({ program, refreshProgram }) {
         </div>
       )}
 
-      {/* Tabela de Escolas Participantes com Checkboxes e Componentes Reais */}
+      {/* Tabela de Escolas Participantes */}
       <div className="card card-pad" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ maxHeight: 560, overflowY: 'auto', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, textAlign: 'left' }}>
@@ -342,8 +374,7 @@ export default function CncaSchools({ program, refreshProgram }) {
                 <th style={{ padding: '10px 12px', width: 110 }}>Código INEP</th>
                 <th style={{ padding: '10px 12px', minWidth: 240 }}>Nome da Escola</th>
                 <th style={{ padding: '10px 12px', width: 110 }}>Zona</th>
-                <th style={{ padding: '10px 12px', minWidth: 200 }}>Componentes Avaliados</th>
-                <th style={{ padding: '10px 12px', width: 150 }}>Etapas Atendidas</th>
+                <th style={{ padding: '10px 12px', minWidth: 180 }}>Ciclos Avaliados</th>
                 <th style={{ padding: '10px 12px', width: 140, textAlign: 'center' }}>Status no Ciclo</th>
                 <th style={{ padding: '10px 12px', width: 100, textAlign: 'right' }}>Ações</th>
               </tr>
@@ -351,84 +382,72 @@ export default function CncaSchools({ program, refreshProgram }) {
             <tbody>
               {filteredSchools.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>
+                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>
                     Nenhuma escola participante encontrada para os filtros selecionados.
                   </td>
                 </tr>
               ) : (
                 filteredSchools.map((s, rowIdx) => {
-                  const isSelected = selectedSchoolIds.has(s.id);
-                  const componentsList = s.components || s.componentsEvaluated || [];
-                  const gradesList = s.grades || s.gradesEvaluated || [];
+                  const sid = s.schoolId || s.id;
+                  const isSelected = selectedSchoolIds.has(sid);
+                  const schName = s.name || s.school?.name;
+                  const schInep = s.inep || s.school?.inep;
+                  const schZone = s.zone || s.school?.zone;
+                  const schDist = s.district || s.school?.district;
+
+                  const hasEntrada = s.hasEntrada || s.resultsSummary?.hasEntrada;
+                  const hasSaida = s.hasSaida || s.resultsSummary?.hasSaida;
 
                   return (
                     <tr
-                      key={s.id}
+                      key={sid}
                       style={{
                         background: isSelected ? '#eff6ff' : (rowIdx % 2 === 0 ? '#fff' : '#fafafa'),
                         borderBottom: '1px solid #e2e8f0',
                       }}
                     >
-                      {/* Checkbox de seleção */}
+                      {/* Checkbox */}
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelectRow(s.id)}
+                          onChange={() => toggleSelectRow(sid)}
                         />
                       </td>
 
                       {/* INEP */}
                       <td style={{ padding: '8px 12px' }}>
-                        <span className="mono" style={{ fontWeight: 600 }}>{s.inep || '—'}</span>
+                        <span className="mono" style={{ fontWeight: 600 }}>{schInep || '—'}</span>
                       </td>
 
-                      {/* Nome da Escola */}
+                      {/* Nome */}
                       <td style={{ padding: '8px 12px' }}>
                         <div>
-                          <strong>{s.name}</strong>
-                          {s.district && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{s.district}</div>}
+                          <strong>{schName}</strong>
+                          {schDist && <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{schDist}</div>}
                         </div>
                       </td>
 
                       {/* Zona */}
                       <td style={{ padding: '8px 12px' }}>
-                        <Badge cls={s.zone === 'RURAL' ? 'badge-yellow' : s.zone === 'ILHAS' ? 'badge-cyan' : 'badge-blue'}>
-                          {s.zone || '—'}
+                        <Badge cls={schZone === 'RURAL' ? 'badge-yellow' : schZone === 'ILHAS' ? 'badge-cyan' : 'badge-blue'}>
+                          {schZone || '—'}
                         </Badge>
                       </td>
 
-                      {/* Componentes Avaliados (Renderização Dinâmica dos 4 Componentes Oficiais) */}
+                      {/* Ciclos Avaliados */}
                       <td style={{ padding: '8px 12px' }}>
-                        {componentsList.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {componentsList.map((c) => {
-                              const def = COMPONENT_LABELS[c] || { label: c, icon: '📊', cls: 'badge-blue' };
-                              return (
-                                <Badge key={c} cls={def.cls} style={{ fontSize: 11, padding: '2px 7px' }}>
-                                  {def.icon} {def.label}
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Nenhum ainda</span>
-                        )}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {hasEntrada && <Badge cls="badge-blue">📥 Entrada</Badge>}
+                          {hasSaida && <Badge cls="badge-green">📤 Saída</Badge>}
+                          {!hasEntrada && !hasSaida && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Nenhum dado</span>}
+                        </div>
                       </td>
 
-                      {/* Etapas Atendidas */}
-                      <td style={{ padding: '8px 12px' }}>
-                        {gradesList.length > 0 ? (
-                          <span style={{ fontSize: 12, fontWeight: 500 }}>{gradesList.join(', ')}</span>
-                        ) : (
-                          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>1º ao 5º Ano (Elegível)</span>
-                        )}
-                      </td>
-
-                      {/* Status no Ciclo */}
+                      {/* Status */}
                       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                         {s.hasData ? (
-                          <Badge cls="badge-green">🟢 Com dados ({s.resultsCount || componentsList.length})</Badge>
+                          <Badge cls="badge-green">🟢 Com dados</Badge>
                         ) : (
                           <Badge cls="badge-yellow">🟡 Aguardando importação</Badge>
                         )}
@@ -465,66 +484,180 @@ export default function CncaSchools({ program, refreshProgram }) {
         <Modal
           open={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
-          title={`Adicionar Escola Participante — CNCA ${program.year}`}
-          size="md"
+          title={`Adicionar Escola ao PARC ${program.year}`}
+          size="lg"
           footer={
             <>
               <Button variant="secondary" onClick={() => setIsAddModalOpen(false)} disabled={adding}>
                 Cancelar
               </Button>
-              <Button onClick={handleAddSchool} disabled={adding || !selectedSchoolId}>
-                {adding ? 'Vinculando...' : 'Adicionar Escola'}
+              <Button
+                onClick={handleAddSchool}
+                disabled={adding || (addMode === 'EXISTING' ? !selectedSchoolId : !newSchoolForm.name.trim())}
+              >
+                {adding ? 'Processando...' : addMode === 'EXISTING' ? 'Vincular Escola' : 'Cadastrar e Vincular Escola'}
               </Button>
             </>
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-              Selecione uma escola existente no cadastro geral da rede municipal ({totalNetwork} cadastradas) para participar do <strong>CNCA {program.year}</strong>.
-            </p>
-
-            <Field label="Selecionar Escola da Rede Geral">
-              <Select
-                value={selectedSchoolId}
-                onChange={(e) => setSelectedSchoolId(e.target.value)}
-                style={{ width: '100%' }}
+            {/* Abas do Modal: Existente vs Nova */}
+            <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${addMode === 'EXISTING' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setAddMode('EXISTING')}
+                style={{ fontSize: 13 }}
               >
-                <option value="">Selecione uma escola...</option>
-                {availableSchools.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} (INEP: {s.inep || 'S/N'}) — {s.zone}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+                🏫 Selecionar da Rede Municipal ({availableSchools.length} disponíveis)
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${addMode === 'NEW' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setAddMode('NEW')}
+                style={{ fontSize: 13 }}
+              >
+                ✨ Cadastrar Nova Escola na Rede
+              </button>
+            </div>
 
-            {selectedAvailableSchool && (
-              <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Código INEP:</span>
-                  <strong className="mono">{selectedAvailableSchool.inep || 'Não informado'}</strong>
+            {addMode === 'EXISTING' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+                  Selecione uma unidade escolar cadastrada na rede municipal para vincular à avaliação de <strong>Fluência Leitora do PARC {program.year}</strong>.
+                </p>
+
+                {/* Filtros de busca rápida dentro do modal */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 10 }}>
+                  <Field label="Buscar escola disponível" style={{ margin: 0 }}>
+                    <Input
+                      type="text"
+                      placeholder="🔎 Digite nome, INEP ou bairro..."
+                      value={modalSearch}
+                      onChange={(e) => setModalSearch(e.target.value)}
+                      style={{ fontSize: 12.5 }}
+                    />
+                  </Field>
+
+                  <Field label="Zona" style={{ margin: 0 }}>
+                    <Select
+                      value={modalZoneFilter}
+                      onChange={(e) => setModalZoneFilter(e.target.value)}
+                      style={{ fontSize: 12.5 }}
+                    >
+                      <option value="TODAS">Todas</option>
+                      <option value="URBANA">Urbana</option>
+                      <option value="RURAL">Rural</option>
+                      <option value="SEDE">Sede</option>
+                      <option value="ILHAS">Ilhas</option>
+                      <option value="ESTRADAS">Estradas</option>
+                    </Select>
+                  </Field>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Zona de Localização:</span>
-                  <strong>{selectedAvailableSchool.zone}</strong>
-                </div>
+                <Field label={`Selecione a Escola (${modalFilteredAvailable.length} encontradas)`}>
+                  <Select
+                    value={selectedSchoolId}
+                    onChange={(e) => setSelectedSchoolId(e.target.value)}
+                    style={{ width: '100%', fontSize: 13 }}
+                    size={modalFilteredAvailable.length > 5 ? 6 : undefined}
+                  >
+                    {modalFilteredAvailable.length === 0 ? (
+                      <option value="" disabled>Nenhuma escola disponível encontrada para os filtros.</option>
+                    ) : (
+                      modalFilteredAvailable.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} {s.inep ? `(INEP: ${s.inep})` : ''} — {s.zone} {s.district ? `(${s.district})` : ''}
+                        </option>
+                      ))
+                    )}
+                  </Select>
+                </Field>
 
-                {selectedAvailableSchool.district && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-3)' }}>Distrito / Bairro:</span>
-                    <span>{selectedAvailableSchool.district}</span>
+                {selectedAvailableSchool && (
+                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-3)' }}>Nome da Escola:</span>
+                      <strong>{selectedAvailableSchool.name}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-3)' }}>Código INEP:</span>
+                      <strong className="mono">{selectedAvailableSchool.inep || 'Não informado'}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-3)' }}>Localização / Zona:</span>
+                      <Badge cls="badge-blue">{selectedAvailableSchool.zone || 'URBANA'}</Badge>
+                    </div>
+                    {selectedAvailableSchool.district && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-3)' }}>Bairro / Distrito:</span>
+                        <span>{selectedAvailableSchool.district}</span>
+                      </div>
+                    )}
                   </div>
                 )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+                  Preencha os dados abaixo para cadastrar uma nova escola na <strong>Rede Municipal</strong> e vinculá-la imediatamente ao <strong>PARC {program.year}</strong>.
+                </p>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Programa:</span>
-                  <strong style={{ color: '#0284c7' }}>CNCA (Compromisso Nacional Criança Alfabetizada)</strong>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Field label="Nome da Escola" required>
+                    <Input
+                      type="text"
+                      placeholder="Ex.: E.M.E.F. Prof. Francisco Silva"
+                      value={newSchoolForm.name}
+                      onChange={(e) => setNewSchoolForm({ ...newSchoolForm, name: e.target.value })}
+                      required
+                    />
+                  </Field>
+
+                  <Field label="Código INEP (8 dígitos)">
+                    <Input
+                      type="text"
+                      placeholder="Ex.: 15001234"
+                      value={newSchoolForm.inep}
+                      onChange={(e) => setNewSchoolForm({ ...newSchoolForm, inep: e.target.value })}
+                    />
+                  </Field>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-3)' }}>Ciclo Avaliativo:</span>
-                  <strong>{program.year}</strong>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                  <Field label="Zona / Localização">
+                    <Select
+                      value={newSchoolForm.zone}
+                      onChange={(e) => setNewSchoolForm({ ...newSchoolForm, zone: e.target.value })}
+                    >
+                      <option value="URBANA">🏙️ Urbana</option>
+                      <option value="RURAL">🌳 Rural</option>
+                      <option value="SEDE">🏙️ Sede</option>
+                      <option value="ILHAS">⛵ Ilhas</option>
+                      <option value="ESTRADAS">🛣️ Estradas</option>
+                    </Select>
+                  </Field>
+
+                  <Field label="Tipo de Unidade">
+                    <Select
+                      value={newSchoolForm.schoolType}
+                      onChange={(e) => setNewSchoolForm({ ...newSchoolForm, schoolType: e.target.value })}
+                    >
+                      <option value="E.M.E.F.">E.M.E.F.</option>
+                      <option value="E.M.E.I.F.">E.M.E.I.F.</option>
+                      <option value="CRECHE">Creche</option>
+                      <option value="ESCOLA">Escola</option>
+                    </Select>
+                  </Field>
+
+                  <Field label="Bairro / Distrito">
+                    <Input
+                      type="text"
+                      placeholder="Ex.: Centro"
+                      value={newSchoolForm.district}
+                      onChange={(e) => setNewSchoolForm({ ...newSchoolForm, district: e.target.value })}
+                    />
+                  </Field>
                 </div>
               </div>
             )}
@@ -537,7 +670,7 @@ export default function CncaSchools({ program, refreshProgram }) {
         <Modal
           open={Boolean(schoolToRemove)}
           onClose={() => setSchoolToRemove(null)}
-          title="Desvincular Escola do CNCA"
+          title="Desvincular Escola do PARC"
           size="sm"
           footer={
             <>
@@ -552,7 +685,7 @@ export default function CncaSchools({ program, refreshProgram }) {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p style={{ fontSize: 13.5, margin: 0 }}>
-              Deseja remover <strong>{schoolToRemove.name}</strong> (INEP: {schoolToRemove.inep || '—'}) das escolas participantes do ciclo <strong>CNCA {program.year}</strong>?
+              Deseja remover <strong>{schoolToRemove.name || schoolToRemove.school?.name}</strong> (INEP: {schoolToRemove.inep || schoolToRemove.school?.inep || '—'}) das escolas participantes do ciclo <strong>PARC {program.year}</strong>?
             </p>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
               A escola continuará existindo no cadastro geral da rede municipal ({totalNetwork} escolas).
@@ -584,12 +717,7 @@ export default function CncaSchools({ program, refreshProgram }) {
               <strong>Atenção</strong>
             </div>
             <p style={{ fontSize: 13.5, margin: 0 }}>
-              {bulkRemoveType === 'SELECTED' && (
-                <>Deseja desvincular as <strong>{selectedSchoolIds.size} escolas selecionadas</strong> deste ciclo do CNCA?</>
-              )}
-              {bulkRemoveType === 'WITHOUT_DATA' && (
-                <>Deseja desvincular <strong>TODAS as {pendingCount} escolas sem dados importados</strong> (creches/não participantes) deste ciclo do CNCA?</>
-              )}
+              Deseja desvincular as <strong>{selectedSchoolIds.size} escolas selecionadas</strong> deste ciclo do PARC?
             </p>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
               As escolas continuarão preservadas no cadastro geral da rede ({totalNetwork} escolas).

@@ -188,6 +188,7 @@ model School {
   collectionLinks ProgramCollectionLink[]
   pactoClasses    PactoClass[]
   cncaResults     CncaSchoolResult[]
+  parcResults     ParcSchoolResult[]
 
   @@index([name])
   @@index([district])
@@ -273,6 +274,7 @@ model Program {
   collectionLinks ProgramCollectionLink[]
   pactoClasses    PactoClass[]
   cncaResults     CncaSchoolResult[]
+  parcResults     ParcSchoolResult[]
 
   @@unique([catalogId, year])
   @@index([year, status])
@@ -630,6 +632,56 @@ model CncaSchoolResult {
   @@index([programId, year, component, grade])
   @@index([schoolId])
   @@index([component, assessment])
+}
+
+// ---------------------------- PARC — PARCERIA PELA ALFABETIZAÇÃO EM REGIME DE COLABORAÇÃO ----------------------------
+
+enum ParcCycle {
+  ENTRADA
+  SAIDA
+}
+
+/**
+ * Resultado da avaliação de Fluência Leitora do PARC (Parceria pela Alfabetização em Regime de Colaboração).
+ * Estrutura dedicada ao 2º Ano do Ensino Fundamental com os ciclos de Entrada e Saída.
+ */
+model ParcSchoolResult {
+  id         String    @id @default(uuid())
+  programId  String
+  schoolId   String
+  year       Int       @default(2026)
+  grade      String    @default("2º Ano")
+  assessment String    @default("Fluência Leitora")
+  cycle      ParcCycle @default(ENTRADA)
+
+  // Métricas de participação
+  enrolled          Int? // alunos previstos
+  evaluated         Int? // alunos avaliados
+  participationRate Float? // taxa de participação (%)
+
+  // Níveis de Fluência Leitora (%)
+  preReaderTotal  Float? // pré-leitor total (%)
+  preReaderLevel1 Float? // pré-leitor nível 1 (%)
+  preReaderLevel2 Float? // pré-leitor nível 2 (%)
+  preReaderLevel3 Float? // pré-leitor nível 3 (%)
+  preReaderLevel4 Float? // pré-leitor nível 4 (%)
+  beginnerReader  Float? // leitor iniciante (%)
+  fluentReader    Float? // leitor fluente (%)
+
+  // Contagens absolutas e metadados adicionais
+  rawCounts  Json? // { preReaderTotalCount?: number, preReader1Count?: number, ... }
+  rawDetails Json? // colunas brutas preservadas da planilha oficial
+  source     String   @default("IMPORTACAO") // "IMPORTACAO", "RASCUNHO", "MANUAL"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, schoolId, year, grade, assessment, cycle])
+  @@index([programId, year, cycle])
+  @@index([schoolId])
+  @@index([cycle])
 }
 
 // ---------------------------- IMPORTAÇÕES ----------------------------

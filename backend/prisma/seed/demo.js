@@ -115,6 +115,12 @@ const PROGRAMS = [
     globalGoal: 85, periodLabel: 'Ciclo 2026', schools: [0, 11],
     indicators: [],
   },
+  {
+    code: 'PARC-2026', name: 'Parceria pela Alfabetização em Regime de Colaboração', year: 2026, status: 'EM_EXECUCAO', organ: 'SEDUC / SEMED',
+    objective: 'Acompanhamento do desenvolvimento da Fluência Leitora em Regime de Colaboração (2º Ano)',
+    globalGoal: 80, periodLabel: 'Ciclo 2026', schools: [0, 11],
+    indicators: [],
+  },
 ];
 
 export const DEMO_CATEGORY_NAMES = CATEGORIES.map(([name]) => name);
@@ -149,53 +155,6 @@ async function upsertDemoGoal(prisma, data) {
 export async function seedDemoData(prisma) {
   const rand = rng(20250825);
   console.log('>> populando dados de demonstração...');
-
-  // 0. Limpeza preventiva de programas ou catálogos legados (como PARC)
-  const legacyCatalogs = await prisma.programCatalog.findMany({
-    where: {
-      OR: [
-        { code: { in: ['PARC', 'PARC-2026', 'PARC_2026'] } },
-        { name: { contains: 'PARC' } },
-        { name: { contains: 'Programa de Avaliação da Rede' } },
-      ],
-    },
-    select: { id: true },
-  });
-  if (legacyCatalogs.length) {
-    const legacyCatIds = legacyCatalogs.map((c) => c.id);
-    const legacyPrograms = await prisma.program.findMany({
-      where: { catalogId: { in: legacyCatIds } },
-      select: { id: true },
-    });
-    const legacyProgIds = legacyPrograms.map((p) => p.id);
-    if (legacyProgIds.length) {
-      await prisma.programSchool.deleteMany({ where: { programId: { in: legacyProgIds } } });
-      await prisma.programIndicator.deleteMany({ where: { programId: { in: legacyProgIds } } });
-      await prisma.result.deleteMany({ where: { programId: { in: legacyProgIds } } });
-      await prisma.goal.deleteMany({ where: { programId: { in: legacyProgIds } } });
-      await prisma.program.deleteMany({ where: { id: { in: legacyProgIds } } });
-    }
-    await prisma.programCatalog.deleteMany({ where: { id: { in: legacyCatIds } } });
-  }
-
-  const directLegacyPrograms = await prisma.program.findMany({
-    where: {
-      OR: [
-        { code: { startsWith: 'PARC' } },
-        { name: { contains: 'PARC' } },
-        { name: { contains: 'Programa de Avaliação da Rede' } },
-      ],
-    },
-    select: { id: true },
-  });
-  if (directLegacyPrograms.length) {
-    const ids = directLegacyPrograms.map((p) => p.id);
-    await prisma.programSchool.deleteMany({ where: { programId: { in: ids } } });
-    await prisma.programIndicator.deleteMany({ where: { programId: { in: ids } } });
-    await prisma.result.deleteMany({ where: { programId: { in: ids } } });
-    await prisma.goal.deleteMany({ where: { programId: { in: ids } } });
-    await prisma.program.deleteMany({ where: { id: { in: ids } } });
-  }
 
   // Escolas
   const schools = [];
