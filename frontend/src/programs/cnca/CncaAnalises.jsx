@@ -54,52 +54,141 @@ const COMPONENT_INFO = {
   },
 };
 
-function getLevelColor(levelName = '') {
-  const norm = levelName.toLowerCase();
+/**
+ * Retorna as configurações visuais de cor, fundo e borda para cada nível/padrão oficial de desempenho.
+ */
+export function getLevelColor(levelName = '') {
+  const norm = String(levelName || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // 6. Avançado / Fluente / Alfabético / Ortográfico / Excelente / Muito Alto / Alto
   if (
-    norm.includes('avançado') ||
     norm.includes('avancado') ||
     norm.includes('fluente') ||
-    norm.includes('alfabético') ||
     norm.includes('alfabetico') ||
-    norm === 'alto'
+    norm.includes('ortografico') ||
+    norm.includes('excelente') ||
+    norm === 'alto' ||
+    norm.includes('muito alto')
   ) {
-    return { bg: '#16a34a', text: '#166534', badgeCls: 'badge-green', lightBg: '#f0fdf4' };
+    return { bg: '#059669', text: '#065f46', badgeCls: 'badge-green', lightBg: '#ecfdf5', border: '#a7f3d0' };
   }
+
+  // 5. Satisfatório / Adequado / Proficiente
   if (
+    (norm.includes('satisfatorio') && !norm.includes('insatisfatorio')) ||
     norm.includes('adequado') ||
-    norm.includes('silábico-alfabético') ||
+    norm.includes('proficiente')
+  ) {
+    return { bg: '#16a34a', text: '#166534', badgeCls: 'badge-green', lightBg: '#f0fdf4', border: '#bbf7d0' };
+  }
+
+  // 4. Intermediário / Silábico-Alfabético / Médio
+  if (
+    norm.includes('intermediario') ||
     norm.includes('silabico-alfabetico') ||
-    norm === 'médio' ||
     norm === 'medio'
   ) {
-    return { bg: '#0284c7', text: '#075985', badgeCls: 'badge-blue', lightBg: '#f0f9ff' };
+    return { bg: '#0284c7', text: '#075985', badgeCls: 'badge-blue', lightBg: '#f0f9ff', border: '#bae6fd' };
   }
+
+  // 3. Insatisfatório / Básico / Silábico / Iniciante / Baixo
   if (
-    norm.includes('básico') ||
+    norm.includes('insatisfatorio') ||
     norm.includes('basico') ||
     norm.includes('iniciante') ||
-    norm.includes('silábico') ||
     norm.includes('silabico') ||
     norm === 'baixo'
   ) {
-    return { bg: '#d97706', text: '#92400e', badgeCls: 'badge-yellow', lightBg: '#fffbeb' };
+    return { bg: '#d97706', text: '#92400e', badgeCls: 'badge-yellow', lightBg: '#fffbeb', border: '#fde68a' };
   }
+
+  // 2. Insuficiente / Crítico
   if (
+    norm.includes('insuficiente') ||
+    norm.includes('critico')
+  ) {
+    return { bg: '#ea580c', text: '#9a3412', badgeCls: 'badge-yellow', lightBg: '#fff7ed', border: '#fed7aa' };
+  }
+
+  // 1. Inadequado / Muito Crítico / Muito Baixo / Abaixo do Básico / Não Leitor / Pré-leitor / Pré-silábico / Defasagem
+  if (
+    norm.includes('inadequado') ||
     norm.includes('abaixo') ||
-    norm.includes('não leitor') ||
     norm.includes('nao leitor') ||
-    norm.includes('pré-leitor') ||
     norm.includes('pre-leitor') ||
-    norm.includes('pré-silábico') ||
     norm.includes('pre-silabico') ||
     norm.includes('defasagem') ||
-    norm.includes('inadequado') ||
-    norm.includes('muito baixo')
+    norm.includes('muito baixo') ||
+    norm.includes('muito critico')
   ) {
-    return { bg: '#dc2626', text: '#991b1b', badgeCls: 'badge-red', lightBg: '#fef2f2' };
+    return { bg: '#dc2626', text: '#991b1b', badgeCls: 'badge-red', lightBg: '#fef2f2', border: '#fecaca' };
   }
-  return { bg: '#64748b', text: '#334155', badgeCls: 'badge-gray', lightBg: '#f8fafc' };
+
+  return { bg: '#64748b', text: '#334155', badgeCls: 'badge-gray', lightBg: '#f8fafc', border: '#e2e8f0' };
+}
+
+/**
+ * Retorna a ordem pedagógica padrão de um nível de desempenho (1 = mais crítico a 6 = mais avançado).
+ */
+export function getLevelRank(levelName = '') {
+  const norm = String(levelName || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (
+    norm.includes('inadequado') ||
+    norm.includes('muito critico') ||
+    norm.includes('muito baixo') ||
+    norm.includes('abaixo') ||
+    norm.includes('nao leitor') ||
+    norm.includes('pre-leitor') ||
+    norm.includes('pre-silabico') ||
+    norm.includes('defasagem')
+  ) {
+    return 1;
+  }
+  if (norm.includes('insuficiente') || norm.includes('critico')) {
+    return 2;
+  }
+  if (
+    norm.includes('insatisfatorio') ||
+    norm.includes('basico') ||
+    norm.includes('iniciante') ||
+    norm.includes('silabico') ||
+    norm === 'baixo'
+  ) {
+    return 3;
+  }
+  if (
+    norm.includes('intermediario') ||
+    norm.includes('silabico-alfabetico') ||
+    norm === 'medio'
+  ) {
+    return 4;
+  }
+  if (
+    (norm.includes('satisfatorio') && !norm.includes('insatisfatorio')) ||
+    norm.includes('adequado') ||
+    norm.includes('proficiente')
+  ) {
+    return 5;
+  }
+  if (
+    norm.includes('avancado') ||
+    norm.includes('fluente') ||
+    norm.includes('alfabetico') ||
+    norm.includes('ortografico') ||
+    norm.includes('excelente') ||
+    norm === 'alto' ||
+    norm.includes('muito alto')
+  ) {
+    return 6;
+  }
+  return 10;
 }
 
 export default function CncaAnalises({ program }) {
@@ -108,6 +197,9 @@ export default function CncaAnalises({ program }) {
   const [assessment, setAssessment] = useState('TODOS');
   const [chartComponent, setChartComponent] = useState('MATEMATICA');
   const [showAllSkills, setShowAllSkills] = useState(false);
+  const [schoolSearch, setSchoolSearch] = useState('');
+  const [tableSort, setTableSort] = useState('score');
+  const [tableDir, setTableDir] = useState('desc');
 
   const { data: filtersData } = useApi(() => cncaApi.filters(program.id), [program.id]);
 
@@ -130,21 +222,172 @@ export default function CncaAnalises({ program }) {
   const criticalSkills = dashboard?.criticalSkills || [];
   const levelsByComponent = dashboard?.levelsByComponent || {};
   const levelsDistribution = dashboard?.levelsDistribution || [];
+  const schoolSummaries = dashboard?.schoolSummaries || [];
 
   const displayedSkills = showAllSkills ? skillsPerformance : skillsPerformance.slice(0, 8);
 
   const activeLevels = useMemo(() => {
+    let list = [];
     const targetComp = component !== 'TODOS' ? component : chartComponent;
     if (levelsByComponent && levelsByComponent[targetComp] && levelsByComponent[targetComp].length > 0) {
-      return levelsByComponent[targetComp];
-    }
-    if (levelsDistribution.length > 0) {
+      list = levelsByComponent[targetComp];
+    } else if (levelsDistribution.length > 0) {
       const filtered = levelsDistribution.filter((l) => l.component === targetComp);
-      if (filtered.length > 0) return filtered;
-      if (component !== 'TODOS') return levelsDistribution;
+      if (filtered.length > 0) list = filtered;
+      else if (component !== 'TODOS') list = levelsDistribution;
+      else list = levelsDistribution;
     }
-    return [];
+
+    // Ordenação pedagógica: Inadequado -> Insuficiente -> Insatisfatório -> Intermediário -> Satisfatório -> Avançado
+    return [...list].sort((a, b) => getLevelRank(a.level) - getLevelRank(b.level));
   }, [component, chartComponent, levelsByComponent, levelsDistribution]);
+
+  // Lista única de nomes de níveis presentes para renderizar colunas dinâmicas na tabela de escolas
+  const presentLevelNames = useMemo(() => {
+    const namesSet = new Set();
+    for (const lvl of activeLevels) {
+      if (lvl.level) namesSet.add(lvl.level);
+    }
+    for (const sc of schoolSummaries) {
+      if (Array.isArray(sc.performanceLevels)) {
+        for (const pl of sc.performanceLevels) {
+          if (pl.level) namesSet.add(pl.level);
+        }
+      }
+    }
+    return Array.from(namesSet).sort((a, b) => getLevelRank(a) - getLevelRank(b));
+  }, [activeLevels, schoolSummaries]);
+
+  // Filtro e ordenação das escolas na tabela comparativa
+  const filteredSchoolSummaries = useMemo(() => {
+    let list = [...schoolSummaries];
+    if (schoolSearch.trim()) {
+      const q = schoolSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      list = list.filter((s) => {
+        const name = (s.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const inep = String(s.inep || '');
+        return name.includes(q) || inep.includes(q);
+      });
+    }
+
+    list.sort((a, b) => {
+      let valA = a[tableSort];
+      let valB = b[tableSort];
+
+      // Se ordenando por uma coluna de nível específico
+      if (presentLevelNames.includes(tableSort)) {
+        const lvlA = (a.performanceLevels || []).find((l) => l.level === tableSort);
+        const lvlB = (b.performanceLevels || []).find((l) => l.level === tableSort);
+        valA = lvlA?.percentage ?? -1;
+        valB = lvlB?.percentage ?? -1;
+      }
+
+      if (valA == null) valA = -999;
+      if (valB == null) valB = -999;
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        return tableDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      return tableDir === 'asc' ? valA - valB : valB - valA;
+    });
+
+    return list;
+  }, [schoolSummaries, schoolSearch, tableSort, tableDir, presentLevelNames]);
+
+  // Definição das colunas da tabela de escolas
+  const schoolTableColumns = useMemo(() => {
+    const cols = [
+      {
+        key: 'name',
+        label: 'Escola / Unidade',
+        sortable: true,
+        render: (row) => (
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>{row.name}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
+              INEP: {row.inep || '—'} {row.zone ? `· Zona ${row.zone}` : ''}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'evaluated',
+        label: 'Avaliados',
+        align: 'right',
+        sortable: true,
+        width: 110,
+        render: (row) => (
+          <div>
+            <strong>{fmtInt(row.evaluated)}</strong>
+            {row.enrolled != null && row.enrolled > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>de {fmtInt(row.enrolled)}</div>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'participationRate',
+        label: 'Participação',
+        align: 'right',
+        sortable: true,
+        width: 120,
+        render: (row) =>
+          row.participationRate != null ? (
+            <Badge variant={row.participationRate >= 80 ? 'green' : row.participationRate >= 60 ? 'yellow' : 'red'}>
+              {fmt(row.participationRate, 1)}%
+            </Badge>
+          ) : (
+            '—'
+          ),
+      },
+    ];
+
+    // Adiciona uma coluna para cada nível de desempenho oficial presente (Inadequado, Insuficiente, Insatisfatório, Intermediário, Satisfatório, Avançado)
+    for (const lvlName of presentLevelNames) {
+      const styling = getLevelColor(lvlName);
+      cols.push({
+        key: lvlName,
+        label: lvlName,
+        align: 'right',
+        sortable: true,
+        width: 130,
+        render: (row) => {
+          const pl = (row.performanceLevels || []).find((l) => l.level === lvlName);
+          if (!pl || pl.percentage == null) return <span style={{ color: 'var(--text-3)' }}>—</span>;
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+              <span style={{ fontWeight: 700, color: styling.bg, fontSize: 13 }}>
+                {fmt(pl.percentage, 1)}%
+              </span>
+              {pl.count != null && (
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                  {pl.count} al.
+                </span>
+              )}
+            </div>
+          );
+        },
+      });
+    }
+
+    cols.push({
+      key: 'score',
+      label: 'Desempenho Geral',
+      align: 'right',
+      sortable: true,
+      width: 140,
+      render: (row) =>
+        row.score != null ? (
+          <strong style={{ fontSize: 14, color: 'var(--primary)' }}>
+            {fmt(row.score, 1)}
+          </strong>
+        ) : (
+          '—'
+        ),
+    });
+
+    return cols;
+  }, [presentLevelNames]);
 
   if (loading && !dashboard) {
     return <LoadingBlock label="Carregando análises detalhadas do CNCA..." />;
@@ -197,7 +440,9 @@ export default function CncaAnalises({ program }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <div>
             <div className="card-title">Distribuição Detalhada por Padrões / Níveis de Desempenho</div>
-            <div className="card-subtitle">Visualização da proporção de estudantes em cada estágio de desenvolvimento.</div>
+            <div className="card-subtitle">
+              Visualização da proporção de estudantes em cada um dos estágios oficiais de desenvolvimento.
+            </div>
           </div>
 
           <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 8, padding: 3, gap: 4 }}>
@@ -229,15 +474,76 @@ export default function CncaAnalises({ program }) {
           </div>
         </div>
 
+        {/* Mini Cards dos Níveis / Padrões Detectados */}
+        {activeLevels.length > 0 && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(auto-fit, minmax(${activeLevels.length >= 6 ? '150px' : '180px'}, 1fr))`,
+              gap: 12,
+              marginBottom: 20,
+            }}
+          >
+            {activeLevels.map((lvl, idx) => {
+              const styling = getLevelColor(lvl.level);
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 8,
+                    background: styling.lightBg,
+                    border: `1px solid ${styling.border}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: styling.text }}>
+                      {lvl.level}
+                    </span>
+                    <strong style={{ fontSize: 16, color: styling.bg }}>
+                      {fmt(lvl.percentage, 1)}%
+                    </strong>
+                  </div>
+                  <div style={{ width: '100%', height: 6, background: 'rgba(0,0,0,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${Math.min(100, Math.max(0, lvl.percentage || 0))}%`,
+                        height: '100%',
+                        background: styling.bg,
+                        borderRadius: 3,
+                      }}
+                    />
+                  </div>
+                  {lvl.count != null && (
+                    <div style={{ fontSize: 11, color: styling.text, opacity: 0.85, textAlign: 'right' }}>
+                      {fmtInt(lvl.count)} estudante(s)
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Gráfico de Barras Horizontais com todos os níveis */}
         {activeLevels.length > 0 ? (
-          <div style={{ width: '100%', height: Math.max(180, activeLevels.length * 44 + 40) }}>
+          <div style={{ width: '100%', height: Math.max(220, activeLevels.length * 48 + 40) }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={activeLevels} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+              <BarChart layout="vertical" data={activeLevels} margin={{ top: 10, right: 30, left: 30, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={{ stroke: '#e2e8f0' }} />
-                <YAxis type="category" dataKey="level" tick={{ fontSize: 12, fill: '#334155', fontWeight: 600 }} width={160} axisLine={false} />
-                <Tooltip formatter={(v) => [`${fmt(v, 1)}%`, 'Percentual']} />
-                <Bar dataKey="percentage" radius={[0, 6, 6, 0]} maxBarSize={24}>
+                <YAxis type="category" dataKey="level" tick={{ fontSize: 12.5, fill: '#334155', fontWeight: 600 }} width={160} axisLine={false} />
+                <Tooltip
+                  formatter={(v, name, props) => [
+                    `${fmt(v, 1)}% ${props.payload?.count != null ? `(${fmtInt(props.payload.count)} alunos)` : ''}`,
+                    'Distribuição',
+                  ]}
+                  contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                />
+                <Bar dataKey="percentage" radius={[0, 6, 6, 0]} maxBarSize={26}>
                   {activeLevels.map((entry, index) => {
                     const styling = getLevelColor(entry.level);
                     return <Cell key={`cell-${index}`} fill={styling.bg} />;
@@ -253,7 +559,51 @@ export default function CncaAnalises({ program }) {
         )}
       </div>
 
-      {/* 2. PONTOS DE ATENÇÃO PRIORITÁRIA */}
+      {/* 2. TABELA COMPARATIVA DETALHADA POR ESCOLA (TODOS OS NÍVEIS) */}
+      {schoolSummaries.length > 0 && (
+        <div className="card card-pad">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+            <div>
+              <div className="card-title">Distribuição dos Padrões de Desempenho por Escola</div>
+              <div className="card-subtitle">
+                Acompanhamento detalhado de cada unidade escolar da rede em todos os padrões e níveis avaliados.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input
+                type="text"
+                className="input"
+                placeholder="🔎 Buscar escola ou INEP..."
+                value={schoolSearch}
+                onChange={(e) => setSchoolSearch(e.target.value)}
+                style={{ width: 240, fontSize: 13 }}
+              />
+            </div>
+          </div>
+
+          <DataTable
+            columns={schoolTableColumns}
+            rows={filteredSchoolSummaries}
+            sort={tableSort}
+            dir={tableDir}
+            onSort={(key, dir) => {
+              setTableSort(key);
+              setTableDir(dir);
+            }}
+            emptyTitle="Nenhuma escola encontrada"
+            emptyHint="Verifique o termo buscado ou ajuste os filtros acima."
+            footer={
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: 12, color: 'var(--text-3)' }}>
+                <span>{filteredSchoolSummaries.length} de {schoolSummaries.length} escola(s) listada(s)</span>
+                <span>Clique nos cabeçalhos para ordenar por qualquer nível de desempenho</span>
+              </div>
+            }
+          />
+        </div>
+      )}
+
+      {/* 3. PONTOS DE ATENÇÃO PRIORITÁRIA */}
       {criticalSkills.length > 0 && (
         <div className="card card-pad" style={{ background: '#fffafa', borderColor: '#fecaca' }}>
           <div className="card-header-row" style={{ marginBottom: 12 }}>
@@ -264,7 +614,7 @@ export default function CncaAnalises({ program }) {
                   Pontos de Atenção Pedagógica ({criticalSkills.length} habilidades &lt; 50%)
                 </div>
                 <div className="card-subtitle" style={{ margin: 0 }}>
-                  Habilidades com percentual de acerto crítico que demandam reforço escolar.
+                  Habilidades com percentual de acerto crítico que demandam reforço escolar prioritário.
                 </div>
               </div>
             </div>
@@ -286,7 +636,7 @@ export default function CncaAnalises({ program }) {
         </div>
       )}
 
-      {/* 3. MATRIZ COMPLETA DE HABILIDADES */}
+      {/* 4. MATRIZ COMPLETA DE HABILIDADES */}
       {skillsPerformance.length > 0 && (
         <div className="card card-pad">
           <div className="card-header-row" style={{ marginBottom: 14 }}>

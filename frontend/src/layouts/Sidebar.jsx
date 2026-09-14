@@ -18,25 +18,29 @@ export default function Sidebar() {
       .catch(() => {});
   }, []);
 
+  const safeIncludes = (val, search) =>
+    typeof val === 'string' && val.toLowerCase().includes(search.toLowerCase());
+
   // Procura os IDs dos programas Pacto, PARC e CNCA
   const pactoProg = programsList.find(
     (p) =>
-      p.catalog?.code === 'PACTO-ALFABETIZACAO' ||
-      p.code?.startsWith('PACTO') ||
-      p.name?.toLowerCase().includes('pacto'),
+      p?.catalog?.code === 'PACTO-ALFABETIZACAO' ||
+      p?.code?.startsWith('PACTO') ||
+      safeIncludes(p?.name, 'pacto'),
   );
   const parcProg = programsList.find(
     (p) =>
-      p.catalog?.code === 'PARC' ||
-      p.code?.startsWith('PARC') ||
-      p.name?.toLowerCase().includes('parc'),
+      p?.catalog?.code === 'PARC' ||
+      p?.code?.startsWith('PARC') ||
+      safeIncludes(p?.name, 'parc'),
   );
   const cncaProg = programsList.find(
     (p) =>
-      p.catalog?.code === 'CNCA' ||
-      p.code?.startsWith('CNCA') ||
-      p.name?.toLowerCase().includes('cnca') ||
-      p.name?.toLowerCase().includes('criança alfabetizada'),
+      p?.catalog?.code === 'CNCA' ||
+      p?.code?.startsWith('CNCA') ||
+      safeIncludes(p?.name, 'cnca') ||
+      safeIncludes(p?.name, 'criança alfabetizada') ||
+      safeIncludes(p?.name, 'crianca alfabetizada'),
   );
 
   const pactoUrl = pactoProg ? `/programas/${pactoProg.id}` : '/programas';

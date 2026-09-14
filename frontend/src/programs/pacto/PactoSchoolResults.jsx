@@ -147,7 +147,7 @@ export default function PactoSchoolResults({ program, onSelectTab }) {
     const fromApi = overview?.schools || [];
     if (fromApi.length > 0) {
       return fromApi.map((s) => {
-        const fallback = FALLBACK_SCHOOLS.find((f) => f.inep === s.inep || f.name.toLowerCase() === s.name.toLowerCase()) || FALLBACK_SCHOOLS[0];
+        const fallback = FALLBACK_SCHOOLS.find((f) => f.inep === s.inep || (f.name || '').toLowerCase() === (s.name || '').toLowerCase()) || FALLBACK_SCHOOLS[0];
         return {
           ...fallback,
           ...s,

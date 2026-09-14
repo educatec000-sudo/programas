@@ -2,7 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from '../layouts/AppLayout.jsx';
 import ProtectedRoute from '../components/ProtectedRoute.jsx';
-import { LoadingBlock } from '../components/ui.jsx';
+import { LoadingBlock, ErrorBoundary } from '../components/ui.jsx';
 
 const Login = lazy(() => import('../pages/Login.jsx'));
 const ForgotPassword = lazy(() => import('../pages/ForgotPassword.jsx'));
@@ -29,9 +29,11 @@ const Notifications = lazy(() => import('../pages/Notifications.jsx'));
 
 function page(Component, permission) {
   const content = (
-    <Suspense fallback={<LoadingBlock label="Carregando página..." />}>
-      <Component />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingBlock label="Carregando página..." />}>
+        <Component />
+      </Suspense>
+    </ErrorBoundary>
   );
   return permission
     ? <ProtectedRoute permission={permission}>{content}</ProtectedRoute>

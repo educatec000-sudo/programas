@@ -91,6 +91,45 @@ test('CNCA: mapeia colunas oficiais de Matemática preservando habilidades H01, 
   assert.deepEqual(colMap.skills.map((s) => s.code), ['H01', 'H02', 'H03', 'H04', 'H05']);
 });
 
+test('CNCA: mapeia os 6 níveis/padrões oficiais de desempenho (Inadequado, Insuficiente, Insatisfatório, Intermediário, Satisfatório, Avançado)', () => {
+  const headers = [
+    'Código INEP',
+    'Nome da Escola',
+    'Ano Escolar',
+    'Avaliação',
+    'Matriculados',
+    'Avaliados',
+    'Taxa de Participação',
+    'Proficiência Média',
+    'Inadequado',
+    'Insuficiente',
+    'Insatisfatório',
+    'Intermediário',
+    'Satisfatório',
+    'Avançado',
+  ];
+
+  const colMap = mapRowColumns(headers);
+
+  assert.equal(colMap.inep, 0);
+  assert.equal(colMap.schoolName, 1);
+  assert.equal(colMap.grade, 2);
+  assert.equal(colMap.assessment, 3);
+  assert.equal(colMap.enrolled, 4);
+  assert.equal(colMap.evaluated, 5);
+  assert.equal(colMap.participationRate, 6);
+  assert.equal(colMap.averageScore, 7);
+  assert.equal(colMap.levels.length, 6);
+  assert.deepEqual(colMap.levels.map((l) => l.name), [
+    'Inadequado',
+    'Insuficiente',
+    'Insatisfatório',
+    'Intermediário',
+    'Satisfatório',
+    'Avançado',
+  ]);
+});
+
 test('CNCA: mapeia colunas oficiais de Fluência preservando PCPM, Precisão e Perfis de Leitor', () => {
   const headers = [
     'INEP',
@@ -671,6 +710,12 @@ test('CNCA Pipeline: prévia, conciliação por INEP/Nome, idempotência e trata
     assert.equal(dashboard.kpis.totalEnrolled, 90);
     assert.equal(dashboard.kpis.totalEvaluated, 86);
     assert.equal(dashboard.kpis.networkAverageScore, 242.8);
+    assert.ok(Array.isArray(dashboard.componentEffectiveness));
+    assert.equal(dashboard.componentEffectiveness.length, 4);
+    const matEffectiveness = dashboard.componentEffectiveness.find((c) => c.component === 'MATEMATICA');
+    assert.ok(matEffectiveness);
+    assert.equal(matEffectiveness.evaluatedSchools, 2);
+    assert.equal(matEffectiveness.hasData, true);
 
     const ranking = await getCncaRanking(mockProgram.id, { indicator: 'MATEMATICA_PROFICIENCIA' });
     assert.equal(ranking.ranking.length, 2);

@@ -102,10 +102,10 @@ export default function Results() {
     if (!rows.length) { error('Cole ao menos uma linha no padrão informado.'); return; }
 
     const programMap = new Map(
-      (programs?.data || []).filter((item) => supportsSharedFeature(item, 'resultados')).map((p) => [p.code.toLowerCase(), p.id]),
+      (programs?.data || []).filter((item) => supportsSharedFeature(item, 'resultados')).map((p) => [String(p.code || '').toLowerCase(), p.id]),
     );
     const schoolMap = new Map((schools?.data || []).map((s) => [s.inep, s.id]));
-    const indicatorMap = new Map((indicators?.data || []).map((i) => [i.code.toLowerCase(), i.id]));
+    const indicatorMap = new Map((indicators?.data || []).map((i) => [String(i.code || '').toLowerCase(), i.id]));
 
     const items = [];
     const errors = [];

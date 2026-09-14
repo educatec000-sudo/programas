@@ -501,7 +501,7 @@ function LinkModal({ open, onClose, onCreated }) {
   const normalizedSchoolFilter = schoolFilter.trim().toLowerCase();
   const schoolOptions = (schools?.data || []).filter((school) =>
     !normalizedSchoolFilter ||
-    school.name.toLowerCase().includes(normalizedSchoolFilter) ||
+    (school.name || '').toLowerCase().includes(normalizedSchoolFilter) ||
     String(school.inep || '').includes(normalizedSchoolFilter) ||
     String(school.address || '').toLowerCase().includes(normalizedSchoolFilter) ||
     String(school.zone || '').toLowerCase().includes(normalizedSchoolFilter),
@@ -510,8 +510,8 @@ function LinkModal({ open, onClose, onCreated }) {
   const normalizedTechnicianFilter = technicianFilter.trim().toLowerCase();
   const technicianOptions = (eligible?.data || []).filter((technician) =>
     !normalizedTechnicianFilter ||
-    technician.name.toLowerCase().includes(normalizedTechnicianFilter) ||
-    technician.email.toLowerCase().includes(normalizedTechnicianFilter),
+    (technician.name || '').toLowerCase().includes(normalizedTechnicianFilter) ||
+    (technician.email || '').toLowerCase().includes(normalizedTechnicianFilter),
   );
 
   const linkedSet = new Set(linkedSchoolIds);

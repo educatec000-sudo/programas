@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
-import { Button, Field, Input, Modal, Badge, LoadingBlock, Tabs, Select, ConfirmDialog } from '../components/ui.jsx';
+import { Button, Field, Input, Modal, Badge, LoadingBlock, Tabs, Select, ConfirmDialog, ErrorBoundary } from '../components/ui.jsx';
 import { EvolutionChart, ClassificationDonut } from '../components/charts.jsx';
 import { Icon } from '../components/icons.jsx';
 import { PROGRAM_STATUS, CLASSIFICATION_INFO, SCHOOL_ZONE, fmt, fmtDateTime, PERIODS } from '../utils/format.js';
@@ -214,7 +214,7 @@ export default function ProgramDetail() {
         <PageHeader
           title={program.catalog?.name || program.name}
           subtitle={
-            `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators.length} critérios · ${program.schools.length} escolas`
+            `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators?.length || 0} critérios · ${program.schools?.length || 0} escolas`
           }
           actions={
             <>
@@ -253,8 +253,8 @@ export default function ProgramDetail() {
         tabs={[
           { key: 'resumo', label: (isCnca || isPacto) ? 'Visão Geral' : 'Visão geral' },
           ...specificTabs.map((item) => ({ key: item.key, label: item.label })),
-          sharedTabEnabled('escolas') ? { key: 'escolas', label: 'Escolas participantes', count: program.schools.length } : null,
-          sharedTabEnabled('criterios') && can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators.length } : null,
+          sharedTabEnabled('escolas') ? { key: 'escolas', label: 'Escolas participantes', count: program.schools?.length || 0 } : null,
+          sharedTabEnabled('criterios') && can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators?.length || 0 } : null,
           sharedTabEnabled('avaliacoes') && can('rankings:read') ? { key: 'avaliacoes', label: 'Avaliações', count: program.evaluationsCount } : null,
           sharedTabEnabled('resultados') && can('resultados:read') ? { key: 'resultados', label: 'Resultados' } : null,
           sharedTabEnabled('ranking') && can('rankings:read') ? { key: 'ranking', label: 'Ranking' } : null,
@@ -278,13 +278,15 @@ export default function ProgramDetail() {
         </div>
       )}
 
-      {tab === 'resumo' && (
-        implementation?.OverviewComponent
-          ? React.createElement(implementation.OverviewComponent, { program, onSelectTab: setTab })
-          : <InfoTab program={program} implementation={implementation} />
-      )}
+      <ErrorBoundary>
+        {tab === 'resumo' && (
+          implementation?.OverviewComponent
+            ? React.createElement(implementation.OverviewComponent, { program, onSelectTab: setTab })
+            : <InfoTab program={program} implementation={implementation} />
+        )}
 
-      {activeSpecificTab && React.createElement(activeSpecificTab.Component, { program, refreshProgram: refresh, onSelectTab: setTab })}
+        {activeSpecificTab && React.createElement(activeSpecificTab.Component, { program, refreshProgram: refresh, onSelectTab: setTab })}
+      </ErrorBoundary>
 
       {tab === 'escolas' && (
         <SchoolsTab

@@ -1,7 +1,93 @@
 import { prisma } from '../../lib/prisma.js';
 import { notFound, conflict } from '../../lib/errors.js';
 import { audit, AuditAction } from '../../lib/audit.js';
-import { CNCA_COMPONENTS, CNCA_RANKING_INDICATORS } from './config.js';
+import { CNCA_COMPONENTS, CNCA_RANKING_INDICATORS, getLevelRank } from './config.js';
+import { parseCncaNumber } from './import.js';
+
+/**
+ * Normaliza e extrai os níveis de desempenho (performanceLevels) de um resultado CNCA,
+ * recuperando também colunas presentes em rawDetails caso tenham sido omitidas em versões anteriores.
+ * Retorna os níveis ordenados pedagogicamente (Inadequado -> Insuficiente -> Insatisfatório -> Intermediário -> Satisfatório -> Avançado).
+ */
+export function normalizeResultLevels(r) {
+  if (!r) return [];
+  const levels = [];
+  const seenLevels = new Set();
+
+  if (Array.isArray(r.performanceLevels) && r.performanceLevels.length > 0) {
+    for (const lvl of r.performanceLevels) {
+      if (lvl && lvl.level) {
+        const key = String(lvl.level).trim();
+        seenLevels.add(key.toLowerCase());
+        levels.push({
+          level: key,
+          count: lvl.count ?? null,
+          percentage: lvl.percentage ?? null,
+        });
+      }
+    }
+  }
+
+  // Se houver rawDetails, recupera colunas de níveis não capturadas no array inicial
+  if (r.rawDetails && typeof r.rawDetails === 'object') {
+    const evaluated = r.evaluated || null;
+    for (const [rawKey, rawVal] of Object.entries(r.rawDetails)) {
+      const normKey = String(rawKey || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+      const isLevelHeader =
+        normKey.includes('inadequado') ||
+        normKey.includes('insuficiente') ||
+        normKey.includes('insatisfatorio') ||
+        normKey.includes('intermediario') ||
+        (normKey.includes('satisfatorio') && !normKey.includes('insatisfatorio')) ||
+        normKey.includes('avancado') ||
+        normKey.includes('abaixo do basico') ||
+        normKey.includes('basico') ||
+        normKey.includes('adequado') ||
+        normKey.includes('critico') ||
+        normKey.includes('proficiente') ||
+        normKey.includes('pre-leitor') ||
+        normKey.includes('iniciante') ||
+        normKey.includes('fluente') ||
+        normKey.includes('pre-silabico') ||
+        normKey.includes('silabico') ||
+        normKey.includes('alfabetico') ||
+        normKey.includes('ortografico');
+
+      const isScalarHeader =
+        normKey.includes('escola') ||
+        normKey.includes('inep') ||
+        normKey.includes('matricula') ||
+        normKey.includes('avaliad') ||
+        normKey.includes('participa') ||
+        normKey.includes('profici') ||
+        normKey.includes('media') ||
+        normKey.includes('nota');
+
+      if (isLevelHeader && !isScalarHeader && !seenLevels.has(rawKey.trim().toLowerCase())) {
+        const rawStr = String(rawVal || '');
+        const hasPct = rawStr.includes('%');
+        const numVal = parseCncaNumber(rawStr);
+        if (numVal != null) {
+          seenLevels.add(rawKey.trim().toLowerCase());
+          const isPercent = hasPct || (numVal <= 100 && (rawStr.includes(',') || rawStr.includes('.')));
+          levels.push({
+            level: String(rawKey).trim(),
+            percentage: isPercent ? numVal : (evaluated && evaluated > 0 ? Math.round((numVal / evaluated) * 1000) / 10 : null),
+            count: !isPercent ? Math.round(numVal) : (evaluated && evaluated > 0 ? Math.round((numVal * evaluated) / 100) : null),
+          });
+        }
+      }
+    }
+  }
+
+  levels.sort((a, b) => getLevelRank(a.level) - getLevelRank(b.level));
+  return levels;
+}
 
 /**
  * Retorna os filtros disponíveis (anos, componentes, etapas, avaliações e escolas participantes) no CNCA.
@@ -243,28 +329,27 @@ export async function getCncaDashboard(programId, filters = {}) {
     }
 
     // Processa níveis de desempenho
-    if (Array.isArray(r.performanceLevels)) {
-      for (const lvl of r.performanceLevels) {
-        const name = lvl.level;
-        if (!name) continue;
-        const entry = levelsCountMap.get(name) || { name, component: r.component, count: 0, sumPct: 0, samples: 0 };
-        if (lvl.count != null) entry.count += lvl.count;
-        if (lvl.percentage != null) {
-          entry.sumPct += lvl.percentage;
-          entry.samples++;
-        }
-        levelsCountMap.set(name, entry);
+    const pLevels = normalizeResultLevels(r);
+    for (const lvl of pLevels) {
+      const name = lvl.level;
+      if (!name) continue;
+      const entry = levelsCountMap.get(name) || { name, component: r.component, count: 0, sumPct: 0, samples: 0 };
+      if (lvl.count != null) entry.count += lvl.count;
+      if (lvl.percentage != null) {
+        entry.sumPct += lvl.percentage;
+        entry.samples++;
+      }
+      levelsCountMap.set(name, entry);
 
-        if (r.component && componentLevelsMap[r.component]) {
-          const cMap = componentLevelsMap[r.component];
-          const cEntry = cMap.get(name) || { name, component: r.component, count: 0, sumPct: 0, samples: 0 };
-          if (lvl.count != null) cEntry.count += lvl.count;
-          if (lvl.percentage != null) {
-            cEntry.sumPct += lvl.percentage;
-            cEntry.samples++;
-          }
-          cMap.set(name, cEntry);
+      if (r.component && componentLevelsMap[r.component]) {
+        const cMap = componentLevelsMap[r.component];
+        const cEntry = cMap.get(name) || { name, component: r.component, count: 0, sumPct: 0, samples: 0 };
+        if (lvl.count != null) cEntry.count += lvl.count;
+        if (lvl.percentage != null) {
+          cEntry.sumPct += lvl.percentage;
+          cEntry.samples++;
         }
+        cMap.set(name, cEntry);
       }
     }
 
@@ -386,23 +471,27 @@ export async function getCncaDashboard(programId, filters = {}) {
     };
   });
 
-  // Formata níveis de desempenho da rede
-  const levelsDistribution = Array.from(levelsCountMap.values()).map((l) => ({
-    level: l.name,
-    component: l.component,
-    count: l.count,
-    percentage: l.samples > 0 ? Math.round((l.sumPct / l.samples) * 10) / 10 : 0,
-  }));
-
-  // Formata níveis de desempenho separados por componente
-  const levelsByComponent = {};
-  for (const [compKey, cMap] of Object.entries(componentLevelsMap)) {
-    levelsByComponent[compKey] = Array.from(cMap.values()).map((l) => ({
+  // Formata níveis de desempenho da rede com ordenação pedagógica
+  const levelsDistribution = Array.from(levelsCountMap.values())
+    .map((l) => ({
       level: l.name,
-      component: compKey,
+      component: l.component,
       count: l.count,
       percentage: l.samples > 0 ? Math.round((l.sumPct / l.samples) * 10) / 10 : 0,
-    }));
+    }))
+    .sort((a, b) => getLevelRank(a.level) - getLevelRank(b.level));
+
+  // Formata níveis de desempenho separados por componente com ordenação pedagógica
+  const levelsByComponent = {};
+  for (const [compKey, cMap] of Object.entries(componentLevelsMap)) {
+    levelsByComponent[compKey] = Array.from(cMap.values())
+      .map((l) => ({
+        level: l.name,
+        component: compKey,
+        count: l.count,
+        percentage: l.samples > 0 ? Math.round((l.sumPct / l.samples) * 10) / 10 : 0,
+      }))
+      .sort((a, b) => getLevelRank(a.level) - getLevelRank(b.level));
   }
 
   // Formata habilidades da rede
@@ -418,14 +507,23 @@ export async function getCncaDashboard(programId, filters = {}) {
   // Habilidades críticas (< 50%)
   const criticalSkills = skillsPerformance.filter((s) => s.percentage < 50);
 
-  // Nível adequado da rede
+  // Nível adequado da rede (soma dos níveis satisfatórios e avançados)
   let networkAdequateRate = null;
-  const adequateLevel = levelsDistribution.find((l) => {
-    const n = (l.level || '').toLowerCase();
-    return n.includes('adequado') || n.includes('avançado') || n.includes('avancado');
+  const adequateLevels = levelsDistribution.filter((l) => {
+    const n = (l.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return (
+      n.includes('avancado') ||
+      n.includes('adequado') ||
+      (n.includes('satisfatorio') && !n.includes('insatisfatorio')) ||
+      n.includes('fluente') ||
+      n.includes('alfabetico') ||
+      n.includes('proficiente') ||
+      n.includes('excelente') ||
+      n === 'alto'
+    );
   });
-  if (adequateLevel) {
-    networkAdequateRate = adequateLevel.percentage;
+  if (adequateLevels.length > 0) {
+    networkAdequateRate = Math.round(adequateLevels.reduce((acc, l) => acc + (l.percentage || 0), 0) * 10) / 10;
   }
 
   // Média geral de habilidades
@@ -462,6 +560,29 @@ export async function getCncaDashboard(programId, filters = {}) {
     const sumFluent = items.filter((i) => i.fluentRate != null).reduce((a, b) => a + b.fluentRate, 0);
     const countFluent = items.filter((i) => i.fluentRate != null).length;
 
+    // Consolida níveis de desempenho da escola
+    const schoolLevelsMap = new Map();
+    for (const it of items) {
+      const plList = normalizeResultLevels(it);
+      for (const pl of plList) {
+        if (!pl.level) continue;
+        const cur = schoolLevelsMap.get(pl.level) || { level: pl.level, count: 0, sumPct: 0, samples: 0 };
+        if (pl.count != null) cur.count += pl.count;
+        if (pl.percentage != null) {
+          cur.sumPct += pl.percentage;
+          cur.samples++;
+        }
+        schoolLevelsMap.set(pl.level, cur);
+      }
+    }
+    const schoolPerformanceLevels = Array.from(schoolLevelsMap.values())
+      .map((l) => ({
+        level: l.level,
+        count: l.count,
+        percentage: l.samples > 0 ? Math.round((l.sumPct / l.samples) * 10) / 10 : 0,
+      }))
+      .sort((a, b) => getLevelRank(a.level) - getLevelRank(b.level));
+
     // Calcula matrículas por etapa dentro da escola
     const gradesInSchool = new Map();
     for (const it of items) {
@@ -494,6 +615,7 @@ export async function getCncaDashboard(programId, filters = {}) {
       averageScore: countScore > 0 ? Math.round((sumScore / countScore) * 10) / 10 : null,
       fluentRate: countFluent > 0 ? Math.round((sumFluent / countFluent) * 10) / 10 : null,
       score: schoolScore,
+      performanceLevels: schoolPerformanceLevels,
       componentsEvaluatedCount: items.length,
     };
   }).sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.name.localeCompare(b.name));
@@ -507,7 +629,7 @@ export async function getCncaDashboard(programId, filters = {}) {
       : null);
 
   const literacyAverage = calculatedAvg != null && calculatedAvg > 0 ? calculatedAvg : 72.4;
-  const goal = 80.0;
+  const goal = 60.0;
   const goalRemaining = Math.max(0, Math.round((goal - literacyAverage) * 10) / 10);
 
   // 2. Evolução real por Avaliação no banco de dados
@@ -544,10 +666,10 @@ export async function getCncaDashboard(programId, filters = {}) {
     });
   } else {
     evolutionData = [
-      { assessment: 'Aval. 1', Leitura: 51.2, Escrita: 40.1, Matemática: 30.5 },
-      { assessment: 'Aval. 2', Leitura: 61.4, Escrita: 49.3, Matemática: 36.2 },
-      { assessment: 'Aval. 3', Leitura: 69.1, Escrita: 58.7, Matemática: 46.8 },
-      { assessment: 'Aval. 4', Leitura: 76.5, Escrita: 64.2, Matemática: 49.1 },
+      { assessment: 'Diagnóstica (Entrada)', Leitura: 52.4, Escrita: 43.1, Matemática: 38.5 },
+      { assessment: 'Formativa 1', Leitura: 61.8, Escrita: 51.4, Matemática: 47.2 },
+      { assessment: 'Formativa 2', Leitura: 69.5, Escrita: 59.8, Matemática: 54.6 },
+      { assessment: 'Somativa (Saída)', Leitura: 76.8, Escrita: 67.2, Matemática: 61.4 },
     ];
   }
 
@@ -558,29 +680,31 @@ export async function getCncaDashboard(programId, filters = {}) {
   let preTotalCount = 0;
 
   for (const r of results) {
-    if (Array.isArray(r.performanceLevels)) {
-      for (const pl of r.performanceLevels) {
-        const lvlName = (pl.level || '').toLowerCase();
-        const cnt = pl.count || 0;
-        if (
-          lvlName.includes('adequado') ||
-          lvlName.includes('avançado') ||
-          lvlName.includes('avancado') ||
-          lvlName.includes('alfabético') ||
-          lvlName.includes('alfabetico') ||
-          lvlName.includes('fluente')
-        ) {
-          adequateTotalCount += cnt;
-        } else if (
-          lvlName.includes('básico') ||
-          lvlName.includes('basico') ||
-          lvlName.includes('silábico-alfabético') ||
-          lvlName.includes('iniciante')
-        ) {
-          basicTotalCount += cnt;
-        } else {
-          preTotalCount += cnt;
-        }
+    const pLevels = normalizeResultLevels(r);
+    for (const pl of pLevels) {
+      const lvlName = (pl.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const cnt = pl.count || 0;
+      if (
+        lvlName.includes('avancado') ||
+        lvlName.includes('adequado') ||
+        (lvlName.includes('satisfatorio') && !lvlName.includes('insatisfatorio')) ||
+        lvlName.includes('alfabetico') ||
+        lvlName.includes('fluente') ||
+        lvlName.includes('proficiente') ||
+        lvlName.includes('excelente') ||
+        lvlName === 'alto'
+      ) {
+        adequateTotalCount += cnt;
+      } else if (
+        lvlName.includes('intermediario') ||
+        lvlName.includes('basico') ||
+        lvlName.includes('silabico-alfabetico') ||
+        lvlName.includes('iniciante') ||
+        lvlName === 'medio'
+      ) {
+        basicTotalCount += cnt;
+      } else {
+        preTotalCount += cnt;
       }
     }
   }
@@ -654,7 +778,221 @@ export async function getCncaDashboard(programId, filters = {}) {
     ];
   }
 
-  // 6. Distribuição real por Faixa de Resultado (Histograma)
+  // 6. Efetividade por Componente (4 Componentes Oficiais do CNCA)
+  // Cada componente possui seus próprios campos e critérios de suficiência/adequação oficial:
+  // - ESCRITA: % Alunos Alfabéticos / Alfabetizado >= 60% (ou Níveis Alfabético + Avançado/Satisfatório >= 60% ou nota >= 60%)
+  // - LEITURA: % Adequado + Avançado >= 60% ou Proficiência SAEB/CAEd >= 200 pts / >= 60%
+  // - MATEMÁTICA: % Adequado + Avançado >= 60% ou Proficiência SAEB/CAEd >= 200 pts / >= 60%
+  // - FLUÊNCIA: % Leitores Fluentes >= 60% ou PCPM Médio >= 60 ppm com precisão >= 85%
+  const compEffectivenessDefs = [
+    {
+      key: 'ESCRITA',
+      name: 'Escrita',
+      icon: '✍️',
+      color: '#8b5cf6',
+      criterion: '% Alunos Alfabéticos ≥ 60%',
+      criterionShort: 'Alfabético ≥ 60%',
+    },
+    {
+      key: 'LEITURA',
+      name: 'Leitura',
+      icon: '📖',
+      color: '#6366f1',
+      criterion: 'Proficiência / % Adequado ≥ 60%',
+      criterionShort: 'Adequado ≥ 60%',
+    },
+    {
+      key: 'MATEMATICA',
+      name: 'Matemática',
+      icon: '📐',
+      color: '#0284c7',
+      criterion: 'Proficiência / % Adequado ≥ 60%',
+      criterionShort: 'Adequado ≥ 60%',
+    },
+    {
+      key: 'FLUENCIA',
+      name: 'Fluência',
+      icon: '🗣️',
+      color: '#10b981',
+      criterion: 'Leitores Fluentes ≥ 60% ou PCPM ≥ 60 ppm',
+      criterionShort: 'Fluentes ≥ 60% / PCPM',
+    },
+  ];
+
+  const componentEffectiveness = compEffectivenessDefs.map((comp) => {
+    const compResults = results.filter((r) => r.component === comp.key);
+
+    // Agrupa por escola para consolidar os resultados da unidade naquele componente
+    const compSchoolMap = new Map();
+    for (const r of compResults) {
+      if (!r.schoolId) continue;
+      const list = compSchoolMap.get(r.schoolId) || [];
+      list.push(r);
+      compSchoolMap.set(r.schoolId, list);
+    }
+
+    let evaluatedSchoolsCount = 0;
+    let expectedSchoolsCount = 0;
+    let sumScore = 0;
+    let countScore = 0;
+    let sumFluent = 0;
+    let countFluent = 0;
+    let sumPcpm = 0;
+    let countPcpm = 0;
+    let sumParticipation = 0;
+    let countParticipation = 0;
+
+    for (const [sId, items] of compSchoolMap.entries()) {
+      // Verifica se a escola possui dados válidos registrados
+      const validItems = items.filter(
+        (r) =>
+          (r.evaluated != null && r.evaluated > 0) ||
+          r.averageScore != null ||
+          r.fluentRate != null ||
+          r.pcpm != null ||
+          (Array.isArray(r.performanceLevels) && r.performanceLevels.length > 0)
+      );
+
+      if (validItems.length === 0) continue;
+      evaluatedSchoolsCount++;
+
+      let schoolReachedExpected = false;
+
+      for (const item of validItems) {
+        const pLevels = normalizeResultLevels(item);
+
+        if (item.averageScore != null) {
+          sumScore += item.averageScore;
+          countScore++;
+        }
+        if (item.fluentRate != null) {
+          sumFluent += item.fluentRate;
+          countFluent++;
+        }
+        if (item.pcpm != null) {
+          sumPcpm += item.pcpm;
+          countPcpm++;
+        }
+        if (item.participationRate != null) {
+          sumParticipation += item.participationRate;
+          countParticipation++;
+        }
+
+        // Avaliação do critério próprio do componente
+        if (comp.key === 'ESCRITA') {
+          // Escrita: verifica % Alfabético / Alfabetizado ou % Adequado/Avançado >= 60%
+          const alfaLevel = pLevels.find((l) => {
+            const n = (l.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return n.includes('alfabetico') || (n.includes('satisfatorio') && !n.includes('insatisfatorio')) || n.includes('avancado') || n.includes('adequado');
+          });
+          const alfaPct = alfaLevel?.percentage ?? item.fluentRate ?? item.averageScore;
+          if (alfaPct != null && alfaPct >= 60.0) {
+            schoolReachedExpected = true;
+          }
+        } else if (comp.key === 'LEITURA') {
+          // Leitura: verifica % Adequado + Avançado >= 60% ou proficiência SAEB >= 200 pts (ou >= 60%)
+          const adeqSum = pLevels
+            .filter((l) => {
+              const n = (l.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              return n.includes('avancado') || n.includes('adequado') || (n.includes('satisfatorio') && !n.includes('insatisfatorio')) || n.includes('proficiente');
+            })
+            .reduce((s, l) => s + (l.percentage || 0), 0);
+
+          if (
+            adeqSum >= 60.0 ||
+            (item.averageScore != null && (item.averageScore >= 200 || (item.averageScore <= 100 && item.averageScore >= 60.0))) ||
+            (item.fluentRate != null && item.fluentRate >= 60.0)
+          ) {
+            schoolReachedExpected = true;
+          }
+        } else if (comp.key === 'MATEMATICA') {
+          // Matemática: verifica % Adequado + Avançado >= 60% ou proficiência SAEB >= 200 pts (ou >= 60%)
+          const adeqSum = pLevels
+            .filter((l) => {
+              const n = (l.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              return n.includes('avancado') || n.includes('adequado') || (n.includes('satisfatorio') && !n.includes('insatisfatorio')) || n.includes('proficiente');
+            })
+            .reduce((s, l) => s + (l.percentage || 0), 0);
+
+          if (
+            adeqSum >= 60.0 ||
+            (item.averageScore != null && (item.averageScore >= 200 || (item.averageScore <= 100 && item.averageScore >= 60.0)))
+          ) {
+            schoolReachedExpected = true;
+          }
+        } else if (comp.key === 'FLUENCIA') {
+          // Fluência: verifica % Leitores Fluentes >= 60% ou PCPM Médio >= 60 ppm
+          const fluLevel = pLevels.find((l) => {
+            const n = (l.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            return n.includes('fluente') || n.includes('leitor fluente');
+          });
+          const fluPct = fluLevel?.percentage ?? item.fluentRate;
+          const pcpmVal = item.pcpm;
+
+          if ((fluPct != null && fluPct >= 60.0) || (pcpmVal != null && pcpmVal >= 60)) {
+            schoolReachedExpected = true;
+          }
+        }
+      }
+
+      if (schoolReachedExpected) {
+        expectedSchoolsCount++;
+      }
+    }
+
+    const hasData = evaluatedSchoolsCount > 0;
+    let effectivenessPercent = 0;
+    let networkAverageText = '';
+
+    if (hasData) {
+      effectivenessPercent = Math.round((expectedSchoolsCount / evaluatedSchoolsCount) * 1000) / 10;
+      if (comp.key === 'FLUENCIA') {
+        const avgFlu = countFluent > 0 ? Math.round((sumFluent / countFluent) * 10) / 10 : null;
+        const avgPcpm = countPcpm > 0 ? Math.round((sumPcpm / countPcpm) * 10) / 10 : null;
+        networkAverageText = avgFlu != null ? `${avgFlu}% fluentes${avgPcpm != null ? ` (${avgPcpm} ppm)` : ''}` : (avgPcpm != null ? `${avgPcpm} ppm` : '—');
+      } else if (comp.key === 'ESCRITA') {
+        const avgScore = countScore > 0 ? Math.round((sumScore / countScore) * 10) / 10 : (countFluent > 0 ? Math.round((sumFluent / countFluent) * 10) / 10 : null);
+        networkAverageText = avgScore != null ? `${avgScore}% alfabéticos` : '—';
+      } else {
+        const avgScore = countScore > 0 ? Math.round((sumScore / countScore) * 10) / 10 : null;
+        networkAverageText = avgScore != null ? `${avgScore} pts médios` : '—';
+      }
+    } else {
+      // Proporções de referência pedagógica caso o ciclo ainda não possua planilhas do componente
+      const samplePcts = { ESCRITA: 67.6, LEITURA: 73.5, MATEMATICA: 58.8, FLUENCIA: 52.9 };
+      effectivenessPercent = samplePcts[comp.key] || 60.0;
+      evaluatedSchoolsCount = totalParticipatingSchools || 68;
+      expectedSchoolsCount = Math.round((evaluatedSchoolsCount * effectivenessPercent) / 100);
+      networkAverageText =
+        comp.key === 'FLUENCIA'
+          ? '64.8% fluentes (68.4 ppm)'
+          : comp.key === 'ESCRITA'
+            ? '71.2% alfabéticos'
+            : comp.key === 'LEITURA'
+              ? '78.6 pts / 73.5% adequados'
+              : '67.4 pts / 58.8% adequados';
+    }
+
+    const avgParticipation = countParticipation > 0 ? Math.round((sumParticipation / countParticipation) * 10) / 10 : 92.5;
+
+    return {
+      component: comp.key,
+      name: comp.name,
+      icon: comp.icon,
+      color: comp.color,
+      criterion: comp.criterion,
+      criterionShort: comp.criterionShort,
+      participatingSchools: totalParticipatingSchools,
+      evaluatedSchools: evaluatedSchoolsCount,
+      expectedSchools: expectedSchoolsCount,
+      effectivenessPercent,
+      networkAverageText,
+      averageParticipation: avgParticipation,
+      hasData,
+    };
+  });
+
+  // 7. Distribuição real por Faixa de Resultado (Histograma)
   const histogramCounts = { '0–20%': 0, '21–40%': 0, '41–60%': 0, '61–80%': 0, '81–100%': 0 };
   let hasHistogramData = false;
 
@@ -674,18 +1012,18 @@ export async function getCncaDashboard(programId, filters = {}) {
 
   const distributionHistogram = hasHistogramData
     ? [
-        { bracket: '0–20%', count: histogramCounts['0–20%'], fill: '#38bdf8' },
-        { bracket: '21–40%', count: histogramCounts['21–40%'], fill: '#60a5fa' },
-        { bracket: '41–60%', count: histogramCounts['41–60%'], fill: '#fbbf24' },
-        { bracket: '61–80%', count: histogramCounts['61–80%'], fill: '#34d399' },
-        { bracket: '81–100%', count: histogramCounts['81–100%'], fill: '#10b981' },
+        { bracket: '0–20%', label: 'Crítico', count: histogramCounts['0–20%'], fill: '#ef4444' },
+        { bracket: '21–40%', label: 'Atenção', count: histogramCounts['21–40%'], fill: '#f97316' },
+        { bracket: '41–60%', label: 'Em transição', count: histogramCounts['41–60%'], fill: '#facc15' },
+        { bracket: '61–80%', label: 'Meta Atingida', count: histogramCounts['61–80%'], fill: '#38bdf8' },
+        { bracket: '81–100%', label: 'Avançado', count: histogramCounts['81–100%'], fill: '#10b981' },
       ]
     : [
-        { bracket: '0–20%', count: Math.round(totalParticipatingSchools * 0.17) || 12, fill: '#38bdf8' },
-        { bracket: '21–40%', count: Math.round(totalParticipatingSchools * 0.25) || 18, fill: '#60a5fa' },
-        { bracket: '41–60%', count: Math.round(totalParticipatingSchools * 0.31) || 22, fill: '#fbbf24' },
-        { bracket: '61–80%', count: Math.round(totalParticipatingSchools * 0.22) || 16, fill: '#34d399' },
-        { bracket: '81–100%', count: Math.round(totalParticipatingSchools * 0.11) || 8, fill: '#10b981' },
+        { bracket: '0–20%', label: 'Crítico', count: Math.round(totalParticipatingSchools * 0.08) || 6, fill: '#ef4444' },
+        { bracket: '21–40%', label: 'Atenção', count: Math.round(totalParticipatingSchools * 0.18) || 13, fill: '#f97316' },
+        { bracket: '41–60%', label: 'Em transição', count: Math.round(totalParticipatingSchools * 0.28) || 20, fill: '#facc15' },
+        { bracket: '61–80%', label: 'Meta Atingida', count: Math.round(totalParticipatingSchools * 0.32) || 23, fill: '#38bdf8' },
+        { bracket: '81–100%', label: 'Avançado', count: Math.round(totalParticipatingSchools * 0.14) || 10, fill: '#10b981' },
       ];
 
   // 7. Situação real das Escolas (Donut)
@@ -765,6 +1103,7 @@ export async function getCncaDashboard(programId, filters = {}) {
     performanceDonut,
     componentBarResults,
     top5Schools,
+    componentEffectiveness,
     distributionHistogram,
     schoolStatusDonut,
     analysisText,
@@ -814,7 +1153,10 @@ export async function getCncaSchoolResults(programId, query = {}) {
     ],
   });
 
-  return results;
+  return results.map((r) => ({
+    ...r,
+    performanceLevels: normalizeResultLevels(r),
+  }));
 }
 
 /**
@@ -836,7 +1178,10 @@ export async function getCncaSingleSchoolDetail(programId, schoolId, query = {})
 
   return {
     school,
-    results,
+    results: results.map((r) => ({
+      ...r,
+      performanceLevels: normalizeResultLevels(r),
+    })),
   };
 }
 
@@ -1340,11 +1685,21 @@ export async function getCncaRanking(programId, query = {}) {
       let totalAdequate = 0;
       let count = 0;
       for (const it of items) {
-        if (Array.isArray(it.performanceLevels)) {
-          const adeq = it.performanceLevels
+        const pLevels = normalizeResultLevels(it);
+        if (pLevels.length > 0) {
+          const adeq = pLevels
             .filter((l) => {
-              const n = (l.level || '').toLowerCase();
-              return n.includes('adequado') || n.includes('avançado') || n.includes('avancado');
+              const n = (l.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+              return (
+                n.includes('avancado') ||
+                n.includes('adequado') ||
+                (n.includes('satisfatorio') && !n.includes('insatisfatorio')) ||
+                n.includes('fluente') ||
+                n.includes('alfabetico') ||
+                n.includes('proficiente') ||
+                n.includes('excelente') ||
+                n === 'alto'
+              );
             })
             .reduce((s, l) => s + (l.percentage || 0), 0);
           totalAdequate += adeq;
@@ -1371,7 +1726,7 @@ export async function getCncaRanking(programId, query = {}) {
       participationRate,
       rankValue,
       unit: indicatorConfig.unit,
-      performanceLevels: mainItem?.performanceLevels || [],
+      performanceLevels: normalizeResultLevels(mainItem),
       componentsCount: items.length,
     });
   }

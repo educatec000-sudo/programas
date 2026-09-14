@@ -490,15 +490,19 @@ export default function CncaSchoolResults({ program }) {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
                           {currentResult.performanceLevels.map((lvl, idx) => {
-                            const norm = (lvl.level || '').toLowerCase();
-                            let barColor = '#6b7280';
-                            if (norm.includes('avançado') || norm.includes('avancado') || norm.includes('fluente') || norm.includes('alfabético') || norm.includes('alfabetico') || norm === 'alto') {
+                            const norm = (lvl.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                            let barColor = '#64748b';
+                            if (norm.includes('avancado') || norm.includes('fluente') || norm.includes('alfabetico') || norm.includes('ortografico') || norm.includes('excelente') || norm === 'alto' || norm.includes('muito alto')) {
                               barColor = '#059669';
-                            } else if (norm.includes('adequado') || norm.includes('silábico-alfabético') || norm.includes('silabico-alfabetico') || norm === 'médio' || norm === 'medio') {
+                            } else if ((norm.includes('satisfatorio') && !norm.includes('insatisfatorio')) || norm.includes('adequado') || norm.includes('proficiente')) {
+                              barColor = '#16a34a';
+                            } else if (norm.includes('intermediario') || norm.includes('silabico-alfabetico') || norm === 'medio') {
                               barColor = '#0284c7';
-                            } else if (norm.includes('básico') || norm.includes('basico') || norm.includes('iniciante') || norm.includes('silábico') || norm.includes('silabico') || norm === 'baixo') {
+                            } else if (norm.includes('insatisfatorio') || norm.includes('basico') || norm.includes('iniciante') || norm.includes('silabico') || norm === 'baixo') {
                               barColor = '#d97706';
-                            } else if (norm.includes('abaixo') || norm.includes('não leitor') || norm.includes('nao leitor') || norm.includes('pré-leitor') || norm.includes('pre-leitor') || norm.includes('pré-silábico') || norm.includes('pre-silabico') || norm.includes('defasagem') || norm.includes('inadequado') || norm.includes('muito baixo')) {
+                            } else if (norm.includes('insuficiente') || norm.includes('critico')) {
+                              barColor = '#ea580c';
+                            } else if (norm.includes('inadequado') || norm.includes('abaixo') || norm.includes('nao leitor') || norm.includes('pre-leitor') || norm.includes('pre-silabico') || norm.includes('defasagem') || norm.includes('muito baixo') || norm.includes('muito critico')) {
                               barColor = '#dc2626';
                             }
 

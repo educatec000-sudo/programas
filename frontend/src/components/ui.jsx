@@ -159,3 +159,37 @@ export function StatCard({ icon, label, value, hint, tone = 'blue' }) {
 export function Alert({ type = 'info', children }) {
   return <div className={`alert alert-${type}`}>{children}</div>;
 }
+
+export class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="card card-pad" style={{ padding: 30, textAlign: 'center', background: '#fffafa', border: '1px solid #fecaca', borderRadius: 12, margin: '16px 0' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+          <h3 style={{ fontSize: 17, color: '#991b1b', marginBottom: 8, fontWeight: 700 }}>Não foi possível carregar este módulo</h3>
+          <p style={{ color: '#475569', fontSize: 12.5, marginBottom: 16 }}>
+            {this.state.error?.message || 'Erro inesperado na renderização.'}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}

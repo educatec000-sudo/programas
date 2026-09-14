@@ -36,7 +36,7 @@ function ProgramCard({ program, onOpen }) {
         }
       }}
     >
-      <div className={`program-card-accent program-card-accent-${program.status.toLowerCase()}`} />
+      <div className={`program-card-accent program-card-accent-${(program.status || 'PLANEJAMENTO').toLowerCase()}`} />
       <div className="program-card-header">
         <div>
           <div className="program-card-code">{program.code}</div>

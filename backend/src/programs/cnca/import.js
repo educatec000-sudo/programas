@@ -564,7 +564,7 @@ export function mapRowColumns(headers) {
       return;
     }
 
-    // 15. Níveis oficiais de desempenho
+    // 15. Níveis oficiais de desempenho (escala 6 níveis: Inadequado, Insuficiente, Insatisfatório, Intermediário, Satisfatório, Avançado; escala 4 níveis: Abaixo do Básico, Básico, Adequado, Avançado; psicogênese e fluência)
     const isPercent = norm.includes('%') || norm.includes('percent') || norm.includes('perc_');
     if (
       norm.includes('abaixo do basico') || norm.includes('abaixo do básico') || norm.includes('abaixo_basico') ||
@@ -574,17 +574,27 @@ export function mapRowColumns(headers) {
       norm.includes('defasagem') ||
       norm.includes('intermediario') || norm.includes('intermediário') ||
       norm.includes('inadequado') ||
+      norm.includes('insuficiente') ||
+      norm.includes('insatisfatorio') || norm.includes('insatisfatório') ||
+      norm.includes('satisfatorio') || norm.includes('satisfatório') ||
+      norm.includes('critico') || norm.includes('crítico') ||
+      norm.includes('muito critico') || norm.includes('muito crítico') ||
+      norm.includes('proficiente') ||
       norm.includes('muito baixo') ||
       norm.includes('baixo') ||
       norm.includes('medio') || norm.includes('médio') ||
       norm.includes('alto') ||
+      norm.includes('muito alto') ||
+      norm.includes('excelente') ||
       norm.includes('pre-leitor') || norm.includes('pre leitor') || norm.includes('pré-leitor') || norm.includes('pre_leitor') ||
+      norm.includes('nao leitor') || norm.includes('não leitor') ||
       norm.includes('leitor iniciante') || norm.includes('iniciante') ||
       norm.includes('leitor fluente') || norm.includes('fluente') ||
       norm.includes('pre-silabico') || norm.includes('pre silabico') || norm.includes('pré-silábico') || norm.includes('pre_silabico') ||
       norm.includes('silabico') || norm.includes('silábico') ||
       norm.includes('silabico-alfabetico') || norm.includes('silábico-alfabético') || norm.includes('silabico_alfabetico') ||
-      norm.includes('alfabetico') || norm.includes('alfabético')
+      norm.includes('alfabetico') || norm.includes('alfabético') ||
+      norm.includes('ortografico') || norm.includes('ortográfico')
     ) {
       mapping.levels.push({ name: String(header).trim(), colIdx: idx, isPercent });
       return;
@@ -889,7 +899,12 @@ export async function parseCncaSpreadsheet(
       if (fluentRate == null) {
         const fluentLevel = performanceLevels.find((l) => {
           const n = normalizeCncaText(l.level);
-          return (n.includes('fluente') || n.includes('alfabetico') || n.includes('alfabético') || n === 'alto') && !n.includes('pre-leitor') && !n.includes('iniciante');
+          return (
+            (n.includes('fluente') || n.includes('alfabetico') || n.includes('satisfatorio') || n.includes('adequado') || n.includes('avancado') || n === 'alto') &&
+            !n.includes('pre-leitor') &&
+            !n.includes('iniciante') &&
+            !n.includes('insatisfatorio')
+          );
         });
         if (fluentLevel) {
           if (fluentLevel.percentage != null) {

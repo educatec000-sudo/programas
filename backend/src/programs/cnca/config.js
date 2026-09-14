@@ -25,10 +25,12 @@ export const CNCA_COMPONENTS = {
     primaryMetricLabel: 'Proficiência Média',
     primaryMetricUnit: 'pontos',
     officialLevels: [
-      { id: 'ABAIXO_DO_BASICO', label: 'Abaixo do Básico', color: '#ef4444' },
-      { id: 'BASICO', label: 'Básico', color: '#f59e0b' },
-      { id: 'ADEQUADO', label: 'Adequado', color: '#10b981' },
-      { id: 'AVANCADO', label: 'Avançado', color: '#059669' },
+      { id: 'INADEQUADO', label: 'Inadequado', color: '#dc2626', aliases: ['inadequado', 'muito critico', 'muito crítico', 'abaixo do basico', 'abaixo do básico'] },
+      { id: 'INSUFICIENTE', label: 'Insuficiente', color: '#ea580c', aliases: ['insuficiente', 'critico', 'crítico'] },
+      { id: 'INSATISFATORIO', label: 'Insatisfatório', color: '#d97706', aliases: ['insatisfatorio', 'insatisfatório', 'basico', 'básico'] },
+      { id: 'INTERMEDIARIO', label: 'Intermediário', color: '#0284c7', aliases: ['intermediario', 'intermediário', 'medio', 'médio'] },
+      { id: 'SATISFATORIO', label: 'Satisfatório', color: '#16a34a', aliases: ['satisfatorio', 'satisfatório', 'adequado', 'proficiente'] },
+      { id: 'AVANCADO', label: 'Avançado', color: '#059669', aliases: ['avancado', 'avançado', 'alto', 'excelente'] },
     ],
     rankingIndicators: [
       { id: 'MATEMATICA_PROFICIENCIA', label: 'Proficiência Média (Matemática)', field: 'averageScore', unit: 'pontos' },
@@ -60,10 +62,12 @@ export const CNCA_COMPONENTS = {
     primaryMetricLabel: 'Proficiência Média',
     primaryMetricUnit: 'pontos',
     officialLevels: [
-      { id: 'ABAIXO_DO_BASICO', label: 'Abaixo do Básico', color: '#ef4444' },
-      { id: 'BASICO', label: 'Básico', color: '#f59e0b' },
-      { id: 'ADEQUADO', label: 'Adequado', color: '#10b981' },
-      { id: 'AVANCADO', label: 'Avançado', color: '#059669' },
+      { id: 'INADEQUADO', label: 'Inadequado', color: '#dc2626', aliases: ['inadequado', 'muito critico', 'muito crítico', 'abaixo do basico', 'abaixo do básico'] },
+      { id: 'INSUFICIENTE', label: 'Insuficiente', color: '#ea580c', aliases: ['insuficiente', 'critico', 'crítico'] },
+      { id: 'INSATISFATORIO', label: 'Insatisfatório', color: '#d97706', aliases: ['insatisfatorio', 'insatisfatório', 'basico', 'básico'] },
+      { id: 'INTERMEDIARIO', label: 'Intermediário', color: '#0284c7', aliases: ['intermediario', 'intermediário', 'medio', 'médio'] },
+      { id: 'SATISFATORIO', label: 'Satisfatório', color: '#16a34a', aliases: ['satisfatorio', 'satisfatório', 'adequado', 'proficiente'] },
+      { id: 'AVANCADO', label: 'Avançado', color: '#059669', aliases: ['avancado', 'avançado', 'alto', 'excelente'] },
     ],
     rankingIndicators: [
       { id: 'LEITURA_PROFICIENCIA', label: 'Proficiência Média (Leitura)', field: 'averageScore', unit: 'pontos' },
@@ -172,3 +176,71 @@ export function detectComponent(hint) {
   }
   return null;
 }
+
+/**
+ * Retorna a ordem pedagógica padrão de um nível de desempenho (1 = mais crítico a 6 = mais avançado).
+ */
+export function getLevelRank(levelName = '') {
+  const norm = String(levelName || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // 1. Inadequado / Muito Crítico / Abaixo do Básico / Pré-leitor / Pré-silábico
+  if (
+    norm.includes('inadequado') ||
+    norm.includes('muito critico') ||
+    norm.includes('muito baixo') ||
+    norm.includes('abaixo') ||
+    norm.includes('nao leitor') ||
+    norm.includes('pre-leitor') ||
+    norm.includes('pre-silabico') ||
+    norm.includes('defasagem')
+  ) {
+    return 1;
+  }
+  // 2. Insuficiente / Crítico
+  if (norm.includes('insuficiente') || norm.includes('critico')) {
+    return 2;
+  }
+  // 3. Insatisfatório / Básico / Iniciante / Silábico / Baixo
+  if (
+    norm.includes('insatisfatorio') ||
+    norm.includes('basico') ||
+    norm.includes('iniciante') ||
+    norm.includes('silabico') ||
+    norm === 'baixo'
+  ) {
+    return 3;
+  }
+  // 4. Intermediário / Silábico-Alfabético / Médio
+  if (
+    norm.includes('intermediario') ||
+    norm.includes('silabico-alfabetico') ||
+    norm === 'medio'
+  ) {
+    return 4;
+  }
+  // 5. Satisfatório / Adequado / Proficiente
+  if (
+    (norm.includes('satisfatorio') && !norm.includes('insatisfatorio')) ||
+    norm.includes('adequado') ||
+    norm.includes('proficiente')
+  ) {
+    return 5;
+  }
+  // 6. Avançado / Fluente / Alfabético / Ortográfico / Excelente / Alto
+  if (
+    norm.includes('avancado') ||
+    norm.includes('fluente') ||
+    norm.includes('alfabetico') ||
+    norm.includes('ortografico') ||
+    norm.includes('excelente') ||
+    norm === 'alto' ||
+    norm.includes('muito alto')
+  ) {
+    return 6;
+  }
+  return 10;
+}
+
