@@ -5,6 +5,7 @@ import { programsApi, schoolsApi, rankingsApi, analyticsApi, resultsApi, goalsAp
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
+import ProgramHeader from '../components/ProgramHeader.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { Button, Field, Input, Modal, Badge, LoadingBlock, Tabs, Select, ConfirmDialog, ErrorBoundary } from '../components/ui.jsx';
 import { EvolutionChart, ClassificationDonut } from '../components/charts.jsx';
@@ -128,130 +129,21 @@ export default function ProgramDetail() {
     }
   };
 
-  const isCnca =
-    implementation?.catalogCode === 'CNCA' ||
-    implementation?.code?.startsWith('CNCA') ||
-    implementation?.code === 'CNCA-2026' ||
-    program.catalog?.code === 'CNCA' ||
-    program.code?.startsWith('CNCA');
-
-  const isPacto =
-    implementation?.catalogCode === 'PACTO-ALFABETIZACAO' ||
-    implementation?.code?.startsWith('PACTO') ||
-    implementation?.code === 'PACTO-ALFABETIZACAO-2026' ||
-    program.catalog?.code === 'PACTO-ALFABETIZACAO' ||
-    program.code?.startsWith('PACTO');
-
   return (
     <>
-      {isPacto ? (
-        <div className="pacto-main-top-header">
-          <div className="pacto-main-title-group">
-            <div className="pacto-main-book-icon-wrap">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-0-5H20" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="pacto-main-title">Pacto pela Alfabetização</h1>
-              <div className="pacto-main-subtitle">
-                Alfabetização na idade certa, um compromisso de todos.
-              </div>
-            </div>
-          </div>
-
-          <div className="pacto-main-header-right-controls">
-            <div className="pacto-main-year-selector-box">
-              <label className="pacto-main-year-label">ANO</label>
-              <Select
-                value={program.id}
-                onChange={(event) => navigate(`/programas/${event.target.value}`)}
-                className="pacto-main-header-year-select"
-              >
-                {(program.cycles || []).map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.year}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        </div>
-      ) : isCnca ? (
-        <div className="cnca-top-header">
-          <div className="cnca-title-group">
-            <div className="cnca-book-icon-wrap">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-0-5H20" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="cnca-main-title">CNCA – Compromisso Nacional Criança Alfabetizada</h1>
-              <div className="cnca-main-subtitle">
-                Acompanhamento dos resultados de alfabetização da rede municipal
-              </div>
-            </div>
-          </div>
-
-          <div className="cnca-header-right-controls">
-            <div className="cnca-year-selector-box">
-              <label className="cnca-year-label">ANO</label>
-              <Select
-                value={program.id}
-                onChange={(event) => navigate(`/programas/${event.target.value}`)}
-                className="cnca-header-year-select"
-              >
-                {(program.cycles || []).map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.year}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <PageHeader
-          title={program.catalog?.name || program.name}
-          subtitle={
-            `${program.catalog?.code || program.code} · Ciclo ${program.year} · ${program.catalog?.organ || program.organ || '—'} · ${program.indicators?.length || 0} critérios · ${program.schools?.length || 0} escolas`
-          }
-          actions={
-            <>
-              <Badge cls={statusInfo?.cls}>{statusInfo?.label}</Badge>
-              <Link to="/programas" className="btn btn-secondary btn-sm">← Voltar</Link>
-            </>
-          }
-        />
-      )}
-
-      {!isCnca && !isPacto && (
-        <div className="card card-pad program-cycle-context">
-          <div>
-            <div className="card-title">Ano/ciclo do programa</div>
-            <div className="card-subtitle">Cada ciclo possui escolas, turmas, avaliações e resultados independentes.</div>
-          </div>
-          <Field label="Ciclo em uso" className="program-cycle-selector">
-            <Select value={program.id} onChange={(event) => navigate(`/programas/${event.target.value}`)}>
-              {(program.cycles || []).map((cycle) => (
-                <option key={cycle.id} value={cycle.id}>
-                  {cycle.year}{cycle.periodLabel ? ` · ${cycle.periodLabel}` : ''} · {PROGRAM_STATUS[cycle.status]?.label || cycle.status}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <div className="program-cycle-actions">
-            {can('programs:write') && <Button size="sm" variant="secondary" onClick={openCycleModal}>+ Adicionar ciclo</Button>}
-            {can('programs:delete') && <Button size="sm" variant="danger" onClick={openDeleteModal}>Excluir programa</Button>}
-          </div>
-        </div>
-      )}
+      <ProgramHeader
+        program={program}
+        onCycleChange={(newCycleId) => navigate(`/programas/${newCycleId}`)}
+        onAddCycle={openCycleModal}
+        onDeleteProgram={openDeleteModal}
+        can={can}
+      />
 
       <Tabs
         active={tab}
         onChange={setTab}
         tabs={[
-          { key: 'resumo', label: (isCnca || isPacto) ? 'Visão Geral' : 'Visão geral' },
+          { key: 'resumo', label: 'Visão Geral' },
           ...specificTabs.map((item) => ({ key: item.key, label: item.label })),
           sharedTabEnabled('escolas') ? { key: 'escolas', label: 'Escolas participantes', count: program.schools?.length || 0 } : null,
           sharedTabEnabled('criterios') && can('indicators:read') ? { key: 'criterios', label: 'Critérios de avaliação', count: program.indicators?.length || 0 } : null,

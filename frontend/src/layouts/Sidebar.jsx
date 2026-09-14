@@ -1,70 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { Icon } from '../components/icons.jsx';
-import { programsApi } from '../services/resources.js';
 
 export default function Sidebar() {
   const { user, can } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  const [programsOpen, setProgramsOpen] = useState(true);
-  const [programsList, setProgramsList] = useState([]);
 
-  useEffect(() => {
-    programsApi
-      .list()
-      .then((res) => setProgramsList(res.data || []))
-      .catch(() => {});
-  }, []);
-
-  const safeIncludes = (val, search) =>
-    typeof val === 'string' && val.toLowerCase().includes(search.toLowerCase());
-
-  // Procura os IDs dos programas Pacto, PARC e CNCA
-  const pactoProg = programsList.find(
-    (p) =>
-      p?.catalog?.code === 'PACTO-ALFABETIZACAO' ||
-      p?.code?.startsWith('PACTO') ||
-      safeIncludes(p?.name, 'pacto'),
-  );
-  const parcProg = programsList.find(
-    (p) =>
-      p?.catalog?.code === 'PARC' ||
-      p?.code?.startsWith('PARC') ||
-      safeIncludes(p?.name, 'parc'),
-  );
-  const cncaProg = programsList.find(
-    (p) =>
-      p?.catalog?.code === 'CNCA' ||
-      p?.code?.startsWith('CNCA') ||
-      safeIncludes(p?.name, 'cnca') ||
-      safeIncludes(p?.name, 'criança alfabetizada') ||
-      safeIncludes(p?.name, 'crianca alfabetizada'),
-  );
-
-  const pactoUrl = pactoProg ? `/programas/${pactoProg.id}` : '/programas';
-  const parcUrl = parcProg ? `/programas/${parcProg.id}` : '/programas';
-  const cncaUrl = cncaProg ? `/programas/${cncaProg.id}` : '/programas';
-
-  const isProgramActive = (targetId, fallbackMatch) => {
-    if (targetId && location.pathname.includes(targetId)) return true;
-    if (fallbackMatch && location.pathname.includes(fallbackMatch)) return true;
-    return false;
-  };
-
-  const isAnyProgramPage =
-    location.pathname.startsWith('/programas') ||
-    isProgramActive(pactoProg?.id, 'pacto') ||
-    isProgramActive(parcProg?.id, 'parc') ||
-    isProgramActive(cncaProg?.id, 'cnca');
+  const isProgramActive = location.pathname.startsWith('/programas');
 
   return (
     <aside className="sidebar">
-      {/* BRAND HEADER */}
+      {/* BRAND HEADER COM LOGO E ESCUDO CPE */}
       <div className="sidebar-brand">
         <div className="logo-icon-wrap">
-          {Icon.cpeLogo()}
+          {Icon.cpeLogo ? Icon.cpeLogo() : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          )}
         </div>
         <div className="brand-text">
           <div className="title">CPE</div>
@@ -72,13 +26,13 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* MAIN NAVIGATION */}
+      {/* NAVEGAÇÃO PRINCIPAL */}
       <div className="sidebar-scrollable">
         <nav className="sidebar-nav">
           <NavLink
             to="/"
             end
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            className={({ isActive }) => `nav-link nav-link-home ${isActive ? 'active' : ''}`}
           >
             <span className="icon">{Icon.home()}</span>
             <span>Início</span>
@@ -92,66 +46,13 @@ export default function Sidebar() {
             <span>Escolas</span>
           </NavLink>
 
-          {/* PROGRAMAS COM SUBMENU RETRÁTIL */}
-          <div className="nav-group">
-            <div
-              className={`nav-link nav-group-header ${isAnyProgramPage ? 'parent-active' : ''}`}
-              onClick={() => setProgramsOpen((prev) => !prev)}
-              style={{ cursor: 'pointer', userSelect: 'none' }}
-            >
-              <span className="icon">{Icon.shield()}</span>
-              <span>Programas</span>
-              <span className="nav-chevron">
-                {programsOpen ? Icon.chevronUp() : Icon.chevronDown()}
-              </span>
-            </div>
-
-            {programsOpen && (
-              <div className="nav-submenu">
-                <NavLink
-                  to={pactoUrl}
-                  className={() =>
-                    `nav-sub-item ${
-                      isProgramActive(pactoProg?.id, 'pacto') ? 'active-sub' : ''
-                    }`
-                  }
-                >
-                  Pacto pela Alfabetização
-                </NavLink>
-
-                <NavLink
-                  to={parcUrl}
-                  className={() =>
-                    `nav-sub-item ${
-                      isProgramActive(parcProg?.id, 'parc') ? 'active-sub' : ''
-                    }`
-                  }
-                >
-                  PARC
-                </NavLink>
-
-                <NavLink
-                  to={cncaUrl}
-                  className={() =>
-                    `nav-sub-item ${
-                      isProgramActive(cncaProg?.id, 'cnca') ? 'active-sub' : ''
-                    }`
-                  }
-                >
-                  CNCA
-                </NavLink>
-              </div>
-            )}
-          </div>
-
+          {/* ITEM DIRETO DE PROGRAMAS */}
           <NavLink
             to="/programas"
-            className={({ isActive }) =>
-              `nav-link ${isActive && !location.pathname.includes('/programas/') ? 'active' : ''}`
-            }
+            className={() => `nav-link ${isProgramActive ? 'active' : ''}`}
           >
-            <span className="icon">{Icon.indicator()}</span>
-            <span>Indicadores</span>
+            <span className="icon">{Icon.shield()}</span>
+            <span>Programas</span>
           </NavLink>
 
           <NavLink
@@ -204,7 +105,7 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* BOTTOM SECTION */}
+      {/* SEÇÃO INFERIOR */}
       <div className="sidebar-bottom">
         <NavLink
           to="/usuarios"
@@ -222,7 +123,22 @@ export default function Sidebar() {
           <span>Configurações</span>
         </NavLink>
       </div>
+
+      {/* DECORAÇÃO DE ONDAS NO RODAPÉ DA SIDEBAR */}
+      <div className="sidebar-wave-decoration">
+        <svg viewBox="0 0 260 40" fill="none" preserveAspectRatio="none">
+          <path
+            d="M0 25 C70 40 180 0 260 20 L260 40 L0 40 Z"
+            fill="#f59e0b"
+            opacity="0.3"
+          />
+          <path
+            d="M0 30 C90 10 170 38 260 22 L260 40 L0 40 Z"
+            fill="#2563eb"
+            opacity="0.5"
+          />
+        </svg>
+      </div>
     </aside>
   );
 }
-

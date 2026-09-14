@@ -66,38 +66,43 @@ export default function ParcRanking({ program }) {
   }, [rankingList, search]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Barra de Filtros e Indicadores do Ranking */}
-      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', background: '#f8fafc' }}>
-        <Field label="Ciclo / Modo de Classificação" style={{ minWidth: 220 }}>
+      <div className="program-filter-panel">
+        <div className="program-filter-item" style={{ minWidth: 200 }}>
+          <label className="program-filter-label">Ciclo / Modo de Classificação</label>
           <Select
             value={selectedCycle}
             onChange={(e) => {
               setSelectedCycle(e.target.value);
               setSelectedIndicator(e.target.value === 'EVOLUCAO' ? 'DELTA_FLUENTE' : 'FLUENTE');
             }}
-            style={{ fontWeight: 600, color: 'var(--primary)', borderColor: 'var(--primary)' }}
+            className="program-select"
+            style={{ fontWeight: 700, color: '#0284c7' }}
           >
             <option value="ENTRADA">📥 Ciclo de Entrada (Diagnóstica)</option>
             <option value="SAIDA">📤 Ciclo de Saída (Final)</option>
             <option value="EVOLUCAO">🚀 Ranking de Evolução (Entrada × Saída)</option>
           </Select>
-        </Field>
+        </div>
 
-        <Field label="Indicador de Classificação" style={{ minWidth: 320 }}>
+        <div className="program-filter-item" style={{ minWidth: 240 }}>
+          <label className="program-filter-label">Indicador de Classificação</label>
           <Select
             value={effectiveIndicator}
             onChange={(e) => setSelectedIndicator(e.target.value)}
+            className="program-select"
             style={{ fontWeight: 600 }}
           >
             {availableIndicators.map((ind) => (
               <option key={ind.id} value={ind.id}>{ind.label}</option>
             ))}
           </Select>
-        </Field>
+        </div>
 
-        <Field label="Localização / Zona" style={{ minWidth: 160 }}>
-          <Select value={zone} onChange={(e) => setZone(e.target.value)}>
+        <div className="program-filter-item" style={{ minWidth: 160 }}>
+          <label className="program-filter-label">Localização / Zona</label>
+          <Select value={zone} onChange={(e) => setZone(e.target.value)} className="program-select">
             <option value="TODAS">Todas as zonas</option>
             {(filtersData?.zones || ['URBANA', 'RURAL']).map((z) => (
               <option key={z} value={z}>
@@ -105,24 +110,17 @@ export default function ParcRanking({ program }) {
               </option>
             ))}
           </Select>
-        </Field>
+        </div>
 
-        <Field label="Ano">
-          <Select value={year || program.year} onChange={(e) => setYear(e.target.value)}>
-            {(filtersData?.years || [program.year]).map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </Select>
-        </Field>
-
-        <div style={{ marginLeft: 'auto', alignSelf: 'flex-end' }}>
+        <div className="program-filter-item">
+          <label className="program-filter-label">Buscar Escola</label>
           <input
             type="text"
-            className="input"
-            placeholder="🔎 Buscar escola ou INEP..."
+            className="input program-select"
+            placeholder="Buscar escola ou INEP..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 240, fontSize: 13 }}
+            style={{ height: 36, width: 220 }}
           />
         </div>
       </div>

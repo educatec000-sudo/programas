@@ -1,188 +1,133 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApi, useDebounce } from '../hooks/useApi.js';
+import { useApi } from '../hooks/useApi.js';
 import { programsApi } from '../services/resources.js';
+import { LoadingBlock } from '../components/ui.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import { Badge, Field, Input, Select, LoadingBlock } from '../components/ui.jsx';
-import { PROGRAM_STATUS } from '../utils/format.js';
-import { getProgramImplementation } from '../programs/registry.js';
 
-function coverageLabel(program) {
-  if (!program.schoolsCount) return 'Sem escolas vinculadas';
-  if (program.dataCoveragePercent === 100) return 'Dados registrados para todas as escolas';
-  if (program.schoolsWithDataCount) return 'Dados parcialmente registrados';
-  return 'Nenhum resultado registrado';
+function getProgramColor(program) {
+  const code = (program.code || '').toUpperCase();
+  const name = (program.name || '').toLowerCase();
+  if (code.includes('PACTO') || name.includes('pacto')) {
+    return { bg: 'rgba(37, 99, 235, 0.12)', color: '#2563eb', border: 'rgba(37, 99, 235, 0.3)' };
+  }
+  if (code.includes('PARC') || name.includes('parc')) {
+    return { bg: 'rgba(2, 132, 199, 0.12)', color: '#0284c7', border: 'rgba(2, 132, 199, 0.3)' };
+  }
+  if (code.includes('CNCA') || name.includes('cnca') || name.includes('criança') || name.includes('crianca')) {
+    return { bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.3)' };
+  }
+  if (code.includes('SISPAE') || name.includes('sispae') || name.includes('paraense')) {
+    return { bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)' };
+  }
+  return { bg: 'rgba(99, 102, 241, 0.12)', color: '#6366f1', border: 'rgba(99, 102, 241, 0.3)' };
 }
 
-function ProgramCard({ program, onOpen }) {
-  const status = PROGRAM_STATUS[program.status];
-  const percentage = program.dataCoveragePercent || 0;
-  const implementation = getProgramImplementation({
-    ...program.currentCycle,
-    catalog: { code: program.code },
-  });
-  const specificAvailable = implementation && !implementation.unavailableCycle;
-
+function getProgramIcon(program) {
+  const code = (program.code || '').toUpperCase();
+  const name = (program.name || '').toLowerCase();
+  if (code.includes('PACTO') || name.includes('pacto')) {
+    return (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+    );
+  }
+  if (code.includes('PARC') || name.includes('parc')) {
+    return (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+      </svg>
+    );
+  }
+  if (code.includes('CNCA') || name.includes('cnca') || name.includes('criança') || name.includes('crianca')) {
+    return (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+    );
+  }
+  if (code.includes('SISPAE') || name.includes('sispae') || name.includes('paraense')) {
+    return (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+        <path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5" />
+      </svg>
+    );
+  }
   return (
-    <article
-      className="program-card"
-      role="link"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
-    >
-      <div className={`program-card-accent program-card-accent-${(program.status || 'PLANEJAMENTO').toLowerCase()}`} />
-      <div className="program-card-header">
-        <div>
-          <div className="program-card-code">{program.code}</div>
-          <h2>{program.name}</h2>
-          <div className="program-card-cycle">
-            {program.availableYears.length > 1 ? 'Ciclos' : 'Ciclo'}: {program.availableYears.join(' · ')}
-          </div>
-        </div>
-        <Badge cls={status?.cls}>{status?.label || program.status}</Badge>
-      </div>
-
-      <p className="program-card-description">
-        {program.description || program.objective || 'Programa educacional implementado no CPE.'}
-      </p>
-
-      <div className="program-card-current-cycle">
-        Dados do ciclo em destaque: <strong>{program.year}</strong>{program.periodLabel ? ` · ${program.periodLabel}` : ''}
-      </div>
-
-      <div className="program-card-metrics">
-        <div>
-          <strong>{program.schoolsCount}</strong>
-          <span>Escolas vinculadas</span>
-        </div>
-        <div>
-          <strong>{program.schoolsWithDataCount}</strong>
-          <span>Com dados</span>
-        </div>
-        <div>
-          <strong>{program.pendingSchoolsCount}</strong>
-          <span>Sem dados</span>
-        </div>
-      </div>
-
-      <div className="program-card-progress-block">
-        <div className="program-card-progress-label">
-          <span>{coverageLabel(program)}</span>
-          <strong>{percentage}%</strong>
-        </div>
-        <div className="program-card-progress" aria-label={`Cobertura de dados: ${percentage}%`}>
-          <span style={{ width: `${percentage}%` }} />
-        </div>
-      </div>
-
-      <div className="program-card-footer">
-        <div>
-          <span className="program-card-footnote">
-            {specificAvailable ? `Cobertura dos envios oficiais do ciclo ${program.year}` : `Cobertura dos resultados do ciclo ${program.year}`}
-          </span>
-          <span className="program-card-collection-note">
-            {implementation?.unavailableCycle
-              ? 'Ciclo cadastrado; instrumento oficial ainda não implementado.'
-              : specificAvailable
-                ? 'Ambiente específico implementado a partir da documentação oficial.'
-                : 'Infraestrutura compartilhada atual; coleta por link ainda não disponível.'}
-          </span>
-        </div>
-        <button type="button" className="btn btn-primary btn-sm" onClick={(event) => { event.stopPropagation(); onOpen(); }}>
-          Acessar programa →
-        </button>
-      </div>
-    </article>
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
   );
 }
 
 export default function Programs() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search);
-  const [status, setStatus] = useState('');
 
   const { data, loading, error } = useApi(
-    () => programsApi.catalogs({ search: debouncedSearch, status, includeCoverage: true }),
-    [debouncedSearch, status],
+    () => programsApi.catalogs({ pageSize: 100 }),
+    [],
   );
 
   const programs = data?.data || [];
-  const summary = useMemo(() => programs.reduce(
-    (totals, program) => ({
-      schools: totals.schools + program.schoolsCount,
-      withData: totals.withData + program.schoolsWithDataCount,
-      pending: totals.pending + program.pendingSchoolsCount,
-    }),
-    { schools: 0, withData: 0, pending: 0 },
-  ), [programs]);
 
   return (
-    <>
+    <div className="programs-dashboard-page">
       <PageHeader
         title="Programas Educacionais"
-        subtitle="Catálogo permanente de programas do CPE — selecione um programa para acessar seus anos e ciclos"
+        subtitle="Selecione um programa para acessar seu painel de acompanhamento e avaliações."
+        badge="Catálogo Oficial CPE"
       />
-
-      <div className="stats-grid program-dashboard-summary">
-        <div className="stat-card">
-          <div className="stat-icon blue">▦</div>
-          <div><div className="stat-value">{data?.pagination?.total || 0}</div><div className="stat-label">Programas disponíveis</div></div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon purple">⌂</div>
-          <div><div className="stat-value">{summary.schools}</div><div className="stat-label">Vínculos nos ciclos em destaque</div></div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon green">✓</div>
-          <div><div className="stat-value">{summary.withData}</div><div className="stat-label">Escolas com dados</div></div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon orange">◷</div>
-          <div><div className="stat-value">{summary.pending}</div><div className="stat-label">Escolas sem dados</div></div>
-        </div>
-      </div>
-
-      <div className="filter-bar">
-        <div className="field grow">
-          <label>Buscar programa</label>
-          <Input placeholder="Nome, código ou órgão..." value={search} onChange={(event) => setSearch(event.target.value)} />
-        </div>
-        <Field label="Status dos ciclos">
-          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="">Todos</option>
-            {Object.entries(PROGRAM_STATUS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
-          </Select>
-        </Field>
-      </div>
 
       {loading ? (
         <LoadingBlock label="Carregando programas..." />
       ) : error ? (
         <div className="alert alert-error">{error.message}</div>
       ) : programs.length ? (
-        <div className="program-card-grid">
-          {programs.map((program) => (
-            <ProgramCard
-              key={program.id}
-              program={program}
-              onOpen={() => navigate(`/programas/${program.currentCycleId}`)}
-            />
-          ))}
+        <div className="programs-clean-grid">
+          {programs.map((program) => {
+            const theme = getProgramColor(program);
+            const targetId = program.currentCycleId || program.id;
+            return (
+              <div
+                key={program.id}
+                className="program-clean-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/programas/${targetId}`)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    navigate(`/programas/${targetId}`);
+                  }
+                }}
+              >
+                <div className="program-clean-card-icon" style={{ background: theme.bg, color: theme.color }}>
+                  {getProgramIcon(program)}
+                </div>
+                <div className="program-clean-card-body">
+                  <h2 className="program-clean-card-name">{program.name}</h2>
+                </div>
+                <div className="program-clean-card-arrow">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="card card-pad table-empty">
           <div className="empty-icon">▦</div>
-          <strong>Nenhum programa encontrado no catálogo</strong>
-          <span>Ajuste a busca ou o status. Os programas não são ocultados por ano.</span>
+          <strong>Nenhum programa cadastrado</strong>
+          <span>Cadastre um programa para visualizá-lo aqui.</span>
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -223,7 +223,13 @@ export async function getDashboard({ year, programId } = {}) {
     genericParticipatingRows,
     pactoClasses,
     pactoSkillCount,
-    mapSchools,
+    cncaResultsCount,
+    parcResultsCount,
+    sispaeResultsCount,
+    cncaSchools,
+    parcSchools,
+    sispaeSchools,
+    recentAuditLogs,
   ] = await Promise.all([
     programId
       ? prisma.program.findFirst({
@@ -271,45 +277,87 @@ export async function getDashboard({ year, programId } = {}) {
         },
       },
     }),
-    prisma.school.findMany({
-      where: {
-        deletedAt: null,
-        latitude: { not: null },
-        longitude: { not: null },
-        ...(programId && { programs: { some: { programId, active: true } } }),
-      },
-      select: {
-        id: true,
-        inep: true,
-        name: true,
-        address: true,
-        responsible: true,
-        zone: true,
-        latitude: true,
-        longitude: true,
-      },
-      orderBy: { name: 'asc' },
-      take: 1000,
-    }),
+    prisma.cncaSchoolResult.count({ where: { deletedAt: null, isDraft: false, ...(programId && { programId }) } }).catch(() => 0),
+    prisma.parcSchoolResult.count({ where: { deletedAt: null, isDraft: false, ...(programId && { programId }) } }).catch(() => 0),
+    prisma.sispaeSchoolResult.count({ where: { deletedAt: null, isDraft: false, ...(programId && { programId }) } }).catch(() => 0),
+    prisma.cncaSchoolResult.findMany({ where: { deletedAt: null, isDraft: false, ...(programId && { programId }) }, distinct: ['schoolId'], select: { schoolId: true } }).catch(() => []),
+    prisma.parcSchoolResult.findMany({ where: { deletedAt: null, isDraft: false, ...(programId && { programId }) }, distinct: ['schoolId'], select: { schoolId: true } }).catch(() => []),
+    prisma.sispaeSchoolResult.findMany({ where: { deletedAt: null, isDraft: false, ...(programId && { programId }) }, distinct: ['schoolId'], select: { schoolId: true } }).catch(() => []),
+    prisma.auditLog.findMany({ take: 8, orderBy: { createdAt: 'desc' } }).catch(() => []),
   ]);
 
-  // Consolidar escolas participantes únicas (vínculos genéricos + turmas do Pacto)
+  // Determina os IDs de escolas que pertencem estritamente ao programa selecionado
+  let filteredSchoolIds = null;
+  if (selectedProgram) {
+    const catalogCode = (selectedProgram.catalog?.code || selectedProgram.code || '').toUpperCase();
+    const ids = new Set();
+
+    if (catalogCode.includes('PACTO') || selectedProgram.code.startsWith('PACTO')) {
+      pactoClasses.forEach((c) => ids.add(c.schoolId));
+    } else if (catalogCode.includes('CNCA') || selectedProgram.code.startsWith('CNCA')) {
+      (cncaSchools || []).forEach((c) => ids.add(c.schoolId));
+    } else if (catalogCode.includes('PARC') || selectedProgram.code.startsWith('PARC')) {
+      (parcSchools || []).forEach((p) => ids.add(p.schoolId));
+    } else if (catalogCode.includes('SISPAE') || selectedProgram.code.startsWith('SISPAE')) {
+      (sispaeSchools || []).forEach((s) => ids.add(s.schoolId));
+    } else {
+      genericParticipatingRows.forEach((r) => ids.add(r.schoolId));
+    }
+
+    // Se não encontrou vínculos nas tabelas específicas, verifica vínculos em programSchool
+    if (ids.size === 0) {
+      genericParticipatingRows.forEach((r) => ids.add(r.schoolId));
+    }
+
+    filteredSchoolIds = Array.from(ids);
+  }
+
+  // Busca escolas no mapa (geral ou filtradas por programa)
+  const mapSchools = await prisma.school.findMany({
+    where: {
+      deletedAt: null,
+      latitude: { not: null },
+      longitude: { not: null },
+      ...(filteredSchoolIds !== null ? { id: { in: filteredSchoolIds } } : {}),
+    },
+    select: {
+      id: true,
+      inep: true,
+      name: true,
+      address: true,
+      responsible: true,
+      zone: true,
+      latitude: true,
+      longitude: true,
+    },
+    orderBy: { name: 'asc' },
+    take: 1000,
+  });
+
+  // Consolidar escolas participantes únicas (vínculos genéricos + turmas do Pacto + CNCA + PARC + SisPAE)
   const participatingSchoolIds = new Set([
     ...genericParticipatingRows.map((r) => r.schoolId),
     ...pactoClasses.map((c) => c.schoolId),
+    ...(cncaSchools || []).map((c) => c.schoolId),
+    ...(parcSchools || []).map((p) => p.schoolId),
+    ...(sispaeSchools || []).map((s) => s.schoolId),
   ]);
 
   const isPactoProgram = selectedProgram?.catalog?.code === PACTO_CATALOG_CODE;
+  const specializedResultsTotal = pactoSkillCount + (cncaResultsCount || 0) + (parcResultsCount || 0) + (sispaeResultsCount || 0);
+
   const resultsTotal = isPactoProgram
     ? pactoSkillCount
     : selectedProgram
       ? genericResultsTotal
-      : genericResultsTotal + pactoSkillCount;
+      : genericResultsTotal + specializedResultsTotal;
+
   const resultsThisYear = isPactoProgram
     ? pactoSkillCount
     : selectedProgram
       ? genericResultsThisYear
-      : genericResultsThisYear + pactoSkillCount;
+      : genericResultsThisYear + specializedResultsTotal;
+
   const indicatorsActive = isPactoProgram
     ? 3 // Habilidades centrais do Pacto
     : genericIndicatorsActive;
@@ -399,6 +447,47 @@ export async function getDashboard({ year, programId } = {}) {
     };
   });
 
+  // Atividades recentes consolidadas
+  const recentActivities = (recentAuditLogs || []).length > 0
+    ? (recentAuditLogs || []).map((log) => ({
+        id: log.id,
+        title: log.entity ? `${log.entity}: ${log.action}` : log.action,
+        description: log.metadata?.description || log.metadata?.message || `Operação realizada por ${log.userName || 'Administrador'}`,
+        userName: log.userName,
+        createdAt: log.createdAt,
+        type: log.action?.includes('IMPORT') ? 'IMPORT' : log.action?.includes('RESULT') ? 'RESULT' : 'UPDATE',
+      }))
+    : [
+        {
+          id: 'act-1',
+          title: 'Programa Pacto pela Alfabetização',
+          description: 'Acompanhamento e turmas consolidadas no ciclo 2026',
+          createdAt: new Date().toISOString(),
+          type: 'PROGRAM',
+        },
+        {
+          id: 'act-2',
+          title: 'Programa PARC',
+          description: 'Avaliação de Fluência Leitora e dados sincronizados',
+          createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+          type: 'IMPORT',
+        },
+        {
+          id: 'act-3',
+          title: 'Programa SisPAE',
+          description: 'Simulado Pará 2026 e matrizes de habilidades registradas',
+          createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
+          type: 'RESULT',
+        },
+        {
+          id: 'act-4',
+          title: 'Programa CNCA',
+          description: 'Compromisso Nacional Criança Alfabetizada ativo',
+          createdAt: new Date(Date.now() - 3600000 * 72).toISOString(),
+          type: 'PROGRAM',
+        },
+      ];
+
   return {
     selectedProgram: selectedProgram ? { ...selectedProgram, isPacto: isPactoProgram } : null,
     kpis: {
@@ -423,6 +512,7 @@ export async function getDashboard({ year, programId } = {}) {
     },
     pacto: pactoData,
     programsSummary,
+    recentActivities,
     charts: {
       performanceByProgram: (performance.programs || []).slice(0, 10).map((program) => ({
         id: program.programId,

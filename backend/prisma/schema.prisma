@@ -189,6 +189,7 @@ model School {
   pactoClasses    PactoClass[]
   cncaResults     CncaSchoolResult[]
   parcResults     ParcSchoolResult[]
+  sispaeResults   SispaeSchoolResult[]
 
   @@index([name])
   @@index([district])
@@ -265,16 +266,18 @@ model Program {
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
-  catalog         ProgramCatalog          @relation(fields: [catalogId], references: [id], onDelete: Restrict)
-  schools         ProgramSchool[]
-  indicators      ProgramIndicator[]
-  results         Result[]
-  goals           Goal[]
-  evaluations     Evaluation[]
-  collectionLinks ProgramCollectionLink[]
-  pactoClasses    PactoClass[]
-  cncaResults     CncaSchoolResult[]
-  parcResults     ParcSchoolResult[]
+  catalog            ProgramCatalog          @relation(fields: [catalogId], references: [id], onDelete: Restrict)
+  schools            ProgramSchool[]
+  indicators         ProgramIndicator[]
+  results            Result[]
+  goals              Goal[]
+  evaluations        Evaluation[]
+  collectionLinks    ProgramCollectionLink[]
+  pactoClasses       PactoClass[]
+  cncaResults        CncaSchoolResult[]
+  parcResults        ParcSchoolResult[]
+  sispaeApplications SispaeApplication[]
+  sispaeResults      SispaeSchoolResult[]
 
   @@unique([catalogId, year])
   @@index([year, status])
@@ -682,6 +685,95 @@ model ParcSchoolResult {
   @@index([programId, year, cycle])
   @@index([schoolId])
   @@index([cycle])
+}
+
+// ---------------------------- SISPAE — SISTEMA PARAENSE DE AVALIAÇÃO EDUCACIONAL ----------------------------
+
+enum SispaeApplicationType {
+  SIMULADO
+  AVALIACAO_OFICIAL
+}
+
+enum SispaeApplicationStatus {
+  PLANEJADA
+  EM_ANDAMENTO
+  CONCLUIDA
+  PUBLICADA
+}
+
+enum SispaeComponent {
+  LINGUA_PORTUGUESA
+  MATEMATICA
+  CIENCIAS_HUMANAS
+  CIENCIAS_NATUREZA
+  PRODUCAO_TEXTUAL
+  OUTRO
+}
+
+/**
+ * Aplicação avaliativa do SisPAE (Sistema Paraense de Avaliação Educacional).
+ * Permite gerenciar Simulados (ex: Simulado Pará 2026 – Alfabetização)
+ * e Avaliações Oficiais (ex: Avaliação SisPAE 2026) como aplicações independentes.
+ */
+model SispaeApplication {
+  id          String                  @id @default(uuid())
+  programId   String
+  name        String // ex.: "Simulado Pará 2026 – Alfabetização", "Avaliação SisPAE 2026"
+  type        SispaeApplicationType   @default(SIMULADO)
+  year        Int                     @default(2026)
+  stage       String? // ex.: "Alfabetização", "Ensino Fundamental"
+  description String?
+  status      SispaeApplicationStatus @default(PUBLICADA)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  program Program              @relation(fields: [programId], references: [id], onDelete: Cascade)
+  results SispaeSchoolResult[]
+
+  @@unique([programId, name, year])
+  @@index([programId, type, year])
+}
+
+/**
+ * Resultado da avaliação por escola no SisPAE.
+ * Cada resultado é estritamente vinculado à sua aplicação e componente,
+ * impedindo misturas entre simulados e avaliações oficiais.
+ */
+model SispaeSchoolResult {
+  id                String          @id @default(uuid())
+  programId         String
+  applicationId     String
+  schoolId          String
+  year              Int             @default(2026)
+  grade             String          @default("2º Ano")
+  component         SispaeComponent @default(LINGUA_PORTUGUESA)
+  enrolled          Int? // alunos previstos / matriculados
+  evaluated         Int? // alunos avaliados
+  participationRate Float? // taxa de participação (%)
+  averageScore      Float? // proficiência média / % de acerto geral
+
+  // Distribuição dos níveis de desempenho (JSON estruturado: [{ level: string, percentage?: number, count?: number }])
+  performanceLevels Json?
+
+  // Habilidades e descritores (JSON estruturado: [{ code: string, percentage?: number, description?: string }])
+  // Ex: [ { code: "H01", percentage: 58 }, { code: "H02", percentage: 61 }, ... ]
+  skills Json?
+
+  source     String   @default("IMPORTACAO") // "IMPORTACAO", "RASCUNHO", "MANUAL"
+  rawDetails Json? // metadados e colunas brutas preservadas da planilha oficial
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  program     Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  application SispaeApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  school      School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, applicationId, schoolId, grade, component])
+  @@index([programId, applicationId, component])
+  @@index([schoolId])
+  @@index([applicationId])
 }
 
 // ---------------------------- IMPORTAÇÕES ----------------------------

@@ -163,6 +163,39 @@ export const parcApi = {
     request(`/programs/${programId}/parc/filters`),
 };
 
+export const sispaeApi = {
+  dashboard: (programId, params) =>
+    request(`/programs/${programId}/sispae/dashboard`, { params }),
+  applications: (programId) =>
+    request(`/programs/${programId}/sispae/applications`),
+  createApplication: (programId, body) =>
+    request(`/programs/${programId}/sispae/applications`, { method: 'POST', body }),
+  updateApplication: (programId, appId, body) =>
+    request(`/programs/${programId}/sispae/applications/${appId}`, { method: 'PUT', body }),
+  deleteApplication: (programId, appId) =>
+    request(`/programs/${programId}/sispae/applications/${appId}`, { method: 'DELETE' }),
+  ranking: (programId, params) =>
+    request(`/programs/${programId}/sispae/ranking`, { params }),
+  analises: (programId, params) =>
+    request(`/programs/${programId}/sispae/analises`, { params }),
+  results: (programId, params) =>
+    request(`/programs/${programId}/sispae/results`, { params }),
+  schoolResults: (programId, params) =>
+    request(`/programs/${programId}/sispae/results`, { params }),
+  schools: (programId, params) =>
+    request(`/programs/${programId}/sispae/schools`, { params }),
+  previewImport: (programId, form) =>
+    request(`/programs/${programId}/sispae/import/preview`, { method: 'POST', body: form }),
+  confirmImport: (programId, body) =>
+    request(`/programs/${programId}/sispae/import/confirm`, { method: 'POST', body }),
+  manualEntry: (programId, body) =>
+    request(`/programs/${programId}/sispae/manual`, { method: 'POST', body }),
+  deleteResult: (programId, resultId) =>
+    request(`/programs/${programId}/sispae/results/${resultId}`, { method: 'DELETE' }),
+  bulkDeleteResults: (programId, body) =>
+    request(`/programs/${programId}/sispae/results/batch-delete`, { method: 'POST', body }),
+};
+
 export const pactoPublicApi = {
   bootstrap: (token) => request(`/public/pacto/${encodeURIComponent(token)}`),
   createClass: (token, body) =>

@@ -125,17 +125,19 @@ export default function ParcSchoolResults({ program }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Barra de Filtros e Ações */}
-      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end', background: '#f8fafc' }}>
-        <Field label="Ciclo" style={{ margin: 0, minWidth: 150 }}>
-          <Select value={cycle} onChange={(e) => setCycle(e.target.value)} style={{ fontSize: 13, height: 36 }}>
+      <div className="program-filter-panel">
+        <div className="program-filter-item" style={{ minWidth: 150 }}>
+          <label className="program-filter-label">Ciclo</label>
+          <Select value={cycle} onChange={(e) => setCycle(e.target.value)} className="program-select">
             <option value="TODOS">Todos os ciclos</option>
             <option value="ENTRADA">📥 Ciclo de Entrada</option>
             <option value="SAIDA">📤 Ciclo de Saída</option>
           </Select>
-        </Field>
+        </div>
 
-        <Field label="Localização / Zona" style={{ margin: 0, minWidth: 150 }}>
-          <Select value={zone} onChange={(e) => setZone(e.target.value)} style={{ fontSize: 13, height: 36 }}>
+        <div className="program-filter-item" style={{ minWidth: 150 }}>
+          <label className="program-filter-label">Localização / Zona</label>
+          <Select value={zone} onChange={(e) => setZone(e.target.value)} className="program-select">
             <option value="TODAS">Todas as zonas</option>
             {(filtersData?.zones || ['URBANA', 'RURAL']).map((z) => (
               <option key={z} value={z}>
@@ -143,33 +145,28 @@ export default function ParcSchoolResults({ program }) {
               </option>
             ))}
           </Select>
-        </Field>
+        </div>
 
-        <Field label="Status" style={{ margin: 0, minWidth: 130 }}>
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} style={{ fontSize: 13, height: 36 }}>
+        <div className="program-filter-item" style={{ minWidth: 130 }}>
+          <label className="program-filter-label">Status</label>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)} className="program-select">
             <option value="TODOS">Todos</option>
             <option value="PUBLICADO">Publicado</option>
             <option value="RASCUNHO">Rascunho</option>
           </Select>
-        </Field>
+        </div>
 
-        <Field label="Ano" style={{ margin: 0, minWidth: 100 }}>
-          <Select value={year || program.year} onChange={(e) => setYear(e.target.value)} style={{ fontSize: 13, height: 36 }}>
-            {(filtersData?.years || [program.year]).map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </Select>
-        </Field>
-
-        <Field label="Buscar Escola ou INEP" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+        <div className="program-filter-item" style={{ flex: 1, minWidth: 200 }}>
+          <label className="program-filter-label">Buscar Escola ou INEP</label>
           <Input
             type="text"
-            placeholder="🔎 Buscar escola ou código INEP..."
+            placeholder="Buscar escola ou código INEP..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ fontSize: 13, height: 36 }}
+            className="program-select"
+            style={{ height: 36 }}
           />
-        </Field>
+        </div>
 
         <div style={{ display: 'flex', gap: 8, alignSelf: 'flex-end', flexWrap: 'wrap' }}>
           {results.some((r) => r.isDraft) && (

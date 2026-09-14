@@ -20,6 +20,16 @@ import {
   ParcEvolution,
   ParcImport,
 } from './parc/index.js';
+import {
+  SispaeDashboard,
+  SispaeApplications,
+  SispaeSchools,
+  SispaeSchoolResults,
+  SispaeRanking,
+  SispaeAnalises,
+  SispaeImport,
+  SispaeRelatorios,
+} from './sispae/index.js';
 
 /**
  * Registro dos ambientes específicos de programas.
@@ -31,6 +41,7 @@ import {
 const PACTO_DISABLED_SHARED_TABS = ['escolas', 'criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios', 'historico'];
 const CNCA_DISABLED_SHARED_TABS = ['escolas', 'criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios', 'historico'];
 const PARC_DISABLED_SHARED_TABS = ['escolas', 'criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios', 'historico'];
+const SISPAE_DISABLED_SHARED_TABS = ['escolas', 'criterios', 'avaliacoes', 'resultados', 'ranking', 'graficos', 'relatorios', 'historico'];
 
 const PACTO_ADMIN_TABS = [
   { key: 'pacto-resultados', label: 'Resultados por Escola', Component: PactoSchoolResults },
@@ -38,6 +49,16 @@ const PACTO_ADMIN_TABS = [
   { key: 'pacto-analises', label: 'Análises', Component: PactoAnalises },
   { key: 'pacto-import', label: 'Importação', Component: PactoImport },
   { key: 'pacto-relatorios', label: 'Relatórios', Component: PactoRelatorios },
+];
+
+const SISPAE_ADMIN_TABS = [
+  { key: 'sispae-aplicacoes', label: 'Aplicações', Component: SispaeApplications },
+  { key: 'sispae-escolas', label: 'Escolas Participantes', Component: SispaeSchools },
+  { key: 'sispae-resultados', label: 'Resultados por Escola', Component: SispaeSchoolResults },
+  { key: 'sispae-ranking', label: 'Ranking', Component: SispaeRanking },
+  { key: 'sispae-analises', label: 'Análises & Habilidades', Component: SispaeAnalises },
+  { key: 'sispae-import', label: 'Importação', Component: SispaeImport },
+  { key: 'sispae-relatorios', label: 'Relatórios', Component: SispaeRelatorios },
 ];
 
 const implementations = [
@@ -104,6 +125,19 @@ const implementations = [
       { key: 'parc-import', label: 'Importar Planilha Oficial', Component: ParcImport },
     ],
   },
+  {
+    code: 'SISPAE-2026',
+    year: 2026,
+    disabledSharedTabs: SISPAE_DISABLED_SHARED_TABS,
+    OverviewComponent: SispaeDashboard,
+    adminTabs: SISPAE_ADMIN_TABS,
+  },
+  {
+    code: 'SISPAE',
+    disabledSharedTabs: SISPAE_DISABLED_SHARED_TABS,
+    OverviewComponent: SispaeDashboard,
+    adminTabs: SISPAE_ADMIN_TABS,
+  },
 ];
 
 function normalizeCode(code) {
@@ -157,6 +191,16 @@ export function getProgramImplementation(program) {
         { key: 'parc-evolucao', label: 'Evolução (Entrada × Saída)', Component: ParcEvolution },
         { key: 'parc-import', label: 'Importar Planilha Oficial', Component: ParcImport },
       ],
+    };
+  }
+
+  // Catálogo SisPAE genérico
+  if (normalizeCode(program.catalog?.code) === 'SISPAE' || normalizeCode(program.code).startsWith('SISPAE')) {
+    return {
+      catalogCode: 'SISPAE',
+      disabledSharedTabs: SISPAE_DISABLED_SHARED_TABS,
+      OverviewComponent: SispaeDashboard,
+      adminTabs: SISPAE_ADMIN_TABS,
     };
   }
 

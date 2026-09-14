@@ -38,11 +38,12 @@ export default function ParcEvolution({ program }) {
   }, [evolutionList, search]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Barra de Filtros */}
-      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', background: '#f8fafc' }}>
-        <Field label="Localização / Zona" style={{ minWidth: 160 }}>
-          <Select value={zone} onChange={(e) => setZone(e.target.value)}>
+      <div className="program-filter-panel">
+        <div className="program-filter-item" style={{ minWidth: 160 }}>
+          <label className="program-filter-label">Localização / Zona</label>
+          <Select value={zone} onChange={(e) => setZone(e.target.value)} className="program-select">
             <option value="TODAS">Todas as zonas</option>
             {(filtersData?.zones || ['URBANA', 'RURAL']).map((z) => (
               <option key={z} value={z}>
@@ -50,26 +51,27 @@ export default function ParcEvolution({ program }) {
               </option>
             ))}
           </Select>
-        </Field>
+        </div>
 
-        <Field label="Ano">
-          <Select value={year || program.year} onChange={(e) => setYear(e.target.value)}>
+        <div className="program-filter-item" style={{ minWidth: 140 }}>
+          <label className="program-filter-label">Ano</label>
+          <Select value={year || program.year} onChange={(e) => setYear(e.target.value)} className="program-select">
             {(filtersData?.years || [program.year]).map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
           </Select>
-        </Field>
+        </div>
 
-        <div style={{ flex: 1, minWidth: 240 }}>
-          <Field label="Buscar Escola ou INEP">
-            <input
-              type="text"
-              className="input"
-              placeholder="🔎 Buscar escola ou código INEP..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </Field>
+        <div className="program-filter-item" style={{ flex: 1, minWidth: 240 }}>
+          <label className="program-filter-label">Buscar Escola ou INEP</label>
+          <input
+            type="text"
+            className="input program-select"
+            placeholder="Buscar escola ou código INEP..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ height: 36 }}
+          />
         </div>
       </div>
 

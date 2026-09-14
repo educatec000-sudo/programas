@@ -313,52 +313,56 @@ export default function ParcDashboard({ program }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Barra Superior de Título Oficial e Filtros */}
-      <div className="card card-pad" style={{ background: '#f8fafc', padding: '16px 20px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 14 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            AVALIAÇÃO DE FLUÊNCIA LEITORA
-          </h2>
+      {/* 1. Barra de Filtros Padrão */}
+      <div className="program-filter-panel">
+        <div className="program-filter-item">
+          <label className="program-filter-label">Edição / Ciclo</label>
+          <Select
+            value={cycle}
+            onChange={(e) => setCycle(e.target.value)}
+            className="program-select"
+            style={{ fontWeight: 700, color: '#0284c7' }}
+          >
+            <option value="ENTRADA">2026 - Entrada</option>
+            <option value="SAIDA">2026 - Saída</option>
+            <option value="TODOS">Todos os Ciclos</option>
+          </Select>
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', justifyContent: 'flex-start' }}>
-          <Field label="Edição" style={{ minWidth: 180, margin: 0 }}>
-            <Select
-              value={cycle}
-              onChange={(e) => setCycle(e.target.value)}
-              style={{ fontWeight: 700, color: '#0284c7', borderColor: '#0284c7' }}
-            >
-              <option value="ENTRADA">2026 - Entrada</option>
-              <option value="SAIDA">2026 - Saída</option>
-              <option value="TODOS">Todos os Ciclos</option>
-            </Select>
-          </Field>
+        <div className="program-filter-item">
+          <label className="program-filter-label">Localização / Zona</label>
+          <Select
+            value={zone}
+            onChange={(e) => handleZoneChange(e.target.value)}
+            className="program-select"
+          >
+            <option value="TODAS">Todas as zonas</option>
+            {(filtersData?.zones || ['SEDE', 'ILHAS', 'ESTRADAS']).map((z) => (
+              <option key={z} value={z}>
+                {z === 'SEDE' ? '🏙️ Sede' : z === 'RURAL' ? '🌳 Rural' : z === 'URBANA' ? '🏙️ Urbana' : z === 'ILHAS' ? '⛵ Ilhas' : z === 'ESTRADAS' ? '🛣️ Estradas' : z}
+              </option>
+            ))}
+          </Select>
+        </div>
 
-          <Field label="Localização / Zona" style={{ minWidth: 170, margin: 0 }}>
-            <Select value={zone} onChange={(e) => handleZoneChange(e.target.value)}>
-              <option value="TODAS">Todas as zonas</option>
-              {(filtersData?.zones || ['SEDE', 'ILHAS', 'ESTRADAS']).map((z) => (
-                <option key={z} value={z}>
-                  {z === 'SEDE' ? '🏙️ Sede' : z === 'RURAL' ? '🌳 Rural' : z === 'URBANA' ? '🏙️ Urbana' : z === 'ILHAS' ? '⛵ Ilhas' : z === 'ESTRADAS' ? '🛣️ Estradas' : z}
-                </option>
-              ))}
-            </Select>
-          </Field>
+        <div className="program-filter-item">
+          <label className="program-filter-label">Distrito / Bairro</label>
+          <Select
+            value={district}
+            onChange={(e) => setDistrict(e.target.value)}
+            className="program-select"
+          >
+            <option value="TODOS">Todos os distritos</option>
+            {availableDistricts.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </Select>
+        </div>
 
-          <Field label="Distrito / Bairro" style={{ minWidth: 200, margin: 0 }}>
-            <Select value={district} onChange={(e) => setDistrict(e.target.value)}>
-              <option value="TODOS">Todos os distritos</option>
-              {availableDistricts.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </Select>
-          </Field>
-
-          <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: 8 }}>
-            <Badge cls={cycle === 'SAIDA' ? 'badge-green' : 'badge-blue'} style={{ fontSize: 13, padding: '6px 12px', fontWeight: 700 }}>
-              {cycle === 'SAIDA' ? '📤 Ciclo de Saída' : cycle === 'TODOS' ? '🌐 Visão Geral' : '📥 Ciclo de Entrada'} · 2º Ano
-            </Badge>
-          </div>
+        <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: 8 }}>
+          <Badge cls={cycle === 'SAIDA' ? 'badge-green' : 'badge-blue'} style={{ fontSize: 13, padding: '6px 12px', fontWeight: 700 }}>
+            {cycle === 'SAIDA' ? '📤 Ciclo de Saída' : cycle === 'TODOS' ? '🌐 Visão Geral' : '📥 Ciclo de Entrada'} · 2º Ano
+          </Badge>
         </div>
       </div>
 

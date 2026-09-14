@@ -105,6 +105,42 @@ export async function ensureCncaAndParc() {
       });
     }
 
+    // 3. Garante existência do catálogo e programa SisPAE
+    let sispaeCatalog = await prisma.programCatalog.findFirst({
+      where: { code: 'SISPAE', deletedAt: null },
+    });
+    if (!sispaeCatalog) {
+      sispaeCatalog = await prisma.programCatalog.create({
+        data: {
+          code: 'SISPAE',
+          name: 'SisPAE — Sistema Paraense de Avaliação Educacional',
+          objective: 'Acompanhamento do desempenho educacional em Língua Portuguesa e Matemática por meio de Simulados e Avaliação Oficial',
+          organ: 'SEDUC / SEMED',
+          description: 'Sistema Paraense de Avaliação Educacional (SisPAE) — Avaliações oficiais e simulados preparatórios.',
+        },
+      });
+    }
+
+    let sispaeProgram = await prisma.program.findFirst({
+      where: { catalogId: sispaeCatalog.id, year: 2026, deletedAt: null },
+    });
+    if (!sispaeProgram) {
+      sispaeProgram = await prisma.program.create({
+        data: {
+          catalogId: sispaeCatalog.id,
+          code: 'SISPAE-2026',
+          name: 'SisPAE — Sistema Paraense de Avaliação Educacional',
+          year: 2026,
+          status: 'EM_EXECUCAO',
+          organ: 'SEDUC / SEMED',
+          objective: 'Acompanhamento do desempenho educacional em Língua Portuguesa e Matemática por meio de Simulados e Avaliação Oficial',
+          globalGoal: 80,
+          periodLabel: 'Ciclo 2026',
+          description: 'SisPAE 2026 — Sistema Paraense de Avaliação Educacional (Simulados e Avaliação Oficial).',
+        },
+      });
+    }
+
     // Se o CNCA-2026 estiver com TODAS as escolas da rede vinculadas sem resultados gravados (resíduo anterior),
     // limpa os vínculos em massa para permitir o controle dinâmico correto de participantes.
     const totalSchoolsCount = await prisma.school.count({ where: { deletedAt: null } });
@@ -118,7 +154,7 @@ export async function ensureCncaAndParc() {
   } catch (err) {
     // Log não bloqueante
     // eslint-disable-next-line no-console
-    console.warn('[ProgramService] Sincronização CNCA/PARC:', err?.message || err);
+    console.warn('[ProgramService] Sincronização CNCA/PARC/SISPAE:', err?.message || err);
   }
 }
 
@@ -163,7 +199,7 @@ export async function listProgramCatalogs(query) {
   const includeCoverage = Boolean(query.includeCoverage);
   const cycles = catalogs.flatMap((catalog) => catalog.cycles);
   const cycleIds = cycles.map((cycle) => cycle.id);
-  const [activeLinks, resultGroups, pactoSubmissions, cncaResults, parcResults] = includeCoverage && cycleIds.length
+  const [activeLinks, resultGroups, pactoSubmissions, cncaResults, parcResults, sispaeResults] = includeCoverage && cycleIds.length
     ? await Promise.all([
         prisma.programSchool.findMany({
           where: { programId: { in: cycleIds }, active: true, school: { deletedAt: null } },
@@ -185,13 +221,18 @@ export async function listProgramCatalogs(query) {
           where: { programId: { in: cycleIds }, school: { deletedAt: null } },
           select: { programId: true, schoolId: true },
         }),
+        prisma.sispaeSchoolResult.findMany({
+          where: { programId: { in: cycleIds }, school: { deletedAt: null } },
+          select: { programId: true, schoolId: true },
+        }),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], [], [], []];
   const schoolsWithData = countSchoolsWithData(activeLinks, [
     ...resultGroups,
     ...pactoSubmissions.map((item) => item.class),
     ...cncaResults,
     ...parcResults,
+    ...sispaeResults,
   ]);
 
   const serialized = catalogs.map((catalog) => {
@@ -288,7 +329,7 @@ export async function listPrograms(query) {
 
   const includeCoverage = Boolean(query.includeCoverage);
   const programIds = programs.map((program) => program.id);
-  const [activeLinks, resultGroups, pactoSubmissions, cncaResults, parcResults] = includeCoverage && programIds.length
+  const [activeLinks, resultGroups, pactoSubmissions, cncaResults, parcResults, sispaeResults] = includeCoverage && programIds.length
     ? await Promise.all([
         prisma.programSchool.findMany({
           where: { programId: { in: programIds }, active: true, school: { deletedAt: null } },
@@ -310,14 +351,19 @@ export async function listPrograms(query) {
           where: { programId: { in: programIds }, school: { deletedAt: null } },
           select: { programId: true, schoolId: true },
         }),
+        prisma.sispaeSchoolResult.findMany({
+          where: { programId: { in: programIds }, school: { deletedAt: null } },
+          select: { programId: true, schoolId: true },
+        }),
       ])
-    : [[], [], [], [], []];
+    : [[], [], [], [], [], []];
 
   const coverageGroups = [
     ...resultGroups,
     ...pactoSubmissions.map((item) => item.class),
     ...cncaResults,
     ...parcResults,
+    ...sispaeResults,
   ];
   const schoolsWithData = countSchoolsWithData(activeLinks, coverageGroups);
 
@@ -623,6 +669,8 @@ async function buildProgramDeletionImpact(id, db = prisma) {
     pactoSkillResults,
     cncaResults,
     parcResults,
+    sispaeApplications,
+    sispaeResults,
     documents,
   ] = await Promise.all([
     db.programSchool.count({ where: { programId: { in: cycleIds } } }),
@@ -637,6 +685,8 @@ async function buildProgramDeletionImpact(id, db = prisma) {
     db.pactoSkillResult.count({ where: { component: { assessment: { class: { programId: { in: cycleIds } } } } } }),
     db.cncaSchoolResult.count({ where: { programId: { in: cycleIds } } }),
     db.parcSchoolResult.count({ where: { programId: { in: cycleIds } } }),
+    db.sispaeApplication ? db.sispaeApplication.count({ where: { programId: { in: cycleIds } } }) : 0,
+    db.sispaeSchoolResult ? db.sispaeSchoolResult.count({ where: { programId: { in: cycleIds } } }) : 0,
     db.document.count({
       where: {
         deletedAt: null,
@@ -660,6 +710,8 @@ async function buildProgramDeletionImpact(id, db = prisma) {
     pactoSkillResults,
     cncaResults,
     parcResults,
+    sispaeApplications,
+    sispaeResults,
     documents,
   };
   return {
@@ -1016,6 +1068,7 @@ export async function getSchoolProgramDeletionImpact(programId, schoolId) {
     pactoAssessments,
     cncaResults,
     parcResults,
+    sispaeResults,
   ] = await Promise.all([
     prisma.result.count({ where: { programId, schoolId } }),
     prisma.goal.count({ where: { programId, schoolId } }),
@@ -1025,6 +1078,7 @@ export async function getSchoolProgramDeletionImpact(programId, schoolId) {
     prisma.pactoAssessment.count({ where: { class: { programId, schoolId } } }),
     prisma.cncaSchoolResult.count({ where: { programId, schoolId } }),
     prisma.parcSchoolResult.count({ where: { programId, schoolId } }),
+    prisma.sispaeSchoolResult ? prisma.sispaeSchoolResult.count({ where: { programId, schoolId } }) : 0,
   ]);
 
   const counts = {
@@ -1036,6 +1090,7 @@ export async function getSchoolProgramDeletionImpact(programId, schoolId) {
     pactoAssessments,
     cncaResults,
     parcResults,
+    sispaeResults,
   };
 
   const totalRelated = Object.values(counts).reduce((sum, val) => sum + val, 0);
@@ -1090,6 +1145,11 @@ export async function removeSchool(id, schoolId, options = {}, actor, ip) {
       await tx.parcSchoolResult.deleteMany({
         where: { programId: id, schoolId },
       });
+      if (tx.sispaeSchoolResult) {
+        await tx.sispaeSchoolResult.deleteMany({
+          where: { programId: id, schoolId },
+        });
+      }
       await tx.evaluation.deleteMany({
         where: { programId: id, schoolId },
       });

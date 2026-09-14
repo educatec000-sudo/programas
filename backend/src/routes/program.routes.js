@@ -19,6 +19,7 @@ import { z } from 'zod';
 import pactoAdminRoutes from '../programs/pacto/admin.routes.js';
 import cncaRoutes from '../programs/cnca/routes.js';
 import parcRoutes from '../programs/parc/routes.js';
+import sispaeRoutes from '../programs/sispae/routes.js';
 
 const router = Router();
 router.use(authenticate);
@@ -47,6 +48,7 @@ router.get('/:id/history', requirePermission('programs:read'), validate({ query:
 router.use('/:id/pacto', pactoAdminRoutes);
 router.use('/:id/cnca', cncaRoutes);
 router.use('/:id/parc', parcRoutes);
+router.use('/:id/sispae', sispaeRoutes);
 router.get(
   '/:id/schools/:schoolId/evaluation',
   requirePermission('programs:read'),

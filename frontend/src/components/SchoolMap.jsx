@@ -3,13 +3,16 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Button } from './ui.jsx';
 
-const DEFAULT_CENTER = [-1.7218, -48.8788];
+// Centro do município de Abaetetuba, Pará, Brasil
+const ABAETETUBA_CENTER = [-1.7218, -48.8788];
+const DEFAULT_ZOOM = 11;
+
 const ZONE_STYLE = {
-  SEDE: { color: '#1d4ed8', label: 'Sede' },
-  ESTRADAS: { color: '#d97706', label: 'Estradas' },
-  ILHAS: { color: '#15803d', label: 'Ilhas' },
-  URBANA: { color: '#7c3aed', label: 'Urbana' },
-  RURAL: { color: '#0f766e', label: 'Rural' },
+  SEDE: { color: '#2563eb', label: 'Sede' },
+  ESTRADAS: { color: '#f59e0b', label: 'Estradas' },
+  ILHAS: { color: '#10b981', label: 'Ilhas' },
+  URBANA: { color: '#8b5cf6', label: 'Urbana' },
+  RURAL: { color: '#0d9488', label: 'Rural' },
 };
 
 function addLine(container, label, value) {
@@ -28,34 +31,35 @@ function addLine(container, label, value) {
 function schoolTooltip(school) {
   const box = document.createElement('div');
   box.style.minWidth = '220px';
-  box.style.maxWidth = '340px';
+  box.style.maxWidth = '320px';
   box.style.whiteSpace = 'normal';
   box.style.lineHeight = '1.35';
 
   const title = document.createElement('div');
   title.textContent = school.name;
   title.style.fontWeight = '800';
-  title.style.fontSize = '13px';
+  title.style.fontSize = '13.5px';
   title.style.marginBottom = '5px';
-  title.style.color = '#0f172a';
+  title.style.color = 'inherit';
   box.appendChild(title);
 
+  addLine(box, 'Município', 'Abaetetuba - PA');
   addLine(box, 'INEP', school.inep || '—');
   addLine(box, 'Endereço', school.address || '—');
   addLine(box, 'Gestor(a)', school.responsible || '—');
   addLine(box, 'Zona', ZONE_STYLE[school.zone]?.label || school.zone || '—');
-  addLine(box, 'Latitude', school.latitude);
-  addLine(box, 'Longitude', school.longitude);
+  if (school.latitude && school.longitude) {
+    addLine(box, 'Coordenadas', `${Number(school.latitude).toFixed(4)}, ${Number(school.longitude).toFixed(4)}`);
+  }
   return box;
 }
 
-export default function SchoolMap({ schools = [] }) {
+export default function SchoolMap({ schools = [], hideHeader = false, height = 460 }) {
   const rootRef = useRef(null);
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef(null);
   const expandedRef = useRef(false);
-  const expandActionRef = useRef(null);
   const [expanded, setExpanded] = useState(false);
 
   expandedRef.current = expanded;
@@ -68,7 +72,6 @@ export default function SchoolMap({ schools = [] }) {
     }
     setExpanded(true);
   };
-  expandActionRef.current = expand;
 
   const close = () => {
     setExpanded(false);
@@ -78,21 +81,21 @@ export default function SchoolMap({ schools = [] }) {
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) return undefined;
 
+    // Inicialização do Mapa focado no território de Abaetetuba, Pará, Brasil
     const map = L.map(mapElementRef.current, {
-      center: DEFAULT_CENTER,
-      zoom: 10,
+      center: ABAETETUBA_CENTER,
+      zoom: DEFAULT_ZOOM,
       zoomControl: true,
       attributionControl: true,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap',
+
+    // Camada ESRI World Street Map (100% gratuita, sem marca d'água, sem chave de API e sem bloqueios 403)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18,
+      attribution: '&copy; Esri &mdash; Abaetetuba, PA',
     }).addTo(map);
 
     markersRef.current = L.layerGroup().addTo(map);
-    map.on('click', () => {
-      if (!expandedRef.current) expandActionRef.current?.();
-    });
     mapRef.current = map;
 
     return () => {
@@ -115,27 +118,28 @@ export default function SchoolMap({ schools = [] }) {
       if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
 
       coordinates.push([latitude, longitude]);
-      const style = ZONE_STYLE[school.zone] || { color: '#334155' };
+      const style = ZONE_STYLE[school.zone] || { color: '#2563eb' };
       L.circleMarker([latitude, longitude], {
-        radius: 7,
+        radius: 7.5,
         color: '#ffffff',
-        weight: 2,
+        weight: 2.2,
         fillColor: style.color,
-        fillOpacity: 0.92,
+        fillOpacity: 0.95,
       })
         .bindTooltip(schoolTooltip(school), {
           direction: 'top',
           sticky: true,
           opacity: 0.98,
-          offset: [0, -7],
+          offset: [0, -8],
         })
         .addTo(layer);
     }
 
-    if (coordinates.length) {
+    if (coordinates.length > 0) {
+      // Ajusta o enquadramento preservando o foco em Abaetetuba
       map.fitBounds(coordinates, { padding: [35, 35], maxZoom: 13 });
     } else {
-      map.setView(DEFAULT_CENTER, 10);
+      map.setView(ABAETETUBA_CENTER, DEFAULT_ZOOM);
     }
   }, [schools]);
 
@@ -166,57 +170,72 @@ export default function SchoolMap({ schools = [] }) {
   }, []);
 
   return (
-    <section
+    <div
       ref={rootRef}
-      className="card"
+      className={hideHeader ? 'map-container-clean' : 'card'}
       style={expanded ? {
         position: 'fixed', inset: 0, zIndex: 10000, borderRadius: 0,
-        padding: 16, background: '#f8fafc', display: 'flex', flexDirection: 'column',
-      } : { marginBottom: 16, overflow: 'hidden' }}
+        padding: 16, background: 'var(--bg)', display: 'flex', flexDirection: 'column',
+      } : { position: 'relative', overflow: 'hidden', width: '100%', borderRadius: 14 }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: expanded ? '0 0 12px' : '14px 16px 10px' }}>
-        <div style={{ flex: 1 }}>
-          <div className="card-title">Localização das escolas</div>
-          <div className="card-subtitle">
-            {schools.length} escola(s) com coordenadas · passe o mouse sobre um ponto para ver os dados
+      {!hideHeader && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: expanded ? '0 0 12px' : '14px 16px 10px' }}>
+          <div style={{ flex: 1 }}>
+            <div className="card-title">Localização das escolas — Abaetetuba/PA</div>
+            <div className="card-subtitle">
+              {schools.length} escola(s) no município de Abaetetuba · passe o mouse sobre um ponto
+            </div>
           </div>
+          <Button variant="secondary" onClick={expanded ? close : expand}>
+            {expanded ? '✕ Fechar apresentação' : '⛶ Expandir mapa'}
+          </Button>
         </div>
-        <Button variant="secondary" onClick={expanded ? close : expand}>
-          {expanded ? '✕ Fechar apresentação' : '⛶ Expandir mapa'}
-        </Button>
-      </div>
+      )}
 
-      <div style={{ position: 'relative', flex: expanded ? 1 : undefined, minHeight: 0 }}>
+      <div style={{ position: 'relative', flex: expanded ? 1 : undefined, minHeight: 0, width: '100%' }}>
         <div
           ref={mapElementRef}
           role="application"
-          aria-label="Mapa com a localização das escolas"
-          title={expanded ? 'Passe o mouse nos pontos para ver as escolas' : 'Clique no mapa para abrir em tela inteira'}
+          aria-label="Mapa de Abaetetuba com a localização das escolas"
           style={{
             width: '100%',
-            height: expanded ? '100%' : 430,
-            minHeight: expanded ? 400 : 430,
-            cursor: expanded ? 'grab' : 'zoom-in',
-            borderRadius: expanded ? 10 : 0,
+            height: expanded ? '100%' : height,
+            minHeight: expanded ? 400 : height,
+            cursor: 'grab',
+            borderRadius: 12,
             zIndex: 1,
           }}
         />
 
-        <div style={{
-          position: 'absolute', left: 12, bottom: 28, zIndex: 500,
-          display: 'flex', flexWrap: 'wrap', gap: 8, padding: '7px 10px',
-          background: 'rgba(255,255,255,.94)', borderRadius: 8,
-          boxShadow: '0 2px 10px rgba(15,23,42,.18)', fontSize: 11.5,
-          pointerEvents: 'none',
-        }}>
+        {/* Botão de Expandir Mapa Sobreposto se hideHeader=true */}
+        {hideHeader && (
+          <button
+            type="button"
+            className="map-floating-expand-btn"
+            onClick={expanded ? close : expand}
+            title={expanded ? 'Fechar tela inteira' : 'Expandir mapa'}
+          >
+            {expanded ? '✕ Fechar' : '⛶ Expandir mapa'}
+          </button>
+        )}
+
+        {/* Legenda Flutuante de Zonas */}
+        <div
+          className="map-floating-legend"
+          style={{
+            position: 'absolute', left: 12, bottom: 18, zIndex: 500,
+            display: 'flex', flexWrap: 'wrap', gap: 10, padding: '7px 12px',
+            borderRadius: 8, fontSize: 11.5, fontWeight: 600, pointerEvents: 'none',
+          }}
+        >
           {Object.entries(ZONE_STYLE).slice(0, 3).map(([key, style]) => (
-            <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: style.color }} />
+            <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: style.color }} />
               {style.label}
             </span>
           ))}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

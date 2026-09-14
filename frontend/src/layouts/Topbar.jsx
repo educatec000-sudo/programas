@@ -1,17 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useTheme } from '../contexts/ThemeContext.jsx';
 import { notificationsApi } from '../services/resources.js';
 import { Icon } from '../components/icons.jsx';
 import { fmtDateTime } from '../utils/format.js';
 
 export default function Topbar() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const wrapRef = useRef(null);
 
   const loadNotifications = async () => {
@@ -57,21 +60,67 @@ export default function Topbar() {
     }
   };
 
-  const displayName = user?.name || 'Rafael Silva';
-  const displayRole = user?.role?.name || 'Técnico SEMEC';
+  const handleSearchSubmit = (e) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      navigate(`/escolas?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const displayName = user?.name || 'Administrador CPE';
+  const displayRole = user?.role?.name || 'Administrador';
   const initials = displayName
     .split(' ')
     .filter(Boolean)
     .map((p) => p[0])
     .slice(0, 2)
     .join('')
-    .toUpperCase() || 'RS';
+    .toUpperCase() || 'AC';
 
   return (
     <header className="topbar">
-      <div className="crumb">CPE — Controle de Programas Educacionais</div>
+      {/* BARRA DE PESQUISA GLOBAL */}
+      <div className="topbar-search-wrap">
+        <span className="search-icon">🔍</span>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleSearchSubmit}
+          placeholder="Buscar escolas, programas, turmas..."
+          className="topbar-search-input"
+        />
+      </div>
+
       <div className="topbar-spacer" />
+
       <div className="topbar-actions" ref={wrapRef}>
+        {/* BOTÃO DE MODO ESCURO (DARK MODE TOGGLE) */}
+        <button
+          className="theme-toggle-btn"
+          onClick={toggleTheme}
+          title={isDark ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+          aria-label="Alternar modo escuro"
+        >
+          {isDark ? (
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          ) : (
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          )}
+        </button>
+
+        {/* NOTIFICAÇÕES */}
         <div style={{ position: 'relative' }}>
           <button
             className="icon-btn"
@@ -116,7 +165,7 @@ export default function Topbar() {
           )}
         </div>
 
-        {/* USER PROFILE CHIP COM AVATAR VERDE IDENTICO AO LAYOUT */}
+        {/* USER PROFILE CHIP */}
         <div style={{ position: 'relative' }}>
           <button
             className="user-chip-custom"
@@ -133,7 +182,7 @@ export default function Topbar() {
             <div className="dropdown">
               <div className="dropdown-header">
                 <strong>{displayName}</strong>
-                <div>{user?.email || 'rafael.silva@semec.gov.br'}</div>
+                <div>{user?.email || 'admin@cpe.gov.br'}</div>
               </div>
               <div className="dropdown-item" onClick={() => { navigate('/perfil'); setUserOpen(false); }}>
                 {Icon.user()} Meu perfil e sessões
@@ -153,4 +202,3 @@ export default function Topbar() {
     </header>
   );
 }
-
