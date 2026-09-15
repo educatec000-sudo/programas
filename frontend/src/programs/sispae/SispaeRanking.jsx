@@ -102,6 +102,23 @@ export default function SispaeRanking({ program = {}, onSelectTab }) {
             style={{ height: 36 }}
           />
         </div>
+
+        {(search || component !== 'ALL' || indicator !== 'ADEQUADO') && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setComponent('ALL');
+                setIndicator('ADEQUADO');
+                setSearch('');
+              }}
+              style={{ height: 36, whiteSpace: 'nowrap' }}
+            >
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Pódio dos Top 3 */}
@@ -123,7 +140,7 @@ export default function SispaeRanking({ program = {}, onSelectTab }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase' }}>
               2º Lugar
             </span>
-            <h4 style={{ margin: '6px 0 2px 0', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+            <h4 style={{ margin: '6px 0 2px 0', fontSize: 15, fontWeight: 700 }}>
               {top3[1]?.schoolName}
             </h4>
             <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 10 }}>
@@ -154,7 +171,7 @@ export default function SispaeRanking({ program = {}, onSelectTab }) {
             <span style={{ fontSize: 12.5, fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
               1º Lugar · Destaque da Rede
             </span>
-            <h4 style={{ margin: '6px 0 2px 0', fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>
+            <h4 style={{ margin: '6px 0 2px 0', fontSize: 17, fontWeight: 800 }}>
               {top3[0]?.schoolName}
             </h4>
             <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 12 }}>
@@ -181,7 +198,7 @@ export default function SispaeRanking({ program = {}, onSelectTab }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase' }}>
               3º Lugar
             </span>
-            <h4 style={{ margin: '6px 0 2px 0', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+            <h4 style={{ margin: '6px 0 2px 0', fontSize: 15, fontWeight: 700 }}>
               {top3[2]?.schoolName}
             </h4>
             <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 10 }}>
@@ -195,11 +212,11 @@ export default function SispaeRanking({ program = {}, onSelectTab }) {
       )}
 
       {/* Tabela Completa do Ranking */}
-      <div className="card" style={{ padding: 0, borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+      <div className="card" style={{ padding: 0, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 12, textTransform: 'uppercase' }}>
+              <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', color: 'var(--text-2)', fontSize: 12, textTransform: 'uppercase' }}>
                 <th style={{ padding: '12px 16px', fontWeight: 700, width: 80, textAlign: 'center' }}>Posição</th>
                 <th style={{ padding: '12px 16px', fontWeight: 700 }}>Escola</th>
                 <th style={{ padding: '12px 16px', fontWeight: 700 }}>INEP</th>
@@ -215,19 +232,19 @@ export default function SispaeRanking({ program = {}, onSelectTab }) {
                   <tr
                     key={row.schoolId}
                     style={{
-                      borderBottom: '1px solid #f1f5f9',
-                      background: idx < 3 ? '#fcfdfd' : idx % 2 === 0 ? '#ffffff' : '#fafafa',
+                      borderBottom: '1px solid var(--border)',
+                      background: idx % 2 === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.02)',
                     }}
                   >
                     <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 800, fontSize: 14 }}>
                       {row.badge}
                     </td>
 
-                    <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 700 }}>
                       {row.schoolName}
                     </td>
 
-                    <td style={{ padding: '12px 16px', color: '#64748b', fontFamily: 'monospace' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-3)', fontFamily: 'monospace' }}>
                       {row.inep || '—'}
                     </td>
 
@@ -252,7 +269,7 @@ export default function SispaeRanking({ program = {}, onSelectTab }) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
+                  <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>
                     Nenhuma escola classificada nesta aplicação.
                   </td>
                 </tr>

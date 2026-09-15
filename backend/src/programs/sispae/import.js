@@ -816,10 +816,15 @@ export async function previewSispaeImport(
       }
       detectedComponents.add(rowComponent);
 
-      // Ano Escolar / Etapa
+      // Ano Escolar / Etapa (Padronizado como 2º Ano do Ensino Fundamental)
       let grade = '2º Ano';
       if (colMap.grade >= 0 && row[colMap.grade]) {
-        grade = String(row[colMap.grade]).trim();
+        const rawGrade = String(row[colMap.grade]).trim();
+        if (rawGrade.includes('2º') || rawGrade.includes('2o') || rawGrade.includes('2°') || rawGrade.includes('2')) {
+          grade = '2º Ano';
+        } else {
+          grade = rawGrade;
+        }
       } else if (options.grade) {
         grade = options.grade;
       }

@@ -949,11 +949,8 @@ function ResultsTab({ program, can }) {
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>
-          Lançamentos deste programa — <Link to="/resultados">gerenciar em Resultados</Link>
+          Lançamentos registrados neste programa
         </span>
-        {can('results:write') && (
-          <Link to={`/resultados?programId=${program.id}`} className="btn btn-primary btn-sm">+ Lançar resultado</Link>
-        )}
       </div>
       <DataTable
         columns={[

@@ -132,9 +132,8 @@ export default function AttentionSchoolsSection({
     <div
       className="card card-pad"
       style={{
-        border: '1px solid #fecaca',
-        background: 'linear-gradient(180deg, #fffafa 0%, #ffffff 100%)',
-        boxShadow: '0 4px 16px rgba(220, 38, 38, 0.04)',
+        border: '1px solid rgba(220, 38, 38, 0.3)',
+        background: 'var(--surface)',
       }}
     >
       {/* 1. CABEÇALHO DA SEÇÃO */}
@@ -142,15 +141,15 @@ export default function AttentionSchoolsSection({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 22 }}>🚨</span>
-            <h2 style={{ fontSize: 17, fontWeight: 800, color: '#991b1b', margin: 0, letterSpacing: '-0.01em' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 800, color: 'var(--danger)', margin: 0, letterSpacing: '-0.01em' }}>
               {title}
             </h2>
             <span
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                background: summary.total > 0 ? '#fee2e2' : '#f1f5f9',
-                color: summary.total > 0 ? '#dc2626' : '#64748b',
+                background: summary.total > 0 ? 'rgba(239, 68, 68, 0.15)' : 'var(--surface-2)',
+                color: summary.total > 0 ? 'var(--danger)' : 'var(--text-3)',
                 padding: '2px 8px',
                 borderRadius: 12,
               }}
@@ -158,7 +157,7 @@ export default function AttentionSchoolsSection({
               {summary.total} {summary.total === 1 ? 'escola' : 'escolas'}
             </span>
           </div>
-          <p style={{ fontSize: 12.5, color: '#64748b', margin: '4px 0 0 0' }}>
+          <p style={{ fontSize: 12.5, color: 'var(--text-2)', margin: '4px 0 0 0' }}>
             {subtitle}
           </p>
         </div>
@@ -172,9 +171,9 @@ export default function AttentionSchoolsSection({
             style={{
               fontWeight: 700,
               fontSize: 12,
-              background: priorityFilter === 'ALL' ? '#0f172a' : '#ffffff',
-              color: priorityFilter === 'ALL' ? '#ffffff' : '#475569',
-              borderColor: priorityFilter === 'ALL' ? '#0f172a' : '#cbd5e1',
+              background: priorityFilter === 'ALL' ? 'var(--text)' : 'var(--surface)',
+              color: priorityFilter === 'ALL' ? 'var(--surface)' : 'var(--text-2)',
+              borderColor: priorityFilter === 'ALL' ? 'var(--text)' : 'var(--border)',
             }}
           >
             Todas ({summary.total})
@@ -186,9 +185,9 @@ export default function AttentionSchoolsSection({
             style={{
               fontWeight: 700,
               fontSize: 12,
-              background: priorityFilter === 'HIGH' ? '#dc2626' : '#ffffff',
+              background: priorityFilter === 'HIGH' ? '#dc2626' : 'var(--surface)',
               color: priorityFilter === 'HIGH' ? '#ffffff' : '#dc2626',
-              borderColor: priorityFilter === 'HIGH' ? '#dc2626' : '#fecaca',
+              borderColor: priorityFilter === 'HIGH' ? '#dc2626' : 'rgba(239, 68, 68, 0.4)',
             }}
           >
             🔴 Alta ({summary.high})
@@ -200,9 +199,9 @@ export default function AttentionSchoolsSection({
             style={{
               fontWeight: 700,
               fontSize: 12,
-              background: priorityFilter === 'MEDIUM' ? '#ea580c' : '#ffffff',
+              background: priorityFilter === 'MEDIUM' ? '#ea580c' : 'var(--surface)',
               color: priorityFilter === 'MEDIUM' ? '#ffffff' : '#ea580c',
-              borderColor: priorityFilter === 'MEDIUM' ? '#ea580c' : '#fed7aa',
+              borderColor: priorityFilter === 'MEDIUM' ? '#ea580c' : 'rgba(234, 88, 12, 0.4)',
             }}
           >
             🟠 Média ({summary.medium})
@@ -215,9 +214,9 @@ export default function AttentionSchoolsSection({
               style={{
                 fontWeight: 700,
                 fontSize: 12,
-                background: priorityFilter === 'LOW' ? '#ca8a04' : '#ffffff',
+                background: priorityFilter === 'LOW' ? '#ca8a04' : 'var(--surface)',
                 color: priorityFilter === 'LOW' ? '#ffffff' : '#ca8a04',
-                borderColor: priorityFilter === 'LOW' ? '#ca8a04' : '#fef08a',
+                borderColor: priorityFilter === 'LOW' ? '#ca8a04' : 'rgba(202, 138, 4, 0.4)',
               }}
             >
               🟡 Baixa ({summary.low})
@@ -238,7 +237,7 @@ export default function AttentionSchoolsSection({
               className="input"
               style={{ height: 34, fontSize: 12.5, paddingLeft: 30 }}
             />
-            <span style={{ position: 'absolute', left: 10, top: 8, color: '#94a3b8', fontSize: 13 }}>
+            <span style={{ position: 'absolute', left: 10, top: 8, color: 'var(--text-3)', fontSize: 13 }}>
               🔍
             </span>
           </div>
@@ -257,10 +256,10 @@ export default function AttentionSchoolsSection({
 
       {/* 3. TABELA DE ESCOLAS EM ATENÇÃO */}
       {filteredSchools.length > 0 ? (
-        <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-          <table className="table" style={{ width: '100%', fontSize: 13, background: '#ffffff', margin: 0 }}>
+        <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <table className="table" style={{ width: '100%', fontSize: 13, margin: 0 }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
+              <tr style={{ background: 'var(--surface-2)' }}>
                 <th style={{ width: '30%', padding: '10px 14px' }}>Escola</th>
                 <th style={{ width: '15%', padding: '10px 14px' }}>Prioridade</th>
                 <th style={{ width: '35%', padding: '10px 14px' }}>Motivos Identificados</th>
@@ -270,7 +269,7 @@ export default function AttentionSchoolsSection({
             <tbody>
               {filteredSchools.map((school) => {
                 const priorityBg =
-                  school.priority === 'HIGH' ? 'rgba(254, 242, 242, 0.4)' : school.priority === 'MEDIUM' ? 'rgba(255, 247, 237, 0.4)' : '#ffffff';
+                  school.priority === 'HIGH' ? 'rgba(239, 68, 68, 0.06)' : school.priority === 'MEDIUM' ? 'rgba(234, 88, 12, 0.06)' : 'transparent';
 
                 return (
                   <tr
@@ -283,10 +282,10 @@ export default function AttentionSchoolsSection({
                     onClick={() => setSelectedSchool(school)}
                   >
                     <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13.5 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13.5 }}>
                         {school.schoolName}
                       </div>
-                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2, display: 'flex', gap: 8 }}>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2, display: 'flex', gap: 8 }}>
                         <span>INEP: <strong>{school.inep || '—'}</strong></span>
                         {school.zone && <span>· Zona: <strong>{school.zone}</strong></span>}
                       </div>
@@ -298,7 +297,7 @@ export default function AttentionSchoolsSection({
 
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div style={{ fontWeight: 600, color: '#334155', fontSize: 12.5 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 12.5 }}>
                           {school.reasonsSummary}
                         </div>
                         {Array.isArray(school.keyMetrics) && school.keyMetrics.length > 0 && (
@@ -309,8 +308,8 @@ export default function AttentionSchoolsSection({
                                 style={{
                                   fontSize: 11,
                                   fontWeight: 600,
-                                  color: km.tone === 'critical' ? '#dc2626' : '#475569',
-                                  background: km.tone === 'critical' ? '#fee2e2' : '#f1f5f9',
+                                  color: km.tone === 'critical' ? 'var(--danger)' : 'var(--text-2)',
+                                  background: km.tone === 'critical' ? 'rgba(239, 68, 68, 0.15)' : 'var(--surface-2)',
                                   padding: '1px 6px',
                                   borderRadius: 4,
                                 }}
@@ -337,8 +336,8 @@ export default function AttentionSchoolsSection({
                           fontSize: 12,
                           fontWeight: 700,
                           color: '#0284c7',
-                          background: '#f0f9ff',
-                          borderColor: '#bae6fd',
+                          background: 'rgba(2, 132, 199, 0.1)',
+                          borderColor: 'rgba(2, 132, 199, 0.3)',
                         }}
                       >
                         Ver Detalhes →
@@ -351,7 +350,7 @@ export default function AttentionSchoolsSection({
           </table>
         </div>
       ) : allSchools.length > 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 8 }}>
+        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-2)', background: 'var(--surface-2)', borderRadius: 8 }}>
           Nenhuma escola encontrada com os filtros selecionados.
         </div>
       ) : (
@@ -359,15 +358,15 @@ export default function AttentionSchoolsSection({
           style={{
             padding: 24,
             textAlign: 'center',
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
             borderRadius: 8,
-            color: '#15803d',
+            color: 'var(--success)',
           }}
         >
           <div style={{ fontSize: 24, marginBottom: 6 }}>🎉</div>
           <strong style={{ fontSize: 14 }}>Nenhuma escola em situação de atenção no momento!</strong>
-          <div style={{ fontSize: 12.5, color: '#166534', marginTop: 2 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 2 }}>
             Todas as escolas com avaliações enviadas estão apresentando taxas de participação e proficiência dentro dos parâmetros esperados.
           </div>
         </div>
@@ -391,16 +390,16 @@ export default function AttentionSchoolsSection({
                 flexWrap: 'wrap',
                 gap: 12,
                 padding: '12px 16px',
-                background: selectedSchool.priority === 'HIGH' ? '#fef2f2' : selectedSchool.priority === 'MEDIUM' ? '#fff7ed' : '#fefce8',
+                background: selectedSchool.priority === 'HIGH' ? 'rgba(239, 68, 68, 0.1)' : selectedSchool.priority === 'MEDIUM' ? 'rgba(234, 88, 12, 0.1)' : 'rgba(202, 138, 4, 0.1)',
                 borderRadius: 8,
-                border: `1px solid ${selectedSchool.priority === 'HIGH' ? '#fecaca' : selectedSchool.priority === 'MEDIUM' ? '#fed7aa' : '#fef08a'}`,
+                border: `1px solid ${selectedSchool.priority === 'HIGH' ? 'rgba(239, 68, 68, 0.3)' : selectedSchool.priority === 'MEDIUM' ? 'rgba(234, 88, 12, 0.3)' : 'rgba(202, 138, 4, 0.3)'}`,
               }}
             >
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>
                   {selectedSchool.schoolName}
                 </div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                   INEP: <strong>{selectedSchool.inep || '—'}</strong> {selectedSchool.zone ? `· Zona: ${selectedSchool.zone}` : ''}
                 </div>
               </div>
@@ -411,7 +410,7 @@ export default function AttentionSchoolsSection({
             </div>
 
             {/* Sumário de Indicadores */}
-            <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>
               Foram identificados <strong>{selectedSchool.reasons?.length || 0} motivos objetivos</strong> que classificam esta unidade como prioritária para acompanhamento técnico:
             </div>
 
@@ -421,20 +420,19 @@ export default function AttentionSchoolsSection({
                 <div
                   key={idx}
                   style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
                     borderRadius: 8,
                     padding: '14px 16px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>
                         {idx + 1}. {reason.indicator}
                       </span>
                       {reason.component && (
-                        <span style={{ fontSize: 11, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+                        <span style={{ fontSize: 11, background: 'var(--surface-2)', color: 'var(--text-2)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
                           {reason.component}
                         </span>
                       )}
@@ -448,7 +446,7 @@ export default function AttentionSchoolsSection({
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
                       gap: 8,
-                      background: '#f8fafc',
+                      background: 'var(--surface-2)',
                       padding: '8px 12px',
                       borderRadius: 6,
                       marginBottom: 10,
@@ -456,23 +454,23 @@ export default function AttentionSchoolsSection({
                     }}
                   >
                     <div>
-                      <span style={{ color: '#64748b' }}>Valor da Escola:</span>
-                      <div style={{ fontWeight: 800, color: reason.severity === 'HIGH' ? '#dc2626' : '#c2410c', fontSize: 13.5 }}>
+                      <span style={{ color: 'var(--text-3)' }}>Valor da Escola:</span>
+                      <div style={{ fontWeight: 800, color: reason.severity === 'HIGH' ? 'var(--danger)' : '#ea580c', fontSize: 13.5 }}>
                         {reason.currentValue}
                       </div>
                     </div>
 
                     <div>
-                      <span style={{ color: '#64748b' }}>Referência / Meta:</span>
-                      <div style={{ fontWeight: 700, color: '#15803d', fontSize: 13.5 }}>
+                      <span style={{ color: 'var(--text-3)' }}>Referência / Meta:</span>
+                      <div style={{ fontWeight: 700, color: 'var(--success)', fontSize: 13.5 }}>
                         {reason.referenceValue}
                       </div>
                     </div>
 
                     {reason.diff && (
                       <div>
-                        <span style={{ color: '#64748b' }}>Diferença / Desvio:</span>
-                        <div style={{ fontWeight: 800, color: '#dc2626', fontSize: 13.5 }}>
+                        <span style={{ color: 'var(--text-3)' }}>Diferença / Desvio:</span>
+                        <div style={{ fontWeight: 800, color: 'var(--danger)', fontSize: 13.5 }}>
                           {reason.diff}
                         </div>
                       </div>
@@ -480,13 +478,13 @@ export default function AttentionSchoolsSection({
                   </div>
 
                   {/* Diagnóstico Pedagógico */}
-                  <div style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.45, marginBottom: 6 }}>
-                    <strong>Diagnóstico:</strong> {reason.description}
+                  <div style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.45, marginBottom: 6 }}>
+                    <strong style={{ color: 'var(--text)' }}>Diagnóstico:</strong> {reason.description}
                   </div>
 
                   {/* Recomendação de Ação */}
                   {reason.recommendation && (
-                    <div style={{ fontSize: 12, color: '#0369a1', background: '#f0f9ff', padding: '6px 10px', borderRadius: 6, border: '1px solid #e0f2fe' }}>
+                    <div style={{ fontSize: 12, color: '#0284c7', background: 'rgba(2, 132, 199, 0.1)', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(2, 132, 199, 0.2)' }}>
                       💡 <strong>Ação Técnica Recomendada:</strong> {reason.recommendation}
                     </div>
                   )}

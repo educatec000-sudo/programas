@@ -85,7 +85,7 @@ export default function PactoAnalises({ program }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Subabas */}
-      <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
         <button
           type="button"
           className={`btn ${activeSubtab === 'ETAPA' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
@@ -110,7 +110,7 @@ export default function PactoAnalises({ program }) {
       </div>
 
       {/* Filtros da Análise */}
-      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', background: '#f8fafc' }}>
+      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end' }}>
         <div style={{ width: 200 }}>
           <Field label="Etapa/Ano">
             <Select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
@@ -132,15 +132,28 @@ export default function PactoAnalises({ program }) {
             </Select>
           </Field>
         </div>
+
+        {(gradeFilter || componentFilter) && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => { setGradeFilter(''); setComponentFilter(''); }}
+              style={{ height: 36, whiteSpace: 'nowrap' }}
+            >
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       {/* SUBABA 1: POR ETAPA */}
       {activeSubtab === 'ETAPA' && (
         <div className="pacto-analises-layout">
           {/* Gráfico 1: Evolução da Proficiência */}
-          <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
+          <div className="card card-pad" style={{ borderRadius: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <strong style={{ fontSize: 14, color: '#0f172a' }}>Evolução da Proficiência por Etapa</strong>
+              <strong style={{ fontSize: 14 }}>Evolução da Proficiência por Etapa</strong>
               <div className="pacto-chart-legend">
                 <span className="legend-item"><i className="dot" style={{ background: '#0284c7' }} /> Leitura</span>
                 <span className="legend-item"><i className="dot" style={{ background: '#16a34a' }} /> Escrita</span>
@@ -150,10 +163,13 @@ export default function PactoAnalises({ program }) {
             <div style={{ width: '100%', height: 260 }}>
               <ResponsiveContainer>
                 <LineChart data={evolutionData} margin={{ top: 14, right: 18, left: -20, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="label" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip formatter={(value) => [`${value}%`]} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--text-3)" fontSize={11} tickLine={false} />
+                  <YAxis domain={[0, 100]} stroke="var(--text-3)" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    formatter={(value) => [`${value}%`]}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                  />
                   <Line type="monotone" dataKey="Leitura" stroke="#0284c7" strokeWidth={2.5} dot={{ r: 4 }} />
                   <Line type="monotone" dataKey="Escrita" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4 }} />
                   <Line type="monotone" dataKey="Matemática" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 4 }} />
@@ -163,15 +179,15 @@ export default function PactoAnalises({ program }) {
           </div>
 
           {/* Gráfico 2: Comparativo de Desempenho (Barras Horizontais) */}
-          <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
-            <strong style={{ fontSize: 14, color: '#0f172a', display: 'block', marginBottom: 16 }}>
+          <div className="card card-pad" style={{ borderRadius: 12 }}>
+            <strong style={{ fontSize: 14, display: 'block', marginBottom: 16 }}>
               Comparativo de Desempenho Consolidado
             </strong>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '10px 0' }}>
               {comparativeData.map((item) => (
                 <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ width: 90, fontSize: 12.5, fontWeight: 600, color: '#334155' }}>{item.name}</span>
-                  <div style={{ flex: 1, height: 18, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden' }}>
+                  <span style={{ width: 90, fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>{item.name}</span>
+                  <div style={{ flex: 1, height: 18, background: 'var(--surface-2)', borderRadius: 6, overflow: 'hidden' }}>
                     <div
                       style={{
                         height: '100%',
@@ -181,12 +197,12 @@ export default function PactoAnalises({ program }) {
                       }}
                     />
                   </div>
-                  <strong style={{ width: 44, textAlign: 'right', fontSize: 13, color: '#0f172a' }}>{item.score}%</strong>
+                  <strong style={{ width: 44, textAlign: 'right', fontSize: 13 }}>{item.score}%</strong>
                 </div>
               ))}
             </div>
 
-            <div style={{ marginTop: 24, padding: 14, borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 12, color: '#1e3a8a' }}>
+            <div style={{ marginTop: 24, padding: 14, borderRadius: 8, background: 'var(--primary-soft)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text)' }}>
               💡 <strong>Destaque pedagógico:</strong> As habilidades de Leitura apresentam o maior avanço acumulado no ciclo, seguidas por Escrita e Matemática.
             </div>
           </div>
@@ -196,9 +212,9 @@ export default function PactoAnalises({ program }) {
       {/* SUBABA 2: POR COMPONENTE */}
       {activeSubtab === 'COMPONENTE' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-          <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
+          <div className="card card-pad" style={{ borderRadius: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <strong style={{ fontSize: 14, color: '#0f172a' }}>Resultados Comparados por Componente</strong>
+              <strong style={{ fontSize: 14 }}>Resultados Comparados por Componente</strong>
               <div className="pacto-chart-legend">
                 <span className="legend-item"><i className="square" style={{ background: '#0284c7' }} /> Português</span>
                 <span className="legend-item"><i className="square" style={{ background: '#7c3aed' }} /> Matemática</span>
@@ -207,10 +223,13 @@ export default function PactoAnalises({ program }) {
             <div style={{ width: '100%', height: 260 }}>
               <ResponsiveContainer>
                 <BarChart data={componentComparisonData} margin={{ top: 14, right: 12, left: -20, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                  <YAxis domain={[0, 100]} stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip formatter={(value) => [`${value}%`]} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                  <XAxis dataKey="name" stroke="var(--text-3)" fontSize={11} tickLine={false} />
+                  <YAxis domain={[0, 100]} stroke="var(--text-3)" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    formatter={(value) => [`${value}%`]}
+                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                  />
                   <Bar dataKey="Portugues" name="Língua Portuguesa" fill="#0284c7" radius={[4, 4, 0, 0]} barSize={20} />
                   <Bar dataKey="Matematica" name="Matemática" fill="#7c3aed" radius={[4, 4, 0, 0]} barSize={20} />
                 </BarChart>
@@ -218,21 +237,21 @@ export default function PactoAnalises({ program }) {
             </div>
           </div>
 
-          <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
-            <strong style={{ fontSize: 14, color: '#0f172a', display: 'block', marginBottom: 12 }}>
+          <div className="card card-pad" style={{ borderRadius: 12 }}>
+            <strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>
               Síntese Pedagógica por Competência
             </strong>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ padding: 12, borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <strong style={{ fontSize: 12.5, color: '#166534' }}>📖 Língua Portuguesa</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#14532d' }}>
+              <div style={{ padding: 12, borderRadius: 8, background: 'rgba(22, 163, 74, 0.12)', border: '1px solid rgba(22, 163, 74, 0.25)' }}>
+                <strong style={{ fontSize: 12.5, color: '#16a34a' }}>📖 Língua Portuguesa</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: 12, color: 'var(--text-2)' }}>
                   Acompanhamento contínuo dos perfis de leitor (PL, LI, LF), compreensão leitora (NC, CO, CA) e níveis psicogenéticos de escrita (PA, AI, AC).
                 </p>
               </div>
 
-              <div style={{ padding: 12, borderRadius: 8, background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
-                <strong style={{ fontSize: 12.5, color: '#5b21b6' }}>📐 Matemática</strong>
-                <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#4c1d95' }}>
+              <div style={{ padding: 12, borderRadius: 8, background: 'rgba(124, 58, 237, 0.12)', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                <strong style={{ fontSize: 12.5, color: '#a78bfa' }}>📐 Matemática</strong>
+                <p style={{ margin: '4px 0 0 0', fontSize: 12, color: 'var(--text-2)' }}>
                   Avaliação da proficiência numérica, raciocínio lógico e resolução de problemas estruturados (Não Proficiente, Proficiente Inicial e Proficiente).
                 </p>
               </div>
@@ -244,8 +263,8 @@ export default function PactoAnalises({ program }) {
       {/* SUBABA 3: POR REDE MUNICIPAL */}
       {activeSubtab === 'REDE' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-          <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
-            <strong style={{ fontSize: 14, color: '#0f172a', display: 'block', marginBottom: 12 }}>
+          <div className="card card-pad" style={{ borderRadius: 12 }}>
+            <strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>
               Distribuição Geral dos Estudantes da Rede Municipal
             </strong>
             <div style={{ display: 'flex', alignItems: 'center', height: 230 }}>
@@ -257,7 +276,10 @@ export default function PactoAnalises({ program }) {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(val) => [`${val}%`, 'Participação']} />
+                    <Tooltip
+                      formatter={(val) => [`${val}%`, 'Participação']}
+                      contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -275,18 +297,18 @@ export default function PactoAnalises({ program }) {
             </div>
           </div>
 
-          <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
-            <strong style={{ fontSize: 14, color: '#0f172a', display: 'block', marginBottom: 12 }}>
+          <div className="card card-pad" style={{ borderRadius: 12 }}>
+            <strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>
               Cobertura da Rede Municipal de Abaetetuba/PA
             </strong>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ padding: 12, background: 'var(--surface-2, #f8fafc)', borderRadius: 8, border: '1px solid var(--border, #e2e8f0)' }}>
-                <div style={{ fontSize: 11.5, color: 'var(--text-2, #64748b)' }}>Escolas na Rede</div>
+              <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11.5, color: 'var(--text-2)' }}>Escolas na Rede</div>
                 <div style={{ fontSize: 20, fontWeight: 800 }}>{overview?.schools?.length || 72} escolas</div>
               </div>
-              <div style={{ padding: 12, background: 'var(--surface-2, #f8fafc)', borderRadius: 8, border: '1px solid var(--border, #e2e8f0)' }}>
-                <div style={{ fontSize: 11.5, color: 'var(--text-2, #64748b)' }}>Taxa de Conclusão</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>
+              <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 11.5, color: 'var(--text-2)' }}>Taxa de Conclusão</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)' }}>
                   {dashboard?.metrics?.participationPercentage || 88}%
                 </div>
               </div>

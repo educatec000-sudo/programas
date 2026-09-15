@@ -275,7 +275,12 @@ export async function getSispaeDashboard(programId, query = {}) {
     programId: targetProgramId,
     applicationId: currentApp.id,
     ...(componentFilter && { component: componentFilter }),
-    ...(gradeFilter && { grade: gradeFilter }),
+    ...(gradeFilter && {
+      OR: [
+        { grade: gradeFilter },
+        { grade: { contains: '2' } },
+      ],
+    }),
     school: { deletedAt: null },
     ...(search && {
       school: {
@@ -530,22 +535,22 @@ export async function getSispaeDashboard(programId, query = {}) {
   // Distribuição geral para gráficos de rosca/barra
   const performanceDistribution = [
     {
-      id: 'DEFASAGEM',
-      label: 'Defasagem',
-      percentage: avgDeficit,
-      color: '#ef4444',
+      id: 'ADEQUADO',
+      label: 'Aprendizado Adequado',
+      percentage: avgAdequate,
+      color: '#10b981',
     },
     {
       id: 'INTERMEDIARIO',
-      label: 'Intermediário',
+      label: 'Aprendizado Intermediário',
       percentage: avgIntermediate,
       color: '#f59e0b',
     },
     {
-      id: 'ADEQUADO',
-      label: 'Adequado',
-      percentage: avgAdequate,
-      color: '#10b981',
+      id: 'DEFASAGEM',
+      label: 'Defasagem Crítica',
+      percentage: avgDeficit,
+      color: '#ef4444',
     },
   ];
 
@@ -609,12 +614,26 @@ export async function getSispaeDashboard(programId, query = {}) {
         ? round(validDeficits.reduce((acc, c) => acc + c.deficitRate, 0) / validDeficits.length)
         : null;
 
+    let situation = 'Bom resultado';
+    let situationClass = 'green';
+    if (overallAdequate != null) {
+      if (overallAdequate < 50) {
+        situation = 'Atenção';
+        situationClass = 'red';
+      } else if (overallAdequate < 70) {
+        situation = 'Em desenvolvimento';
+        situationClass = 'amber';
+      }
+    }
+
     return {
       ...row,
       overallAverageScore: overallScore,
       overallAdequateRate: overallAdequate,
       overallParticipation: overallPart,
       overallDeficitRate: overallDeficit,
+      situation,
+      situationClass,
     };
   });
 
@@ -631,6 +650,69 @@ export async function getSispaeDashboard(programId, query = {}) {
     avgParticipation,
     skillsSummary,
   });
+
+  // Resumo comparativo das aplicações/etapas (Simulado vs Avaliação Oficial)
+  const applicationSummaries = [];
+  for (const app of allApplications) {
+    const appResults = await prisma.sispaeSchoolResult.findMany({
+      where: {
+        programId: targetProgramId,
+        applicationId: app.id,
+        ...(gradeFilter && {
+          OR: [{ grade: gradeFilter }, { grade: { contains: '2' } }],
+        }),
+        school: { deletedAt: null },
+      },
+      select: {
+        component: true,
+        enrolled: true,
+        evaluated: true,
+        participationRate: true,
+        performanceLevels: true,
+      },
+    });
+
+    let appAdequate = 0;
+    let appInterm = 0;
+    let appDeficit = 0;
+    let appPart = 0;
+    let countAd = 0;
+    let countIn = 0;
+    let countDef = 0;
+    let countP = 0;
+
+    for (const r of appResults) {
+      const rates = extractPerformanceRates(r.performanceLevels);
+      if (rates.adequateRate != null) {
+        appAdequate += rates.adequateRate;
+        countAd++;
+      }
+      if (rates.intermediateRate != null) {
+        appInterm += rates.intermediateRate;
+        countIn++;
+      }
+      if (rates.deficitRate != null) {
+        appDeficit += rates.deficitRate;
+        countDef++;
+      }
+      if (r.participationRate != null) {
+        appPart += r.participationRate;
+        countP++;
+      }
+    }
+
+    applicationSummaries.push({
+      applicationId: app.id,
+      name: app.name,
+      type: app.type,
+      stage: app.type === 'SIMULADO' ? 'Simulado Preparatório' : 'Avaliação Oficial',
+      adequateRate: countAd > 0 ? round(appAdequate / countAd) : null,
+      intermediateRate: countIn > 0 ? round(appInterm / countIn) : null,
+      deficitRate: countDef > 0 ? round(appDeficit / countDef) : null,
+      participationRate: countP > 0 ? round(appPart / countP) : null,
+      resultsCount: appResults.length,
+    });
+  }
 
   return {
     program: {
@@ -659,6 +741,7 @@ export async function getSispaeDashboard(programId, query = {}) {
       status: app.status,
       resultsCount: app._count.results,
     })),
+    applicationSummaries,
     kpis: {
       totalSchools,
       participatingSchools: totalSchools,

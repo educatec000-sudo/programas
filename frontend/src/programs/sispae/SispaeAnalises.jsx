@@ -99,42 +99,58 @@ export default function SispaeAnalises({ program = {}, onSelectTab }) {
             style={{ height: 36 }}
           />
         </div>
+
+        {(search || component !== 'ALL') && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setComponent('ALL');
+                setSearch('');
+              }}
+              style={{ height: 36, whiteSpace: 'nowrap' }}
+            >
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cards de Resumo Pedagógico da Rede */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-        <div className="card" style={{ padding: '16px 20px', borderRadius: 10, border: '1px solid #fecaca', background: '#fef2f2' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#991b1b', textTransform: 'uppercase' }}>
+        <div className="card" style={{ padding: '16px 20px', borderRadius: 10, border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.1)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--danger)', textTransform: 'uppercase' }}>
             ⚠️ Habilidades Críticas (&lt; 50%)
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#dc2626', marginTop: 4 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--danger)', marginTop: 4 }}>
             {criticalSkills.length} descritores
           </div>
-          <div style={{ fontSize: 11.5, color: '#7f1d1d', marginTop: 2 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2 }}>
             demandam reforço emergencial
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px 20px', borderRadius: 10, border: '1px solid #fde68a', background: '#fffbeb' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#92400e', textTransform: 'uppercase' }}>
+        <div className="card" style={{ padding: '16px 20px', borderRadius: 10, border: '1px solid rgba(245, 158, 11, 0.3)', background: 'rgba(245, 158, 11, 0.1)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase' }}>
             ⚡ Habilidades em Alerta (50-70%)
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#d97706', marginTop: 4 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#f59e0b', marginTop: 4 }}>
             {alertSkills.length} descritores
           </div>
-          <div style={{ fontSize: 11.5, color: '#78350f', marginTop: 2 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2 }}>
             em desenvolvimento intermediário
           </div>
         </div>
 
-        <div className="card" style={{ padding: '16px 20px', borderRadius: 10, border: '1px solid #bbf7d0', background: '#f0fdf4' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#065f46', textTransform: 'uppercase' }}>
+        <div className="card" style={{ padding: '16px 20px', borderRadius: 10, border: '1px solid rgba(16, 185, 129, 0.3)', background: 'rgba(16, 185, 129, 0.1)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
             🎯 Habilidades Consolidadas (≥ 70%)
           </div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: '#16a34a', marginTop: 4 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, color: '#10b981', marginTop: 4 }}>
             {consolidatedSkills.length} descritores
           </div>
-          <div style={{ fontSize: 11.5, color: '#064e3b', marginTop: 2 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 2 }}>
             domínio satisfatório pela rede
           </div>
         </div>

@@ -91,29 +91,27 @@ export default function ParcRelatorios({ program = {} }) {
         id="relatorio-executivo"
         style={{
           padding: '32px 36px',
-          background: '#ffffff',
           borderRadius: 14,
-          border: '1px solid #e2e8f0',
           display: 'flex',
           flexDirection: 'column',
           gap: 24,
         }}
       >
         {/* Cabeçalho do Relatório */}
-        <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 16 }}>
+        <div style={{ borderBottom: '2px solid var(--border)', paddingBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', letterSpacing: 1 }}>
                 SECRETARIA MUNICIPAL DE EDUCAÇÃO · SEMED ABAETETUBA
               </div>
-              <h1 style={{ margin: '4px 0 2px 0', fontSize: 22, fontWeight: 800, color: '#0f172a' }}>
+              <h1 style={{ margin: '4px 0 2px 0', fontSize: 22, fontWeight: 800 }}>
                 PARC — Programa de Alfabetização na Idade Certa {programYear}
               </h1>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-2)' }}>
                 Relatório Executivo Oficial de Fluência Leitora · {cycle === 'SAIDA' ? 'Ciclo de Saída' : 'Ciclo de Entrada'} (2º Ano)
               </div>
             </div>
-            <div style={{ textAlign: 'right', fontSize: 11.5, color: '#64748b' }}>
+            <div style={{ textAlign: 'right', fontSize: 11.5, color: 'var(--text-3)' }}>
               <div>Data de Emissão: {new Date().toLocaleDateString('pt-BR')}</div>
               <div>CPE — Controle de Programas Educacionais</div>
             </div>
@@ -122,24 +120,24 @@ export default function ParcRelatorios({ program = {} }) {
 
         {/* Resumo de Indicadores Gerais */}
         <div>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, textTransform: 'uppercase' }}>
             1. Indicadores Globais de Fluência Leitora
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>ESTUDANTES PREVISTOS</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{fmtInt(kpis.totalEnrolled || 0)}</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>ESTUDANTES PREVISTOS</div>
+              <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtInt(kpis.totalEnrolled || 0)}</div>
             </div>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>ESTUDANTES AVALIADOS</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{fmtInt(kpis.totalEvaluated || 0)}</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>ESTUDANTES AVALIADOS</div>
+              <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtInt(kpis.totalEvaluated || 0)}</div>
             </div>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>TAXA DE PARTICIPAÇÃO</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#10b981' }}>{fmt(kpis.participationRate, 1)}%</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>TAXA DE PARTICIPAÇÃO</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)' }}>{fmt(kpis.participationRate, 1)}%</div>
             </div>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>ÍNDICE DE FLUÊNCIA (IFL)</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>ÍNDICE DE FLUÊNCIA (IFL)</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#ea580c' }}>{fmt(kpis.ifl, 1)} / 10</div>
             </div>
           </div>
@@ -147,12 +145,12 @@ export default function ParcRelatorios({ program = {} }) {
 
         {/* Distribuição por Níveis de Fluência */}
         <div>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, textTransform: 'uppercase' }}>
             2. Distribuição por Níveis de Fluência Leitora
           </h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #cbd5e1' }}>
+              <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
                 <th style={{ padding: 10, fontWeight: 700 }}>Nível de Fluência</th>
                 <th style={{ padding: 10, fontWeight: 700, textAlign: 'center' }}>Classificação</th>
                 <th style={{ padding: 10, fontWeight: 700, textAlign: 'center' }}>Total Alunos</th>
@@ -161,8 +159,8 @@ export default function ParcRelatorios({ program = {} }) {
             </thead>
             <tbody>
               {pieSlices.map((slice) => (
-                <tr key={slice.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: 10, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <tr key={slice.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: 10, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ width: 12, height: 12, borderRadius: '50%', background: slice.color, display: 'inline-block' }} />
                     {slice.label}
                   </td>
@@ -180,12 +178,12 @@ export default function ParcRelatorios({ program = {} }) {
         {/* Resumo por Localização e Pontos de Atenção */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           <div>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: 13.5, fontWeight: 700, color: '#0369a1' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: 13.5, fontWeight: 700, color: '#0284c7' }}>
               📍 Desempenho por Segmento Territorial
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {zoneBreakdown.map((zb) => (
-                <div key={zb.zone} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: '#f0f9ff', borderRadius: 6 }}>
+                <div key={zb.zone} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 6, border: '1px solid var(--border)' }}>
                   <span><strong>{zb.zone}</strong> ({zb.schoolsCount} escolas)</span>
                   <span>Part.: <strong>{fmt(zb.participationRate, 1)}%</strong> · Fluentes: <strong>{fmt(zb.fluentReader, 1)}%</strong></span>
                 </div>
@@ -194,14 +192,14 @@ export default function ParcRelatorios({ program = {} }) {
           </div>
 
           <div>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: 13.5, fontWeight: 700, color: '#b91c1c' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--danger)' }}>
               ⚠️ Escolas Prioritárias para Intervenção
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {attentionSchools.slice(0, 5).map((s, idx) => (
-                <div key={s.schoolId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: '#fef2f2', borderRadius: 6 }}>
+                <div key={s.schoolId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: 6, border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                   <span><strong>{idx + 1}º</strong> {s.schoolName}</span>
-                  <strong style={{ color: '#dc2626' }}>{s.priorityLabel}</strong>
+                  <strong style={{ color: 'var(--danger)' }}>{s.priorityLabel}</strong>
                 </div>
               ))}
             </div>

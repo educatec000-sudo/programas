@@ -36,7 +36,7 @@ function SemiCircleGaugeCard({ title, icon, value, unit = '%', min = 0, max = 10
           <path
             d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
             fill="none"
-            stroke="#e2e8f0"
+            stroke="var(--surface-3, #e2e8f0)"
             strokeWidth="13"
             strokeLinecap="round"
           />
@@ -60,17 +60,17 @@ function SemiCircleGaugeCard({ title, icon, value, unit = '%', min = 0, max = 10
             textAnchor="middle"
             fontSize="21"
             fontWeight="800"
-            fill="#0f172a"
+            fill="var(--text, #0f172a)"
             fontFamily="system-ui, -apple-system, sans-serif"
           >
             {isScore ? fmt(value, 1) : `${fmt(value, 1)}${unit}`}
           </text>
           {/* Rótulo Mínimo */}
-          <text x={cx - r} y={cy + 13} textAnchor="start" fontSize="9.5" fontWeight="600" fill="#94a3b8">
+          <text x={cx - r} y={cy + 13} textAnchor="start" fontSize="9.5" fontWeight="600" fill="var(--text-3, #94a3b8)">
             {min}{unit && !isScore ? unit : ''}
           </text>
           {/* Rótulo Máximo */}
-          <text x={cx + r} y={cy + 13} textAnchor="end" fontSize="9.5" fontWeight="600" fill="#94a3b8">
+          <text x={cx + r} y={cy + 13} textAnchor="end" fontSize="9.5" fontWeight="600" fill="var(--text-3, #94a3b8)">
             {max}{unit && !isScore ? unit : ''}
           </text>
         </svg>
@@ -182,7 +182,7 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName, viewMo
                 key={p.id}
                 d={p.pathData}
                 fill={p.color}
-                stroke="#ffffff"
+                stroke="var(--surface, #ffffff)"
                 strokeWidth="2"
                 style={{ transition: 'all 0.3s ease', cursor: 'pointer' }}
               >
@@ -196,7 +196,7 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName, viewMo
                 <polyline
                   points={`${p.callout.p1.x},${p.callout.p1.y} ${p.callout.p2.x},${p.callout.p2.y} ${p.callout.p3.x},${p.callout.p3.y}`}
                   fill="none"
-                  stroke="#64748b"
+                  stroke="var(--text-3, #64748b)"
                   strokeWidth="1.2"
                 />
                 <text
@@ -205,7 +205,7 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName, viewMo
                   textAnchor={p.callout.anchor}
                   fontSize="11"
                   fontWeight="700"
-                  fill="#0f172a"
+                  fill="var(--text, #0f172a)"
                   fontFamily="system-ui, -apple-system, sans-serif"
                 >
                   {p.callout.label}
@@ -681,10 +681,10 @@ export default function ParcDashboard({ program = {} }) {
 
           {/* Comparativo Entrada × Saída (quando ambos os ciclos estiverem presentes) */}
           {cycleComparison && cycleComparison.entrada && cycleComparison.saida && (
-            <div className="card card-pad" style={{ background: '#faf5ff', borderColor: '#d8b4fe' }}>
+            <div className="card card-pad" style={{ background: 'var(--surface-2)', borderColor: 'var(--border)' }}>
               <div className="card-header-row" style={{ marginBottom: 12 }}>
                 <div>
-                  <div className="card-title" style={{ color: '#6b21a8' }}>
+                  <div className="card-title" style={{ color: '#8b5cf6' }}>
                     🚀 Evolução da Rede: Ciclo de Entrada × Ciclo de Saída (2026)
                   </div>
                   <div className="card-subtitle">
@@ -697,7 +697,7 @@ export default function ParcDashboard({ program = {} }) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-                <div style={{ background: '#fff', padding: 12, borderRadius: 8, border: '1px solid #e9d5ff' }}>
+                <div style={{ background: 'var(--surface)', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Ganho em Fluentes</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: cycleComparison.evolution.deltaFluent >= 0 ? '#10b981' : '#ef4444', marginTop: 4 }}>
                     {cycleComparison.evolution.deltaFluent >= 0 ? '+' : ''}{fmt(cycleComparison.evolution.deltaFluent, 1)} p.p.
@@ -707,7 +707,7 @@ export default function ParcDashboard({ program = {} }) {
                   </div>
                 </div>
 
-                <div style={{ background: '#fff', padding: 12, borderRadius: 8, border: '1px solid #e9d5ff' }}>
+                <div style={{ background: 'var(--surface)', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Redução de Pré-leitores</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#10b981', marginTop: 4 }}>
                     {cycleComparison.evolution.deltaPreReaderReduction >= 0 ? '-' : '+'}{fmt(Math.abs(cycleComparison.evolution.deltaPreReaderReduction), 1)} p.p.
@@ -717,7 +717,7 @@ export default function ParcDashboard({ program = {} }) {
                   </div>
                 </div>
 
-                <div style={{ background: '#fff', padding: 12, borderRadius: 8, border: '1px solid #e9d5ff' }}>
+                <div style={{ background: 'var(--surface)', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Total de Leitores (Inic + Fluent)</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: cycleComparison.evolution.deltaBeginnerPlusFluent >= 0 ? '#3b82f6' : '#ef4444', marginTop: 4 }}>
                     {cycleComparison.evolution.deltaBeginnerPlusFluent >= 0 ? '+' : ''}{fmt(cycleComparison.evolution.deltaBeginnerPlusFluent, 1)} p.p.

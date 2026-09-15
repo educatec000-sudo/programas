@@ -80,16 +80,14 @@ export default function SispaeApplications({ program = {}, onSelectTab }) {
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: 14,
-          background: '#ffffff',
           borderRadius: 12,
-          border: '1px solid #e2e8f0',
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>
             Aplicações Avaliativas do SisPAE
           </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#64748b' }}>
+          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-2)' }}>
             Gerencie os Simulados Preparatórios e as Avaliações Oficiais do programa. Os dados de cada aplicação permanecem estritamente isolados.
           </p>
         </div>
@@ -115,22 +113,20 @@ export default function SispaeApplications({ program = {}, onSelectTab }) {
             style={{
               padding: 20,
               borderRadius: 12,
-              border: `1px solid ${app.type === 'SIMULADO' ? '#fde68a' : '#a7f3d0'}`,
-              background: '#ffffff',
+              border: `1px solid ${app.type === 'SIMULADO' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
               gap: 16,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             }}
           >
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                 <span
                   style={{
-                    background: app.type === 'SIMULADO' ? '#fef3c7' : '#d1fae5',
-                    color: app.type === 'SIMULADO' ? '#92400e' : '#065f46',
-                    border: `1px solid ${app.type === 'SIMULADO' ? '#fcd34d' : '#6ee7b7'}`,
+                    background: app.type === 'SIMULADO' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                    color: app.type === 'SIMULADO' ? '#f59e0b' : '#10b981',
+                    border: `1px solid ${app.type === 'SIMULADO' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
                     padding: '3px 8px',
                     borderRadius: 6,
                     fontSize: 11,
@@ -140,16 +136,16 @@ export default function SispaeApplications({ program = {}, onSelectTab }) {
                 >
                   {app.type === 'SIMULADO' ? '📝 Simulado' : '🏛️ Avaliação Oficial'}
                 </span>
-                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600 }}>
                   Ano {app.year}
                 </span>
               </div>
 
-              <h3 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: 16, fontWeight: 700 }}>
                 {app.name}
               </h3>
 
-              <p style={{ margin: 0, fontSize: 13, color: '#64748b', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.4 }}>
                 {app.description || 'Sem descrição cadastrada.'}
               </p>
             </div>
@@ -160,15 +156,15 @@ export default function SispaeApplications({ program = {}, onSelectTab }) {
                   display: 'flex',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  background: '#f8fafc',
+                  background: 'var(--surface-2)',
                   borderRadius: 8,
                   fontSize: 12.5,
                   marginBottom: 12,
-                  border: '1px solid #f1f5f9',
+                  border: '1px solid var(--border)',
                 }}
               >
                 <span>Resultados Cadastrados:</span>
-                <strong style={{ color: app.resultsCount > 0 ? '#0284c7' : '#94a3b8' }}>
+                <strong style={{ color: app.resultsCount > 0 ? '#0284c7' : 'var(--text-3)' }}>
                   {fmtInt(app.resultsCount)} registros
                 </strong>
               </div>
@@ -186,7 +182,7 @@ export default function SispaeApplications({ program = {}, onSelectTab }) {
                 <button
                   className="btn btn-outline"
                   onClick={() => handleDeleteApplication(app)}
-                  style={{ color: '#ef4444', borderColor: '#fecaca', padding: '6px 10px', fontSize: 12 }}
+                  style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', padding: '6px 10px', fontSize: 12 }}
                   title="Excluir aplicação"
                 >
                   🗑️

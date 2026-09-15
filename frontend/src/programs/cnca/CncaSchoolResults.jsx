@@ -210,7 +210,7 @@ export default function CncaSchoolResults({ program }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Barra de alternância de modo de visualização */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: 8, padding: 3, gap: 4 }}>
+        <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 4 }}>
           <button
             type="button"
             onClick={() => setViewMode('DETAIL')}
@@ -218,7 +218,7 @@ export default function CncaSchoolResults({ program }) {
               padding: '6px 14px',
               borderRadius: 6,
               border: 'none',
-              background: viewMode === 'DETAIL' ? '#fff' : 'transparent',
+              background: viewMode === 'DETAIL' ? 'var(--surface)' : 'transparent',
               fontWeight: viewMode === 'DETAIL' ? 600 : 400,
               color: viewMode === 'DETAIL' ? 'var(--primary)' : 'var(--text-2)',
               cursor: 'pointer',
@@ -236,7 +236,7 @@ export default function CncaSchoolResults({ program }) {
               padding: '6px 14px',
               borderRadius: 6,
               border: 'none',
-              background: viewMode === 'MANAGE' ? '#fff' : 'transparent',
+              background: viewMode === 'MANAGE' ? 'var(--surface)' : 'transparent',
               fontWeight: viewMode === 'MANAGE' ? 600 : 400,
               color: viewMode === 'MANAGE' ? 'var(--primary)' : 'var(--text-2)',
               cursor: 'pointer',
@@ -513,7 +513,7 @@ export default function CncaSchoolResults({ program }) {
                                   padding: '12px 14px',
                                   borderRadius: 8,
                                   border: '1px solid var(--border)',
-                                  background: '#fff',
+                                  background: 'var(--surface-2)',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   gap: 6,
@@ -523,7 +523,7 @@ export default function CncaSchoolResults({ program }) {
                                   <span style={{ fontSize: 13, fontWeight: 600 }}>{lvl.level}</span>
                                   <strong style={{ fontSize: 15, color: barColor }}>{fmt(lvl.percentage, 1)}%</strong>
                                 </div>
-                                <div style={{ width: '100%', height: 7, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                                <div style={{ width: '100%', height: 7, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden' }}>
                                   <div style={{ width: `${Math.min(100, Math.max(0, lvl.percentage || 0))}%`, height: '100%', background: barColor }} />
                                 </div>
                                 {lvl.count != null && (
@@ -560,20 +560,20 @@ export default function CncaSchoolResults({ program }) {
                                 style={{
                                   padding: '10px 12px',
                                   borderRadius: 8,
-                                  border: isCrit ? '1px solid #fecaca' : '1px solid var(--border)',
-                                  background: isCrit ? '#fef2f2' : '#fff',
+                                  border: isCrit ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid var(--border)',
+                                  background: isCrit ? 'rgba(239, 68, 68, 0.1)' : 'var(--surface-2)',
                                   display: 'flex',
                                   flexDirection: 'column',
                                   gap: 6,
                                 }}
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: isCrit ? '#991b1b' : 'var(--text-1)' }}>
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: isCrit ? 'var(--danger)' : 'var(--text)' }}>
                                     {sk.code} {sk.name && sk.name !== sk.code ? `· ${sk.name}` : ''}
                                   </span>
                                   <strong style={{ fontSize: 14, color: barColor }}>{fmt(sk.percentage, 1)}%</strong>
                                 </div>
-                                <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ width: '100%', height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
                                   <div style={{ width: `${Math.min(100, Math.max(0, sk.percentage || 0))}%`, height: '100%', background: barColor }} />
                                 </div>
                               </div>
@@ -601,7 +601,7 @@ export default function CncaSchoolResults({ program }) {
                         </div>
 
                         {showRawDetails && (
-                          <div style={{ marginTop: 12, maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: '#f8fafc' }}>
+                          <div style={{ marginTop: 12, maxHeight: 300, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: 'var(--surface-2)' }}>
                             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                               <thead>
                                 <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left', color: 'var(--text-3)' }}>
@@ -611,7 +611,7 @@ export default function CncaSchoolResults({ program }) {
                               </thead>
                               <tbody>
                                 {Object.entries(currentResult.rawDetails).map(([k, v]) => (
-                                  <tr key={k} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                  <tr key={k} style={{ borderBottom: '1px solid var(--border)' }}>
                                     <td style={{ padding: '6px 8px', fontWeight: 600, color: 'var(--text-2)' }}>{k}</td>
                                     <td style={{ padding: '6px 8px', fontFamily: 'monospace' }}>{String(v)}</td>
                                   </tr>
@@ -655,7 +655,7 @@ export default function CncaSchoolResults({ program }) {
           </div>
 
           {/* Barra de Filtros em Lote */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', background: 'var(--surface-2)', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
             <Field label="Componente" style={{ margin: 0 }}>
               <Select value={manageComponent} onChange={(e) => setManageComponent(e.target.value)} style={{ fontSize: 12.5, height: 34 }}>
                 <option value="TODOS">Todos os componentes</option>
@@ -705,8 +705,8 @@ export default function CncaSchoolResults({ program }) {
 
           {/* Barra de Ações em Massa (quando há itens selecionados) */}
           {selectedResultIds.size > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: 8 }}>
-              <span style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(2, 132, 199, 0.12)', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '10px 14px', borderRadius: 8 }}>
+              <span style={{ fontSize: 13, color: '#0284c7', fontWeight: 600 }}>
                 {selectedResultIds.size} registro(s) selecionado(s)
               </span>
 
@@ -716,7 +716,7 @@ export default function CncaSchoolResults({ program }) {
                     variant="secondary"
                     onClick={() => handlePublish()}
                     disabled={isProcessing}
-                    style={{ background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0', fontSize: 12.5 }}
+                    style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.3)', fontSize: 12.5 }}
                   >
                     🚀 Publicar Selecionados ({selectedDraftsCount})
                   </Button>
@@ -725,7 +725,7 @@ export default function CncaSchoolResults({ program }) {
                   variant="secondary"
                   onClick={() => { setBulkDeleteType('SELECTED'); setBulkDeleteModalOpen(true); }}
                   disabled={isProcessing}
-                  style={{ background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca', fontSize: 12.5 }}
+                  style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', fontSize: 12.5 }}
                 >
                   🗑️ Excluir Selecionados ({selectedResultIds.size})
                 </Button>
@@ -751,7 +751,7 @@ export default function CncaSchoolResults({ program }) {
             <div style={{ maxHeight: 520, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ position: 'sticky', top: 0, zIndex: 5, background: '#f8fafc', borderBottom: '2px solid var(--border)' }}>
+                  <tr style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
                     <th style={{ padding: '10px 12px', width: 40, textAlign: 'center' }}>
                       <input
                         type="checkbox"
@@ -777,8 +777,8 @@ export default function CncaSchoolResults({ program }) {
                       <tr
                         key={r.id}
                         style={{
-                          background: isSelected ? '#eff6ff' : (rowIdx % 2 === 0 ? '#fff' : '#fafafa'),
-                          borderBottom: '1px solid #e2e8f0',
+                          background: isSelected ? 'rgba(2, 132, 199, 0.12)' : (rowIdx % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)'),
+                          borderBottom: '1px solid var(--border)',
                         }}
                       >
                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
@@ -868,13 +868,13 @@ export default function CncaSchoolResults({ program }) {
             <p style={{ margin: 0 }}>
               Tem certeza que deseja excluir o resultado do componente <strong>{deletingResult.component}</strong> da escola:
             </p>
-            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
               <strong>{deletingResult.school?.name || selectedSchool?.name}</strong>
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
                 Etapa: {deletingResult.grade} · Avaliação: {deletingResult.assessment} · Status: {deletingResult.source === 'RASCUNHO' ? 'Rascunho' : 'Oficial'}
               </div>
             </div>
-            <p style={{ margin: 0, fontSize: 12.5, color: '#dc2626' }}>
+            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--danger)' }}>
               Esta ação removerá este registro específico e atualizará os indicadores do CNCA imediatamente.
             </p>
           </div>

@@ -605,12 +605,12 @@ export default function CncaAnalises({ program }) {
 
       {/* 3. PONTOS DE ATENÇÃO PRIORITÁRIA */}
       {criticalSkills.length > 0 && (
-        <div className="card card-pad" style={{ background: '#fffafa', borderColor: '#fecaca' }}>
+        <div className="card card-pad" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
           <div className="card-header-row" style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 20 }}>⚠️</span>
               <div>
-                <div className="card-title" style={{ color: '#991b1b', margin: 0 }}>
+                <div className="card-title" style={{ color: '#ef4444', margin: 0 }}>
                   Pontos de Atenção Pedagógica ({criticalSkills.length} habilidades &lt; 50%)
                 </div>
                 <div className="card-subtitle" style={{ margin: 0 }}>
@@ -622,10 +622,10 @@ export default function CncaAnalises({ program }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
             {criticalSkills.map((sk) => (
-              <div key={sk.code} style={{ background: '#fff', border: '1px solid #fecaca', padding: '12px 14px', borderRadius: 8 }}>
+              <div key={sk.code} style={{ background: 'var(--surface-2)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '12px 14px', borderRadius: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: 13, color: '#991b1b' }}>{sk.code}</strong>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#dc2626' }}>{fmt(sk.percentage, 1)}%</span>
+                  <strong style={{ fontSize: 13, color: 'var(--danger)' }}>{sk.code}</strong>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--danger)' }}>{fmt(sk.percentage, 1)}%</span>
                 </div>
                 {sk.name && sk.name !== sk.code && (
                   <div style={{ fontSize: 11.5, color: 'var(--text-2)', marginTop: 4 }}>{sk.name}</div>
@@ -656,13 +656,13 @@ export default function CncaAnalises({ program }) {
               const isCrit = sk.percentage < 50;
               const barColor = isCrit ? '#dc2626' : sk.percentage >= 70 ? '#16a34a' : '#0284c7';
               return (
-                <div key={sk.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid var(--border)', gap: 16 }}>
+                <div key={sk.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', gap: 16 }}>
                   <div style={{ minWidth: 260, flex: 1 }}>
-                    <strong style={{ fontSize: 13, color: isCrit ? '#991b1b' : 'var(--text-1)' }}>{sk.code}</strong>
+                    <strong style={{ fontSize: 13, color: isCrit ? 'var(--danger)' : 'var(--text-1)' }}>{sk.code}</strong>
                     {sk.name && sk.name !== sk.code && <span style={{ fontSize: 12.5, color: 'var(--text-2)', marginLeft: 8 }}>· {sk.name}</span>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 200, flex: 1 }}>
-                    <div style={{ flex: 1, height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden' }}>
+                    <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
                       <div style={{ width: `${Math.min(100, Math.max(0, sk.percentage))}%`, height: '100%', background: barColor, borderRadius: 999 }} />
                     </div>
                     <strong style={{ fontSize: 13.5, color: barColor, width: 50, textAlign: 'right' }}>{fmt(sk.percentage, 1)}%</strong>

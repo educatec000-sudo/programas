@@ -172,8 +172,8 @@ export default function PactoRelatorios({ program }) {
         </div>
 
         {/* Coluna Direita: Filtros do Relatório */}
-        <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
-          <h4 style={{ fontSize: 14, fontWeight: 750, color: '#0f172a', margin: '0 0 14px 0' }}>
+        <div className="card card-pad" style={{ borderRadius: 12 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 750, margin: '0 0 14px 0' }}>
             Filtros do Relatório
           </h4>
 

@@ -1990,9 +1990,12 @@ body.dark-theme {
   position: relative;
   width: 100%;
   height: 220px;
+  min-height: 220px;
   border-radius: 10px;
   overflow: hidden;
   margin: 8px 0;
+  background: #e2e8f0;
+  z-index: 1;
 }
 
 .sispae-map-footer-row-v2 {
@@ -2798,8 +2801,17 @@ body.dark-theme {
 [data-theme="dark"] .parc-levels-header-v2,
 [data-theme="dark"] .parc-comp-table-header-v2,
 [data-theme="dark"] .parc-attention-feed-title,
-[data-theme="dark"] .parc-callout-title {
+[data-theme="dark"] .parc-callout-title,
+[data-theme="dark"] .parc-gauge-header-v2,
+[data-theme="dark"] .parc-level-name-wrap,
+[data-theme="dark"] .parc-level-pct-val,
+[data-theme="dark"] .parc-pie-legend-item {
   color: var(--text) !important;
+}
+
+[data-theme="dark"] .parc-level-count-val,
+[data-theme="dark"] .parc-pie-sub-title {
+  color: var(--text-2) !important;
 }
 
 [data-theme="dark"] .parc-callout-card-v2 {

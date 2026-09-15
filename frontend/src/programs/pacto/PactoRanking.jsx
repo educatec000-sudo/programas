@@ -70,7 +70,7 @@ export default function PactoRanking({ program, onSelectTab }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Subabas: Por Proficiência | Por Evolução / Participação */}
-      <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
         <button
           type="button"
           className={`btn ${rankingMode === 'PROFICIENCIA' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
@@ -88,7 +88,7 @@ export default function PactoRanking({ program, onSelectTab }) {
       </div>
 
       {/* Barra de Filtros do Ranking */}
-      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', background: '#f8fafc' }}>
+      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end' }}>
         <div style={{ flex: '1 1 200px' }}>
           <Field label="Buscar Escola">
             <Input
@@ -137,13 +137,22 @@ export default function PactoRanking({ program, onSelectTab }) {
           >
             Todas ({schoolRanking.length})
           </Button>
+          {(search || gradeFilter || componentFilter) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => { setSearch(''); setGradeFilter(''); setComponentFilter(''); }}
+            >
+              Limpar
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Grid Principal: Tabela à Esquerda + Visualizador à Direita */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         {/* Tabela do Ranking */}
-        <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12 }}>
+        <div className="card card-pad" style={{ borderRadius: 12 }}>
           <DataTable
             columns={[
               {
@@ -162,8 +171,8 @@ export default function PactoRanking({ program, onSelectTab }) {
                 label: 'Escola Municipal',
                 render: (item) => (
                   <div>
-                    <strong style={{ color: '#0f172a', fontSize: 13 }}>{item.school}</strong>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                    <strong style={{ fontSize: 13 }}>{item.school}</strong>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                       INEP: <span className="mono">{item.inep || '—'}</span> · Abaetetuba/PA
                     </div>
                   </div>
@@ -184,7 +193,7 @@ export default function PactoRanking({ program, onSelectTab }) {
                 label: 'Participação',
                 align: 'center',
                 render: (item) => (
-                  <span style={{ fontWeight: 600, color: (item.participationPercentage ?? 0) >= 90 ? '#15803d' : '#b45309' }}>
+                  <span style={{ fontWeight: 600, color: (item.participationPercentage ?? 0) >= 90 ? 'var(--success)' : 'var(--warning)' }}>
                     {item.participationPercentage != null ? `${fmt(item.participationPercentage)}%` : '—'}
                   </span>
                 ),
@@ -208,8 +217,8 @@ export default function PactoRanking({ program, onSelectTab }) {
         </div>
 
         {/* Card Ilustrativo e Destaques à Direita */}
-        <div className="card card-pad" style={{ background: '#ffffff', borderRadius: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24 }}>
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#eff6ff', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+        <div className="card card-pad" style={{ borderRadius: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 24 }}>
+          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--primary-soft)', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
             <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
               <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
@@ -219,10 +228,10 @@ export default function PactoRanking({ program, onSelectTab }) {
               <path d="M6 2h12v7a6 6 0 0 1-12 0V2Z" />
             </svg>
           </div>
-          <h3 style={{ fontSize: 16, fontWeight: 750, color: '#0f172a', margin: '0 0 8px 0' }}>
+          <h3 style={{ fontSize: 16, fontWeight: 750, margin: '0 0 8px 0' }}>
             Classificação Geral da Rede Municipal
           </h3>
-          <p style={{ fontSize: 12.5, color: '#64748b', maxWidth: 280, margin: '0 0 18px 0', lineHeight: 1.4 }}>
+          <p style={{ fontSize: 12.5, color: 'var(--text-2)', maxWidth: 280, margin: '0 0 18px 0', lineHeight: 1.4 }}>
             O ranking do Pacto calcula a média ponderada com base no alcance de níveis de proficiência em Leitura, Escrita e Matemática na avaliação vigente.
           </p>
 

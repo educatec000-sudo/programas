@@ -45,10 +45,10 @@ function UnmatchedSchoolRow({
   return (
     <div
       style={{
-        background: currentMappedId ? '#f0fdf4' : '#fff',
+        background: currentMappedId ? 'rgba(16, 185, 129, 0.12)' : 'var(--surface)',
         padding: '12px 14px',
         borderRadius: 8,
-        border: currentMappedId ? '1.5px solid #86efac' : '1px solid #fde68a',
+        border: currentMappedId ? '1.5px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
@@ -60,7 +60,7 @@ function UnmatchedSchoolRow({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>{currentMappedId ? '✅' : '⚠️'}</span>
-            <strong style={{ fontSize: 14.5, color: currentMappedId ? '#166534' : '#1e293b' }}>
+            <strong style={{ fontSize: 14.5, color: currentMappedId ? 'var(--success)' : 'var(--text)' }}>
               {unmatched.schoolNameRaw}
             </strong>
             {currentMappedId ? (
@@ -75,7 +75,7 @@ function UnmatchedSchoolRow({
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
             Linha {unmatched.rowNumber} · INEP na planilha: <strong>{unmatched.inepRaw || 'Não informado'}</strong>
-            <span style={{ marginLeft: 8, color: '#b45309' }}>• {unmatched.error}</span>
+            <span style={{ marginLeft: 8, color: '#f59e0b' }}>• {unmatched.error}</span>
           </div>
         </div>
 
@@ -83,7 +83,7 @@ function UnmatchedSchoolRow({
           <Button
             variant="ghost"
             size="sm"
-            style={{ color: '#ef4444', fontSize: 12, padding: '2px 8px' }}
+            style={{ color: 'var(--danger)', fontSize: 12, padding: '2px 8px' }}
             onClick={() => {
               onMapSchool(unmatched.rowNumber, '');
               setSearchTerm('');
@@ -96,8 +96,8 @@ function UnmatchedSchoolRow({
 
       {/* Sugestões Automáticas Rápidas (1 Clique) */}
       {unmatched.candidateSchools?.length > 0 && !currentMappedId && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, background: '#fffbeb', padding: '6px 10px', borderRadius: 6, border: '1px dashed #fde68a' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>Sugestão Sugerida:</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, background: 'rgba(245, 158, 11, 0.12)', padding: '6px 10px', borderRadius: 6, border: '1px dashed rgba(245, 158, 11, 0.4)' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>Sugestão Sugerida:</span>
           {unmatched.candidateSchools.map((cand) => (
             <button
               key={cand.id}
@@ -107,9 +107,9 @@ function UnmatchedSchoolRow({
                 setSearchTerm('');
               }}
               style={{
-                background: '#fff',
+                background: 'var(--surface)',
                 border: '1px solid #f59e0b',
-                color: '#92400e',
+                color: '#f59e0b',
                 borderRadius: 14,
                 padding: '3px 10px',
                 fontSize: 12,
@@ -139,8 +139,8 @@ function UnmatchedSchoolRow({
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               fontSize: 13,
-              background: currentMappedId ? '#f0fdf4' : '#fff',
-              borderColor: searchTerm ? '#f59e0b' : currentMappedId ? '#86efac' : '#cbd5e1',
+              background: currentMappedId ? 'rgba(16, 185, 129, 0.12)' : 'var(--surface)',
+              borderColor: searchTerm ? '#f59e0b' : currentMappedId ? 'var(--success)' : 'var(--border)',
               paddingRight: searchTerm ? 26 : 10,
             }}
           />
@@ -155,7 +155,7 @@ function UnmatchedSchoolRow({
                 transform: 'translateY(-50%)',
                 background: 'transparent',
                 border: 'none',
-                color: '#94a3b8',
+                color: 'var(--text-3)',
                 cursor: 'pointer',
                 fontSize: 13,
                 padding: 0,
@@ -175,8 +175,8 @@ function UnmatchedSchoolRow({
             style={{
               fontSize: 13,
               fontWeight: currentMappedId ? 600 : 400,
-              color: currentMappedId ? '#166534' : 'inherit',
-              borderColor: currentMappedId ? '#86efac' : searchTerm ? '#f59e0b' : '#cbd5e1',
+              color: currentMappedId ? 'var(--success)' : 'inherit',
+              borderColor: currentMappedId ? 'var(--success)' : searchTerm ? '#f59e0b' : 'var(--border)',
             }}
           >
             <option value="">
@@ -210,7 +210,7 @@ function UnmatchedSchoolRow({
 
       {/* Confirmação Visual da Escola Vinculada */}
       {matchedSchoolObj && (
-        <div style={{ fontSize: 12.5, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ fontSize: 12.5, color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>🎯 Vinculada ao cadastro CPE:</span>
           <span>{matchedSchoolObj.name}</span>
           <span className="mono" style={{ opacity: 0.8 }}>(INEP: {matchedSchoolObj.inep || '—'})</span>
@@ -669,7 +669,7 @@ export default function ParcImport({ program, onImportSuccess }) {
                       className="input"
                       value={String(program.year || 2026)}
                       disabled
-                      style={{ background: '#f8fafc' }}
+                      style={{ background: 'var(--surface-2)' }}
                     />
                   </Field>
                 </div>
@@ -677,11 +677,11 @@ export default function ParcImport({ program, onImportSuccess }) {
                 {/* Zona de Drop / Seleção de Arquivo */}
                 <div
                   style={{
-                    border: '2px dashed #cbd5e1',
+                    border: '2px dashed var(--border)',
                     borderRadius: 8,
                     padding: '30px 20px',
                     textAlign: 'center',
-                    background: file ? '#f0fdf4' : '#f8fafc',
+                    background: file ? 'rgba(16, 185, 129, 0.12)' : 'var(--surface-2)',
                     cursor: 'pointer',
                   }}
                   onClick={() => fileInputRef.current?.click()}
@@ -696,7 +696,7 @@ export default function ParcImport({ program, onImportSuccess }) {
                   <div style={{ fontSize: 36, marginBottom: 8 }}>📄</div>
                   {file ? (
                     <div>
-                      <strong style={{ color: '#166534', fontSize: 15 }}>{file.name}</strong>
+                      <strong style={{ color: 'var(--success)', fontSize: 15 }}>{file.name}</strong>
                       <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
                         {(file.size / 1024).toFixed(1)} KB · Clique para trocar o arquivo
                       </div>
@@ -760,27 +760,27 @@ export default function ParcImport({ program, onImportSuccess }) {
                 </div>
 
                 {invalidRowCount > 0 && (
-                  <div className="card card-pad" style={{ borderLeft: '4px solid #ef4444', background: '#fef2f2' }}>
-                    <div style={{ fontSize: 11.5, color: '#991b1b', textTransform: 'uppercase', fontWeight: 600 }}>
+                  <div className="card card-pad" style={{ borderLeft: '4px solid #ef4444', background: 'rgba(239, 68, 68, 0.12)' }}>
+                    <div style={{ fontSize: 11.5, color: 'var(--danger)', textTransform: 'uppercase', fontWeight: 600 }}>
                       Não Identificadas
                     </div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: '#ef4444', marginTop: 4 }}>
                       {invalidRowCount}
                     </div>
-                    <div style={{ fontSize: 11, color: '#991b1b' }}>Exigem mapeamento</div>
+                    <div style={{ fontSize: 11, color: 'var(--danger)' }}>Exigem mapeamento</div>
                   </div>
                 )}
               </div>
 
               {/* Painel de Resolução de Escolas Não Identificadas */}
               {unidentifiedSchools.length > 0 && (
-                <div className="card card-pad" style={{ border: '2px solid #fed7aa', background: '#fffbeb' }}>
+                <div className="card card-pad" style={{ border: '2px solid rgba(245, 158, 11, 0.4)', background: 'rgba(245, 158, 11, 0.08)' }}>
                   <div className="card-header-row" style={{ marginBottom: 14 }}>
                     <div>
-                      <div className="card-title" style={{ color: '#9a3412', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div className="card-title" style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span>⚠️</span> Escolas Não Identificadas Automaticamente ({unidentifiedSchools.length})
                       </div>
-                      <div className="card-subtitle" style={{ color: '#c2410c' }}>
+                      <div className="card-subtitle" style={{ color: 'var(--text-2)' }}>
                         O PARC nunca cria novas escolas automaticamente no cadastro do CPE. Faça a vinculação manual selecionando ou pesquisando a escola correspondente abaixo:
                       </div>
                     </div>
@@ -799,7 +799,7 @@ export default function ParcImport({ program, onImportSuccess }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 14, background: '#fff', padding: '10px 12px', borderRadius: 6, border: '1px solid #fde68a' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 14, background: 'var(--surface)', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)' }}>
                     <div style={{ flex: 1, minWidth: 260 }}>
                       <input
                         type="text"
@@ -807,7 +807,7 @@ export default function ParcImport({ program, onImportSuccess }) {
                         placeholder="🔎 Filtrar escolas pendentes na lista abaixo (digite qualquer parte do nome)..."
                         value={searchUnmatched}
                         onChange={(e) => setSearchUnmatched(e.target.value)}
-                        style={{ fontSize: 13.5, borderColor: '#fcd34d' }}
+                        style={{ fontSize: 13.5 }}
                       />
                     </div>
                     {searchUnmatched && (
@@ -819,14 +819,14 @@ export default function ParcImport({ program, onImportSuccess }) {
                         Limpar Filtro
                       </Button>
                     )}
-                    <div style={{ fontSize: 12.5, color: '#92400e', fontWeight: 600 }}>
+                    <div style={{ fontSize: 12.5, color: '#f59e0b', fontWeight: 600 }}>
                       Mostrando {filteredUnidentifiedSchools.length} de {unidentifiedSchools.length} ({mappedCount} vinculadas)
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
                     {filteredUnidentifiedSchools.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: 24, color: '#92400e', background: '#fff', borderRadius: 6 }}>
+                      <div style={{ textAlign: 'center', padding: 24, color: '#f59e0b', background: 'var(--surface)', borderRadius: 6 }}>
                         Nenhuma escola não identificada corresponde ao filtro "{searchUnmatched}".
                       </div>
                     ) : (

@@ -57,7 +57,7 @@ export default function CncaRanking({ program }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Barra de Seleção do Indicador Oficial e Filtros */}
-      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end', background: '#f8fafc' }}>
+      <div className="card card-pad filter-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'flex-end' }}>
         <Field label="Indicador Oficial de Classificação" style={{ minWidth: 320 }}>
           <Select
             value={selectedIndicator}
@@ -96,15 +96,30 @@ export default function CncaRanking({ program }) {
           </Select>
         </Field>
 
-        <div style={{ marginLeft: 'auto', alignSelf: 'flex-end' }}>
+        <div style={{ marginLeft: 'auto', alignSelf: 'flex-end', display: 'flex', gap: 6, alignItems: 'center' }}>
           <input
             type="text"
             className="input"
             placeholder="🔎 Buscar escola ou INEP..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 240, fontSize: 13 }}
+            style={{ width: 220, fontSize: 13 }}
           />
+          {(search || grade !== 'TODOS' || assessment !== 'TODOS' || selectedIndicator !== 'FLUENCIA_FLUENTES') && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setSearch('');
+                setGrade('TODOS');
+                setAssessment('TODOS');
+                setSelectedIndicator('FLUENCIA_FLUENTES');
+              }}
+              style={{ height: 36, whiteSpace: 'nowrap' }}
+            >
+              Limpar
+            </button>
+          )}
         </div>
       </div>
 
@@ -122,9 +137,9 @@ export default function CncaRanking({ program }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
               {podium.map((school, idx) => {
                 const medals = ['🥇', '🥈', '🥉'];
-                const bgColors = ['#fffbeb', '#f8fafc', '#fff7ed'];
-                const borderColors = ['#fde68a', '#e2e8f0', '#fed7aa'];
-                const badgeCls = idx === 0 ? 'badge-yellow' : idx === 1 ? 'badge-gray' : 'badge-yellow';
+                const bgColors = ['rgba(245, 158, 11, 0.1)', 'rgba(59, 130, 246, 0.08)', 'rgba(249, 115, 22, 0.1)'];
+                const borderColors = ['rgba(245, 158, 11, 0.4)', 'rgba(59, 130, 246, 0.3)', 'rgba(249, 115, 22, 0.4)'];
+                const badgeCls = idx === 0 ? 'badge-yellow' : idx === 1 ? 'badge-blue' : 'badge-yellow';
 
                 return (
                   <div
@@ -148,13 +163,13 @@ export default function CncaRanking({ program }) {
                     </div>
 
                     <div>
-                      <strong style={{ fontSize: 15, color: 'var(--text-1)', display: 'block' }}>{school.name}</strong>
+                      <strong style={{ fontSize: 15, display: 'block' }}>{school.name}</strong>
                       <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                         INEP <span className="mono">{school.inep || '—'}</span> {school.zone ? `· ${school.zone}` : ''}
                       </div>
                     </div>
 
-                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                       <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Resultado Oficial:</span>
                       <strong style={{ fontSize: 18, color: 'var(--primary)' }}>
                         {school.rankValue != null ? `${fmt(school.rankValue, 1)} ${school.unit || ''}` : '—'}

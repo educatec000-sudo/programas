@@ -400,8 +400,10 @@ export default function Schools() {
 
 function MiniStat({ icon, value, label, tone }) {
   const tones = {
-    blue: ['#eff6ff', '#1d4ed8'], green: ['#f0fdf4', '#15803d'],
-    violet: ['#f5f3ff', '#6d28d9'], yellow: ['#fffbeb', '#b45309'],
+    blue: ['var(--primary-soft)', 'var(--primary-dark)'],
+    green: ['var(--success-bg)', 'var(--success)'],
+    violet: ['rgba(139, 92, 246, 0.18)', '#a78bfa'],
+    yellow: ['var(--warning-bg)', 'var(--warning)'],
   };
   const [bg, color] = tones[tone] || tones.blue;
   return (

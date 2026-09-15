@@ -467,7 +467,7 @@ export default function PactoDashboard({ program, onSelectTab }) {
                     <td className="pacto-school-name-cell" title={school.school}>
                       {school.school}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#334155' }}>
+                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--text-2)' }}>
                       {school.participationPercentage != null ? `${school.participationPercentage}%` : '—'}
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#0284c7' }}>
@@ -564,13 +564,13 @@ export default function PactoDashboard({ program, onSelectTab }) {
       </div>
 
       {/* 5. Painel Pedagógico Colapsável (Matrizes e Diagnósticos Detalhados) */}
-      <div className="card card-pad" style={{ marginTop: 6, background: '#f8fafc' }}>
+      <div className="card card-pad" style={{ marginTop: 6, background: 'var(--surface-2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <strong style={{ fontSize: 14, color: '#1e293b' }}>
+            <strong style={{ fontSize: 14, color: 'var(--text)' }}>
               🔍 Diagnóstico Detalhado por Habilidades e Matrizes do Pacto
             </strong>
-            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
               Consulte a distribuição detalhada dos níveis psicogenéticos (Pré-silábico a Alfabético) e competências avaliadas.
             </div>
           </div>
@@ -588,10 +588,10 @@ export default function PactoDashboard({ program, onSelectTab }) {
             {dashboard?.charts && dashboard.charts.length > 0 ? (
               <div className="pacto-dashboard-chart-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
                 {dashboard.charts.map((chart) => (
-                  <div key={`${chart.component}-${chart.skill}`} className="card card-pad pacto-dashboard-chart" style={{ background: '#ffffff' }}>
+                  <div key={`${chart.component}-${chart.skill}`} className="card card-pad pacto-dashboard-chart" style={{ background: 'var(--surface)' }}>
                     <div className="pacto-skill-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                       <div>
-                        <strong style={{ fontSize: 13.5, color: '#0f172a' }}>{chart.skillLabel}</strong>
+                        <strong style={{ fontSize: 13.5, color: 'var(--text)' }}>{chart.skillLabel}</strong>
                         <div style={{ color: 'var(--text-3)', fontSize: 11.5, marginTop: 2 }}>
                           {chart.componentLabel} · base: <strong>{metricValue(chart.evaluated)}</strong> avaliados
                         </div>
@@ -635,7 +635,7 @@ export default function PactoDashboard({ program, onSelectTab }) {
                       ))}
                     </div>
 
-                    <div className="pacto-skill-footer" style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between' }}>
+                    <div className="pacto-skill-footer" style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-2)', fontSize: 12 }}>Índice de proficiência:</span>
                       <strong style={{ fontSize: 13, color: chart.score != null ? 'var(--text)' : 'var(--text-3)' }}>
                         {chart.score != null ? `${chart.score}%` : 'Sem dados'}

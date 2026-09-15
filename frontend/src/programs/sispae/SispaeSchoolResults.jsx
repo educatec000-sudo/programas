@@ -7,7 +7,7 @@ import { fmt, fmtInt } from '../../utils/format.js';
 export default function SispaeSchoolResults({ program = {}, onSelectTab }) {
   const [selectedAppId, setSelectedAppId] = useState('');
   const [component, setComponent] = useState('ALL');
-  const [grade, setGrade] = useState('ALL');
+  const [grade, setGrade] = useState('2º Ano');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedResult, setSelectedResult] = useState(null);
@@ -114,12 +114,7 @@ export default function SispaeSchoolResults({ program = {}, onSelectTab }) {
             }}
             className="program-select"
           >
-            <option value="ALL">Todos os Anos</option>
-            <option value="2º Ano">2º Ano</option>
-            <option value="1º Ano">1º Ano</option>
-            <option value="3º Ano">3º Ano</option>
-            <option value="4º Ano">4º Ano</option>
-            <option value="5º Ano">5º Ano</option>
+            <option value="2º Ano">2º Ano (Alfabetização)</option>
           </select>
         </div>
 
@@ -138,6 +133,23 @@ export default function SispaeSchoolResults({ program = {}, onSelectTab }) {
             style={{ height: 36 }}
           />
         </div>
+
+        {(search || component !== 'ALL') && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setComponent('ALL');
+                setSearch('');
+                setPage(1);
+              }}
+              style={{ height: 36, whiteSpace: 'nowrap' }}
+            >
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabela de Resultados */}

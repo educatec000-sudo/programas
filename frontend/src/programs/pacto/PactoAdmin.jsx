@@ -583,10 +583,10 @@ export default function PactoAdmin({ program }) {
               </Select>
             </Field>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 0 12px 0', background: '#f8fafc', padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 0 12px 0', background: 'var(--surface-2)', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', flexWrap: 'wrap', gap: 8 }}>
               <div>
-                <span style={{ fontWeight: 600, fontSize: 13, color: '#334155' }}>Adição rápida de turmas</span>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Cadastre várias turmas da escola em uma única etapa.</div>
+                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>Adição rápida de turmas</span>
+                <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Cadastre várias turmas da escola em uma única etapa.</div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button size="sm" variant="secondary" onClick={applyAdminDefaultPreset}>⚡ Padrão (PII, 1º e 2º A, B)</Button>
@@ -596,9 +596,9 @@ export default function PactoAdmin({ program }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '48vh', overflowY: 'auto', paddingRight: 4 }}>
               {classRows.map((row, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: 'var(--surface-2)', padding: 12, borderRadius: 8, border: '1px solid var(--border)', flexWrap: 'wrap' }}>
                   <div style={{ width: 110 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Etapa / Ano</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Etapa / Ano</label>
                     <Select value={row.grade} onChange={(e) => updateAdminClassRow(idx, 'grade', e.target.value)}>
                       <option value="0">PII</option>
                       <option value="1">1º ano</option>
@@ -606,18 +606,18 @@ export default function PactoAdmin({ program }) {
                     </Select>
                   </div>
                   <div style={{ width: 90 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Turno</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Turno</label>
                     <Select value={row.shift} onChange={(e) => updateAdminClassRow(idx, 'shift', e.target.value)}>
                       <option value="M">M</option>
                       <option value="T">T</option>
                     </Select>
                   </div>
                   <div style={{ width: 130 }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Turma *</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Turma *</label>
                     <Input maxLength={30} value={row.name} onChange={(e) => updateAdminClassRow(idx, 'name', e.target.value.toUpperCase())} placeholder="Ex.: A" />
                   </div>
                   <div style={{ flex: '1 1 200px' }}>
-                    <label style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Avaliações</label>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>Avaliações</label>
                     <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
                       {ALL_ASSESSMENTS.map((code) => (
                         <label key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>

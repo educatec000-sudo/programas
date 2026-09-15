@@ -19,6 +19,8 @@ export default function Evaluations() {
   const { data: schools } = useApi(() => schoolsApi.list({ pageSize: 1000 }), []);
 
   const set = (key) => (event) => setFilters((current) => ({ ...current, [key]: event.target.value }));
+  const hasFilters = Boolean(filters.programId || filters.schoolId || filters.year || filters.period);
+  const clearFilters = () => setFilters({ programId: '', schoolId: '', year: '', period: '' });
 
   return (
     <>
@@ -56,6 +58,13 @@ export default function Evaluations() {
             {PERIODS.map((period) => <option key={period} value={period}>{period}</option>)}
           </Select>
         </Field>
+        {hasFilters && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+            <button type="button" className="btn btn-ghost" onClick={clearFilters} style={{ height: 36, whiteSpace: 'nowrap' }}>
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       <DataTable

@@ -638,6 +638,19 @@ export async function getCncaDashboard(programId, filters = {}) {
       ? Math.round((schoolEvaluated / schoolEnrolled) * 1000) / 10
       : (countPart > 0 ? Math.round((sumPart / countPart) * 10) / 10 : null);
 
+    const litScore = schoolScore ?? (countFluent > 0 ? Math.round((sumFluent / countFluent) * 10) / 10 : null);
+    let situation = 'Bom resultado';
+    let situationClass = 'green';
+    if (litScore != null) {
+      if (litScore < 50) {
+        situation = 'Atenção';
+        situationClass = 'red';
+      } else if (litScore < 70) {
+        situation = 'Em desenvolvimento';
+        situationClass = 'yellow';
+      }
+    }
+
     return {
       id: sc.id,
       inep: sc.inep,
@@ -649,14 +662,23 @@ export async function getCncaDashboard(programId, filters = {}) {
       responsible: sc.responsible,
       enrolled: schoolEnrolled,
       evaluated: schoolEvaluated,
+      students: schoolEnrolled || schoolEvaluated,
+      participation: schoolParticipation,
       participationRate: schoolParticipation,
+      literacy: litScore,
       averageScore: countScore > 0 ? Math.round((sumScore / countScore) * 10) / 10 : null,
       fluentRate: countFluent > 0 ? Math.round((sumFluent / countFluent) * 10) / 10 : null,
       leituraScore,
       escritaScore,
       matematicaScore,
       fluenciaScore,
+      leitura: leituraScore,
+      escrita: escritaScore,
+      matematica: matematicaScore,
+      fluencia: fluenciaScore,
       score: schoolScore,
+      situation,
+      situationClass,
       performanceLevels: schoolPerformanceLevels,
       componentsEvaluatedCount: items.length,
     };

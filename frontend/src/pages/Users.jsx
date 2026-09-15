@@ -154,6 +154,13 @@ export default function Users() {
             {(roles || []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           </Select>
         </Field>
+        {(search || roleId) && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+            <button type="button" className="btn btn-ghost" onClick={() => { setSearch(''); setRoleId(''); setPage(1); }} style={{ height: 36, whiteSpace: 'nowrap' }}>
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       <DataTable

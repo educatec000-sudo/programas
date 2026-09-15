@@ -278,6 +278,23 @@ export default function CncaSchools({ program, refreshProgram }) {
               <option value="SEM_DADOS">🟡 Sem dados no ciclo ({pendingCount})</option>
             </Select>
           </Field>
+
+          {(search || zoneFilter !== 'TODAS' || dataFilter !== 'TODAS') && (
+            <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setSearch('');
+                  setZoneFilter('TODAS');
+                  setDataFilter('TODAS');
+                }}
+                style={{ height: 36, whiteSpace: 'nowrap' }}
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
         </div>
 
         {(search || zoneFilter !== 'TODAS' || dataFilter !== 'TODAS') && (

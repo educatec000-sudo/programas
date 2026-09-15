@@ -99,7 +99,7 @@ export default function Reports() {
 
       {/* Se o programa selecionado possuir gerador de relatórios específico oficial, renderiza com suporte completo */}
       {specificReportsTab && selectedProgram && (
-        <div className="card card-pad" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+        <div className="card card-pad" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-2, #64748b)', textTransform: 'uppercase' }}>

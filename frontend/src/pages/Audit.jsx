@@ -81,6 +81,18 @@ export default function Audit() {
             <Field label="Até">
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </Field>
+            {(search || action || entity || dateFrom || dateTo) && (
+              <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => { setSearch(''); setAction(''); setEntity(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+                  style={{ height: 36, whiteSpace: 'nowrap' }}
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            )}
           </div>
 
           <DataTable

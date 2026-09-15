@@ -329,8 +329,8 @@ export default function ParcSchools({ program, refreshProgram }) {
 
       {/* Barra de Ações em Massa */}
       {selectedSchoolIds.size > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px 14px', borderRadius: 8 }}>
-          <span style={{ fontSize: 13, color: '#1e40af', fontWeight: 600 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(2, 132, 199, 0.12)', border: '1px solid rgba(2, 132, 199, 0.3)', padding: '10px 14px', borderRadius: 8 }}>
+          <span style={{ fontSize: 13, color: '#0284c7', fontWeight: 600 }}>
             {selectedSchoolIds.size} escola(s) selecionada(s)
           </span>
 
@@ -342,7 +342,7 @@ export default function ParcSchools({ program, refreshProgram }) {
                 setBulkRemoveModalOpen(true);
               }}
               disabled={bulkRemoving}
-              style={{ background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca', fontSize: 12.5 }}
+              style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', fontSize: 12.5 }}
             >
               🗑️ Desvincular Selecionadas ({selectedSchoolIds.size})
             </Button>
@@ -362,7 +362,7 @@ export default function ParcSchools({ program, refreshProgram }) {
         <div style={{ maxHeight: 560, overflowY: 'auto', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, textAlign: 'left' }}>
             <thead>
-              <tr style={{ position: 'sticky', top: 0, zIndex: 5, background: '#f8fafc', borderBottom: '2px solid var(--border)' }}>
+              <tr style={{ position: 'sticky', top: 0, zIndex: 5, background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
                 <th style={{ padding: '10px 12px', width: 40, textAlign: 'center' }}>
                   <input
                     type="checkbox"
@@ -575,7 +575,7 @@ export default function ParcSchools({ program, refreshProgram }) {
                 </Field>
 
                 {selectedAvailableSchool && (
-                  <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5 }}>
+                  <div style={{ background: 'var(--surface-2)', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-3)' }}>Nome da Escola:</span>
                       <strong>{selectedAvailableSchool.name}</strong>

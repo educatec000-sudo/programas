@@ -938,32 +938,32 @@ export default function PactoSchoolResults({ program, onSelectTab }) {
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-                    <div style={{ padding: '12px 14px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
+                    <div style={{ padding: '12px 14px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: 8, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
-                        <span style={{ color: '#991b1b', fontWeight: 700 }}>Não Proficiente (NP — Até 4 pts)</span>
+                        <span style={{ color: 'var(--danger)', fontWeight: 700 }}>Não Proficiente (NP — Até 4 pts)</span>
                         <strong>{componentMetrics.matematica.np.count} alunos ({componentMetrics.matematica.np.pct}%)</strong>
                       </div>
-                      <div style={{ height: 8, background: '#fee2e2', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: 8, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden' }}>
                         <div style={{ width: `${componentMetrics.matematica.np.pct}%`, height: '100%', background: '#dc2626', borderRadius: 4 }} />
                       </div>
                     </div>
 
-                    <div style={{ padding: '12px 14px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fde68a' }}>
+                    <div style={{ padding: '12px 14px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: 8, border: '1px solid rgba(245, 158, 11, 0.3)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
-                        <span style={{ color: '#92400e', fontWeight: 700 }}>Proficiente Inicial (PI — 5 a 6 pts)</span>
+                        <span style={{ color: '#f59e0b', fontWeight: 700 }}>Proficiente Inicial (PI — 5 a 6 pts)</span>
                         <strong>{componentMetrics.matematica.pi.count} alunos ({componentMetrics.matematica.pi.pct}%)</strong>
                       </div>
-                      <div style={{ height: 8, background: '#fef3c7', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: 8, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden' }}>
                         <div style={{ width: `${componentMetrics.matematica.pi.pct}%`, height: '100%', background: '#d97706', borderRadius: 4 }} />
                       </div>
                     </div>
 
-                    <div style={{ padding: '12px 14px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
+                    <div style={{ padding: '12px 14px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: 8, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
-                        <span style={{ color: '#166534', fontWeight: 700 }}>Proficiente (P — 7 a 10 pts)</span>
+                        <span style={{ color: 'var(--success)', fontWeight: 700 }}>Proficiente (P — 7 a 10 pts)</span>
                         <strong>{componentMetrics.matematica.p.count} alunos ({componentMetrics.matematica.p.pct}%)</strong>
                       </div>
-                      <div style={{ height: 8, background: '#dcfce7', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: 8, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden' }}>
                         <div style={{ width: `${componentMetrics.matematica.p.pct}%`, height: '100%', background: '#16a34a', borderRadius: 4 }} />
                       </div>
                     </div>

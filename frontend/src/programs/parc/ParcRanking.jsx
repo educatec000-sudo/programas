@@ -123,6 +123,24 @@ export default function ParcRanking({ program }) {
             style={{ height: 36, width: 220 }}
           />
         </div>
+
+        {(zone !== 'TODAS' || search || selectedCycle !== 'ENTRADA' || selectedIndicator !== 'FLUENTE') && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: 36, marginTop: 'auto' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setSelectedCycle('ENTRADA');
+                setSelectedIndicator('FLUENTE');
+                setZone('TODAS');
+                setSearch('');
+              }}
+              style={{ height: 36, whiteSpace: 'nowrap' }}
+            >
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Alerta explicativo */}
@@ -139,9 +157,9 @@ export default function ParcRanking({ program }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
               {podium.map((school, idx) => {
                 const medals = ['🥇', '🥈', '🥉'];
-                const bgColors = ['#fffbeb', '#f8fafc', '#fff7ed'];
-                const borderColors = ['#fde68a', '#e2e8f0', '#fed7aa'];
-                const badgeCls = idx === 0 ? 'badge-yellow' : idx === 1 ? 'badge-gray' : 'badge-yellow';
+                const bgColors = ['rgba(245, 158, 11, 0.1)', 'rgba(59, 130, 246, 0.08)', 'rgba(249, 115, 22, 0.1)'];
+                const borderColors = ['rgba(245, 158, 11, 0.4)', 'rgba(59, 130, 246, 0.3)', 'rgba(249, 115, 22, 0.4)'];
+                const badgeCls = idx === 0 ? 'badge-yellow' : idx === 1 ? 'badge-blue' : 'badge-yellow';
                 const sName = school.name || school.school?.name || 'Escola';
                 const sInep = school.inep || school.school?.inep || '—';
                 const sZone = school.zone || school.school?.zone || '';
@@ -168,13 +186,13 @@ export default function ParcRanking({ program }) {
                     </div>
 
                     <div>
-                      <strong style={{ fontSize: 15, color: 'var(--text-1)', display: 'block' }}>{sName}</strong>
+                      <strong style={{ fontSize: 15, display: 'block' }}>{sName}</strong>
                       <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                         INEP <span className="mono">{sInep}</span> {sZone ? `· ${sZone}` : ''}
                       </div>
                     </div>
 
-                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                       <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>Resultado:</span>
                       <strong style={{ fontSize: 18, color: 'var(--primary)' }}>
                         {school.rankValue != null ? `${fmt(school.rankValue, 1)} ${school.unit || currentIndicator?.unit || ''}` : '—'}

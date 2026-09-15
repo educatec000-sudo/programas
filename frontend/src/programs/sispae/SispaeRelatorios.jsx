@@ -74,29 +74,27 @@ export default function SispaeRelatorios({ program = {} }) {
         id="relatorio-executivo"
         style={{
           padding: '32px 36px',
-          background: '#ffffff',
           borderRadius: 14,
-          border: '1px solid #e2e8f0',
           display: 'flex',
           flexDirection: 'column',
           gap: 24,
         }}
       >
         {/* Cabeçalho do Relatório */}
-        <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 16 }}>
+        <div style={{ borderBottom: '2px solid var(--border)', paddingBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#0284c7', textTransform: 'uppercase', letterSpacing: 1 }}>
                 SECRETARIA MUNICIPAL DE EDUCAÇÃO · SEMED
               </div>
-              <h1 style={{ margin: '4px 0 2px 0', fontSize: 22, fontWeight: 800, color: '#0f172a' }}>
+              <h1 style={{ margin: '4px 0 2px 0', fontSize: 22, fontWeight: 800 }}>
                 SisPAE — Sistema Paraense de Avaliação Educacional {programYear}
               </h1>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#475569' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-2)' }}>
                 Relatório Executivo · {currentApp?.name} ({currentApp?.type === 'SIMULADO' ? 'Simulado Preparatório' : 'Avaliação Oficial'})
               </div>
             </div>
-            <div style={{ textAlign: 'right', fontSize: 11.5, color: '#64748b' }}>
+            <div style={{ textAlign: 'right', fontSize: 11.5, color: 'var(--text-3)' }}>
               <div>Data de Emissão: {new Date().toLocaleDateString('pt-BR')}</div>
               <div>CPE — Controle de Programas Educacionais</div>
             </div>
@@ -105,24 +103,24 @@ export default function SispaeRelatorios({ program = {} }) {
 
         {/* Resumo de Indicadores Gerais */}
         <div>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, textTransform: 'uppercase' }}>
             1. Indicadores Globais de Participação e Desempenho
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>ESCOLAS PARTICIPANTES</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{fmtInt(kpis.totalSchools || 0)}</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>ESCOLAS PARTICIPANTES</div>
+              <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtInt(kpis.totalSchools || 0)}</div>
             </div>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>ESTUDANTES AVALIADOS</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{fmtInt(kpis.evaluated || 0)}</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>ESTUDANTES AVALIADOS</div>
+              <div style={{ fontSize: 20, fontWeight: 800 }}>{fmtInt(kpis.evaluated || 0)}</div>
             </div>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>TAXA DE PARTICIPAÇÃO</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#10b981' }}>{fmt(kpis.participationRate)}%</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>TAXA DE PARTICIPAÇÃO</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)' }}>{fmt(kpis.participationRate)}%</div>
             </div>
-            <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>APRENDIZADO ADEQUADO</div>
+            <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700 }}>APRENDIZADO ADEQUADO</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#0284c7' }}>{fmt(kpis.adequateRate)}%</div>
             </div>
           </div>
@@ -130,12 +128,12 @@ export default function SispaeRelatorios({ program = {} }) {
 
         {/* Resumo por Componente */}
         <div>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: 15, fontWeight: 800, textTransform: 'uppercase' }}>
             2. Desempenho Consolidado por Componente Curricular
           </h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #cbd5e1' }}>
+              <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
                 <th style={{ padding: 10, fontWeight: 700 }}>Componente</th>
                 <th style={{ padding: 10, fontWeight: 700, textAlign: 'center' }}>Escolas</th>
                 <th style={{ padding: 10, fontWeight: 700, textAlign: 'center' }}>Avaliados</th>
@@ -147,8 +145,8 @@ export default function SispaeRelatorios({ program = {} }) {
             </thead>
             <tbody>
               {componentsSummary.map((c) => (
-                <tr key={c.code} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: 10, fontWeight: 700, color: '#0f172a' }}>{c.label}</td>
+                <tr key={c.code} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: 10, fontWeight: 700 }}>{c.label}</td>
                   <td style={{ padding: 10, textAlign: 'center' }}>{c.schoolsCount}</td>
                   <td style={{ padding: 10, textAlign: 'center' }}>{fmtInt(c.evaluated)}</td>
                   <td style={{ padding: 10, textAlign: 'center', fontWeight: 700 }}>{fmt(c.participationRate)}%</td>
@@ -169,7 +167,7 @@ export default function SispaeRelatorios({ program = {} }) {
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {topSchools.slice(0, 5).map((s, idx) => (
-                <div key={s.schoolId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: '#f0fdf4', borderRadius: 6 }}>
+                <div key={s.schoolId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 6, border: '1px solid var(--border)' }}>
                   <span><strong>{idx + 1}º</strong> {s.schoolName}</span>
                   <strong style={{ color: '#047857' }}>{fmt(s.overallAdequateRate)}%</strong>
                 </div>
@@ -178,14 +176,14 @@ export default function SispaeRelatorios({ program = {} }) {
           </div>
 
           <div>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: 13.5, fontWeight: 700, color: '#b91c1c' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: 13.5, fontWeight: 700, color: 'var(--danger)' }}>
               ⚠️ Escolas em Situação Prioritária
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {attentionSchools.slice(0, 5).map((s, idx) => (
-                <div key={s.schoolId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: '#fef2f2', borderRadius: 6 }}>
+                <div key={s.schoolId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '6px 10px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: 6, border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                   <span>{s.schoolName}</span>
-                  <strong style={{ color: '#dc2626' }}>{fmt(s.overallDeficitRate)}% def.</strong>
+                  <strong style={{ color: 'var(--danger)' }}>{fmt(s.overallDeficitRate)}% def.</strong>
                 </div>
               ))}
             </div>
