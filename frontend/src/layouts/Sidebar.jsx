@@ -46,21 +46,13 @@ export default function Sidebar() {
             <span>Escolas</span>
           </NavLink>
 
-          {/* ITEM DIRETO DE PROGRAMAS */}
+          {/* ITEM DE PROGRAMAS */}
           <NavLink
             to="/programas"
             className={() => `nav-link ${isProgramActive ? 'active' : ''}`}
           >
             <span className="icon">{Icon.shield()}</span>
             <span>Programas</span>
-          </NavLink>
-
-          <NavLink
-            to="/resultados"
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-          >
-            <span className="icon">{Icon.result()}</span>
-            <span>Resultados</span>
           </NavLink>
 
           <NavLink
@@ -76,7 +68,7 @@ export default function Sidebar() {
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="icon">{Icon.analytics()}</span>
-            <span>Análises</span>
+            <span>Análises & Gráficos</span>
           </NavLink>
 
           <NavLink
@@ -84,7 +76,7 @@ export default function Sidebar() {
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="icon">{Icon.chart()}</span>
-            <span>Gráficos</span>
+            <span>Rankings</span>
           </NavLink>
 
           <NavLink

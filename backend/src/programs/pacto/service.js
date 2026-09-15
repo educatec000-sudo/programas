@@ -24,6 +24,10 @@ import {
   previewGroupToPayload,
   readPactoImportFile,
 } from './import.js';
+import {
+  previewConsolidatedPactoImport,
+  confirmConsolidatedPactoImport,
+} from './consolidatedImport.js';
 
 const classInclude = {
   assessments: {
@@ -1278,3 +1282,14 @@ export async function deleteAdminAssessment(programId, assessmentId, actor, ip) 
 
   return { success: true, message: 'Avaliação excluída com sucesso' };
 }
+
+export async function previewAdminImport(programId, file, options = {}) {
+  await assertPactoProgram(programId);
+  return previewConsolidatedPactoImport(programId, file, options);
+}
+
+export async function confirmAdminImport(programId, body, actor, ip) {
+  await assertPactoProgram(programId);
+  return confirmConsolidatedPactoImport(programId, body, actor, ip);
+}
+

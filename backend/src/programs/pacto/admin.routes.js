@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requirePermission } from '../../middlewares/auth.js';
 import { validate } from '../../middlewares/validate.js';
+import { uploadImportFile } from '../../middlewares/upload.js';
 import * as controller from './controller.js';
 import {
   adminClassSchema,
@@ -25,6 +26,19 @@ router.get(
   requirePermission('reports:read'),
   validate({ params: programParamsSchema }),
   controller.exportReport,
+);
+router.post(
+  '/import/preview',
+  requirePermission('programs:write'),
+  validate({ params: programParamsSchema }),
+  uploadImportFile,
+  controller.previewAdminImport,
+);
+router.post(
+  '/import/confirm',
+  requirePermission('programs:write'),
+  validate({ params: programParamsSchema }),
+  controller.confirmAdminImport,
 );
 router.post(
   '/schools/:schoolId/link',

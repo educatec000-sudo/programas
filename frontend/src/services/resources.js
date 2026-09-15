@@ -78,6 +78,10 @@ export const pactoAdminApi = {
   exportReport: (programId) => download(`/programs/${programId}/pacto/report.csv`, {
     fallbackName: 'pacto-alfabetizacao-2026.csv',
   }),
+  previewImport: (programId, form) =>
+    request(`/programs/${programId}/pacto/import/preview`, { method: 'POST', body: form }),
+  confirmImport: (programId, body) =>
+    request(`/programs/${programId}/pacto/import/confirm`, { method: 'POST', body }),
   generateLink: (programId, schoolId, expiresAt) =>
     request(`/programs/${programId}/pacto/schools/${schoolId}/link`, {
       method: 'POST',

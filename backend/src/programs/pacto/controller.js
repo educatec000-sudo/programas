@@ -166,6 +166,34 @@ async function removeTemporaryUpload(file) {
   }
 }
 
+export const previewAdminImport = wrap(async (req, res) => {
+  try {
+    if (!req.file) {
+      throw new HttpError(400, 'Selecione um arquivo CSV ou XLSX.', 'PACTO_IMPORT_FILE_REQUIRED');
+    }
+    const programId = req.data?.params?.id || req.params.id;
+    const data = await service.previewAdminImport(
+      programId,
+      req.file,
+      req.body || {},
+    );
+    res.json(data);
+  } finally {
+    await removeTemporaryUpload(req.file);
+  }
+});
+
+export const confirmAdminImport = wrap(async (req, res) => {
+  const programId = req.data?.params?.id || req.params.id;
+  const data = await service.confirmAdminImport(
+    programId,
+    req.body,
+    req.user,
+    getClientIp(req),
+  );
+  res.json(data);
+});
+
 export const previewImport = wrap(async (req, res) => {
   try {
     if (!req.file) {

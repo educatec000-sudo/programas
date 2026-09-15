@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApi } from '../hooks/useApi.js';
 import { reportsApi, programsApi } from '../services/resources.js';
 import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
-import { Alert, Button, Field, Select, LoadingBlock } from '../components/ui.jsx';
+import { Alert, Button, Field, Select, LoadingBlock, ErrorBoundary } from '../components/ui.jsx';
 import { PERIODS, yearsRange } from '../utils/format.js';
-import { supportsSharedFeature } from '../programs/registry.js';
+import { getProgramImplementation } from '../programs/registry.js';
 
 const REPORT_INFO = {
   geral: { icon: '📊', desc: 'Lista gerencial dos programas; cada pontuação permanece isolada' },
@@ -21,16 +21,33 @@ const REPORT_INFO = {
 export default function Reports() {
   const { toast, error } = useToast();
   const { data: types, loading } = useApi(() => reportsApi.types(), []);
-  const { data: programs } = useApi(() => programsApi.list({ pageSize: 1000 }), []);
+  const { data: programsData } = useApi(() => programsApi.list({ pageSize: 100 }), []);
+  const programs = programsData?.data || [];
 
   const [selected, setSelected] = useState('geral');
   const [filters, setFilters] = useState({ programId: '', schoolId: '', indicatorId: '', year: '', period: '' });
   const [format, setFormat] = useState('pdf');
   const [busy, setBusy] = useState(false);
-  const { data: program } = useApi(
-    () => (filters.programId ? programsApi.get(filters.programId) : Promise.resolve(null)),
-    [filters.programId],
-  );
+
+  // Seleciona o primeiro programa automaticamente por padrão se necessário
+  useEffect(() => {
+    if (!filters.programId && programs.length > 0) {
+      setFilters((f) => ({ ...f, programId: programs[0].id, year: String(programs[0].year) }));
+    }
+  }, [programs, filters.programId]);
+
+  const selectedProgram = useMemo(() => {
+    return programs.find((p) => p.id === filters.programId) || programs[0] || null;
+  }, [programs, filters.programId]);
+
+  const implementation = useMemo(() => {
+    return getProgramImplementation(selectedProgram);
+  }, [selectedProgram]);
+
+  const specificReportsTab = useMemo(() => {
+    if (!implementation?.adminTabs) return null;
+    return implementation.adminTabs.find((t) => t.key.includes('relatorio')) || null;
+  }, [implementation]);
 
   const needsProgram = selected !== 'geral';
   const missingProgram = needsProgram && !filters.programId;
@@ -44,7 +61,7 @@ export default function Reports() {
   };
 
   const chooseProgram = (programId) => {
-    const p = (programs?.data || []).find((item) => item.id === programId);
+    const p = programs.find((item) => item.id === programId);
     setFilters((current) => ({
       ...current,
       programId,
@@ -71,19 +88,60 @@ export default function Reports() {
     }
   };
 
-  if (loading) return <LoadingBlock />;
+  if (loading && programs.length === 0) return <LoadingBlock />;
 
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <PageHeader
-        title="Relatórios por programa"
-        subtitle="Relatórios avaliativos nunca misturam resultados de programas diferentes"
+        title="Relatórios & Exportações"
+        subtitle="Emissão de relatórios oficiais e consolidações por programa educacional"
       />
 
+      {/* Se o programa selecionado possuir gerador de relatórios específico oficial, renderiza com suporte completo */}
+      {specificReportsTab && selectedProgram && (
+        <div className="card card-pad" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-2, #64748b)', textTransform: 'uppercase' }}>
+                Programa Selecionado:
+              </span>
+              <Select
+                value={filters.programId}
+                onChange={(e) => chooseProgram(e.target.value)}
+                style={{ fontSize: 13, fontWeight: 600, minWidth: 260 }}
+              >
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.year})
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <span
+              style={{
+                background: 'rgba(2, 132, 199, 0.1)',
+                color: '#0284c7',
+                padding: '4px 10px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              Instrumento Oficial
+            </span>
+          </div>
+
+          <ErrorBoundary>
+            <specificReportsTab.Component program={selectedProgram} />
+          </ErrorBoundary>
+        </div>
+      )}
+
+      {/* Gerador de Relatórios Globais do CPE */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16, alignItems: 'start' }}>
         <div className="card card-pad">
-          <div className="card-title">1. Escolha o relatório</div>
-          <div className="card-subtitle">Todos os relatórios usam dados reais do PostgreSQL</div>
+          <div className="card-title">1. Escolha o tipo de relatório consolidado</div>
+          <div className="card-subtitle">Relatórios estruturados para prestação de contas e planejamento pedagógico</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
             {(types || []).map((type) => (
               <button
@@ -92,7 +150,9 @@ export default function Reports() {
                 onClick={() => chooseType(type.key)}
                 className="card card-pad"
                 style={{
-                  cursor: 'pointer', textAlign: 'left', padding: '13px 14px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  padding: '13px 14px',
                   borderColor: selected === type.key ? 'var(--primary)' : 'var(--border)',
                   borderWidth: selected === type.key ? 2 : 1,
                   background: selected === type.key ? 'var(--primary-50)' : 'var(--surface)',
@@ -107,32 +167,37 @@ export default function Reports() {
         </div>
 
         <div className="card card-pad">
-          <div className="card-title">2. Filtros</div>
-          <div className="card-subtitle">Ajuste o escopo do relatório</div>
+          <div className="card-title">2. Parâmetros e Formato</div>
+          <div className="card-subtitle">Ajuste os filtros de extração</div>
 
           {needsProgram && (
             <Field label="Programa *">
               <Select value={filters.programId} onChange={(event) => chooseProgram(event.target.value)}>
                 <option value="">Selecione o programa...</option>
-                {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'relatorios')).map((item) => <option key={item.id} value={item.id}>{item.code} — {item.name}</option>)}
+                {programs.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} ({item.year})
+                  </option>
+                ))}
               </Select>
             </Field>
           )}
 
           {selected === 'escola' && (
             <Field label="Escola participante *">
-              <Select value={filters.schoolId} onChange={(event) => setFilters((current) => ({ ...current, schoolId: event.target.value }))} disabled={!program}>
+              <Select
+                value={filters.schoolId}
+                onChange={(event) => setFilters((current) => ({ ...current, schoolId: event.target.value }))}
+                disabled={!selectedProgram}
+              >
                 <option value="">Selecione a escola...</option>
-                {(program?.schools || []).filter((school) => school.linkActive).map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
-              </Select>
-            </Field>
-          )}
-
-          {selected === 'indicador' && (
-            <Field label="Critério do programa *">
-              <Select value={filters.indicatorId} onChange={(event) => setFilters((current) => ({ ...current, indicatorId: event.target.value }))} disabled={!program}>
-                <option value="">Selecione o critério...</option>
-                {(program?.indicators || []).map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.code} — {criterion.name}</option>)}
+                {(selectedProgram?.schools || [])
+                  .filter((school) => school.linkActive !== false)
+                  .map((school) => (
+                    <option key={school.id} value={school.id}>
+                      {school.name}
+                    </option>
+                  ))}
               </Select>
             </Field>
           )}
@@ -140,7 +205,11 @@ export default function Reports() {
           <Field label="Ano">
             <Select value={filters.year} onChange={(event) => setFilters((current) => ({ ...current, year: event.target.value }))}>
               <option value="">Automático</option>
-              {yearsRange(2023).map((item) => <option key={item} value={item}>{item}</option>)}
+              {yearsRange(2023).map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
             </Select>
           </Field>
 
@@ -148,15 +217,25 @@ export default function Reports() {
             <Field label="Período">
               <Select value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value }))}>
                 <option value="">Mais recente</option>
-                {PERIODS.map((item) => <option key={item} value={item}>{item}</option>)}
+                {PERIODS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
               </Select>
             </Field>
           )}
 
-          <Field label="3. Formato">
+          <Field label="Formato de Saída">
             <div style={{ display: 'flex', gap: 8 }}>
               {['pdf', 'xlsx', 'csv'].map((item) => (
-                <button key={item} type="button" className={`pill ${format === item ? 'active' : ''}`} onClick={() => setFormat(item)} style={{ flex: 1, textAlign: 'center' }}>
+                <button
+                  key={item}
+                  type="button"
+                  className={`pill ${format === item ? 'active' : ''}`}
+                  onClick={() => setFormat(item)}
+                  style={{ flex: 1, textAlign: 'center' }}
+                >
                   {item.toUpperCase()}
                 </button>
               ))}
@@ -164,7 +243,7 @@ export default function Reports() {
           </Field>
 
           {selected === 'geral' && (
-            <Alert type="info">O relatório geral lista os programas separadamente; não calcula uma nota única da escola ou do município.</Alert>
+            <Alert type="info">O relatório geral consolida os indicadores dos programas de forma isolada.</Alert>
           )}
           {missing && <Alert type="warn">Preencha os campos obrigatórios (*) antes de gerar.</Alert>}
 
@@ -176,6 +255,6 @@ export default function Reports() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

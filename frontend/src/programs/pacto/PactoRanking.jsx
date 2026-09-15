@@ -4,6 +4,7 @@ import { pactoAdminApi } from '../../services/resources.js';
 import { Badge, Button, Field, Input, LoadingBlock, Select } from '../../components/ui.jsx';
 import DataTable from '../../components/DataTable.jsx';
 import { buildPactoDashboard, formatGradeLabel } from './dashboard.js';
+import { fmt } from '../../utils/format.js';
 
 export default function PactoRanking({ program, onSelectTab }) {
   const { data: overview, loading, error } = useApi(
@@ -27,51 +28,62 @@ export default function PactoRanking({ program, onSelectTab }) {
 
   const schoolRanking = dashboard?.schoolRanking || [];
 
-  // Dados com fallback fiel ao mockup se não houver registros suficientes
-  const displayRanking = useMemo(() => {
-    let list = schoolRanking.length > 0 && schoolRanking.some((s) => s.score !== null)
-      ? schoolRanking
-      : [
-          { position: 1, positionBadge: '🥇 1º', school: 'E.M.E.F. Santa Maria', score: 92.4, participationPercentage: 98.5, isComplete: true },
-          { position: 2, positionBadge: '🥈 2º', school: 'E.M.E.I.E.F. São Pedro', score: 89.7, participationPercentage: 97.3, isComplete: true },
-          { position: 3, positionBadge: '🥉 3º', school: 'E.M.E.F. Monte Alegre', score: 87.6, participationPercentage: 96.1, isComplete: true },
-          { position: 4, positionBadge: '4º', school: 'E.M.E.F. Boa Esperança', score: 85.3, participationPercentage: 95.8, isComplete: true },
-          { position: 5, positionBadge: '5º', school: 'E.M.E.I.E.F. Santo Anastácio', score: 83.9, participationPercentage: 94.7, isComplete: true },
-          { position: 6, positionBadge: '6º', school: 'E.M.E.F. Dom Pedro I', score: 81.2, participationPercentage: 93.5, isComplete: true },
-          { position: 7, positionBadge: '7º', school: 'E.M.E.F. Princesa Isabel', score: 79.8, participationPercentage: 91.2, isComplete: true },
-        ];
+  // Ordenação de acordo com o modo selecionado
+  const sortedRanking = useMemo(() => {
+    let list = [...schoolRanking];
+
+    if (rankingMode === 'EVOLUCAO') {
+      list.sort((a, b) => (
+        (b.participationPercentage ?? 0) - (a.participationPercentage ?? 0) ||
+        (b.completenessPercentage ?? 0) - (a.completenessPercentage ?? 0) ||
+        (b.score ?? 0) - (a.score ?? 0)
+      ));
+      list.forEach((s, idx) => {
+        s.displayPosition = idx + 1;
+        s.displayPositionBadge = idx === 0 ? '🥇 1º' : idx === 1 ? '🥈 2º' : idx === 2 ? '🥉 3º' : `${idx + 1}º`;
+      });
+    } else {
+      list.forEach((s) => {
+        s.displayPosition = s.position;
+        s.displayPositionBadge = s.positionBadge;
+      });
+    }
 
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((s) => (s.school || '').toLowerCase().includes(q) || String(s.inep || '').includes(q));
+      const q = search.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      list = list.filter((s) => {
+        const name = (s.school || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const inep = String(s.inep || '');
+        return name.includes(q) || inep.includes(q);
+      });
     }
 
     if (displayScope === 'TOP5') {
       return list.slice(0, 5);
     }
     return list;
-  }, [schoolRanking, search, displayScope]);
+  }, [schoolRanking, rankingMode, search, displayScope]);
 
   if (loading && !overview) return <LoadingBlock label="Carregando ranking do Pacto..." />;
   if (error) return <div className="alert alert-error">{error.message}</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Subabas: Por Proficiência | Por Evolução */}
+      {/* Subabas: Por Proficiência | Por Evolução / Participação */}
       <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
         <button
           type="button"
           className={`btn ${rankingMode === 'PROFICIENCIA' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
           onClick={() => setRankingMode('PROFICIENCIA')}
         >
-          Por Proficiência
+          🏆 Por Proficiência Consolidada
         </button>
         <button
           type="button"
           className={`btn ${rankingMode === 'EVOLUCAO' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
           onClick={() => setRankingMode('EVOLUCAO')}
         >
-          Por Evolução
+          📈 Por Participação & Cobertura
         </button>
       </div>
 
@@ -123,7 +135,7 @@ export default function PactoRanking({ program, onSelectTab }) {
             variant={displayScope === 'ALL' ? 'primary' : 'secondary'}
             onClick={() => setDisplayScope('ALL')}
           >
-            Todas
+            Todas ({schoolRanking.length})
           </Button>
         </div>
       </div>
@@ -141,17 +153,19 @@ export default function PactoRanking({ program, onSelectTab }) {
                 align: 'center',
                 render: (item, idx) => (
                   <strong style={{ fontSize: 13.5 }}>
-                    {item.positionBadge || (idx === 0 ? '🥇 1º' : idx === 1 ? '🥈 2º' : idx === 2 ? '🥉 3º' : `${idx + 1}º`)}
+                    {item.displayPositionBadge || (idx === 0 ? '🥇 1º' : idx === 1 ? '🥈 2º' : idx === 2 ? '🥉 3º' : `${idx + 1}º`)}
                   </strong>
                 ),
               },
               {
                 key: 'school',
-                label: 'Escola',
+                label: 'Escola Municipal',
                 render: (item) => (
                   <div>
                     <strong style={{ color: '#0f172a', fontSize: 13 }}>{item.school}</strong>
-                    <div style={{ fontSize: 11, color: '#64748b' }}>Abaetetuba/PA</div>
+                    <div style={{ fontSize: 11, color: '#64748b' }}>
+                      INEP: <span className="mono">{item.inep || '—'}</span> · Abaetetuba/PA
+                    </div>
                   </div>
                 ),
               },
@@ -161,7 +175,7 @@ export default function PactoRanking({ program, onSelectTab }) {
                 align: 'center',
                 render: (item) => (
                   <strong style={{ color: '#0284c7', fontSize: 13.5 }}>
-                    {item.score != null ? `${item.score}%` : '—'}
+                    {item.score != null ? `${fmt(item.score)}%` : '—'}
                   </strong>
                 ),
               },
@@ -170,8 +184,8 @@ export default function PactoRanking({ program, onSelectTab }) {
                 label: 'Participação',
                 align: 'center',
                 render: (item) => (
-                  <span style={{ fontWeight: 600, color: '#334155' }}>
-                    {item.participationPercentage != null ? `${item.participationPercentage}%` : '—'}
+                  <span style={{ fontWeight: 600, color: (item.participationPercentage ?? 0) >= 90 ? '#15803d' : '#b45309' }}>
+                    {item.participationPercentage != null ? `${fmt(item.participationPercentage)}%` : '—'}
                   </span>
                 ),
               },
@@ -181,13 +195,15 @@ export default function PactoRanking({ program, onSelectTab }) {
                 align: 'center',
                 render: (item) => (
                   <Badge cls={item.isComplete !== false ? 'badge-green' : 'badge-yellow'}>
-                    {item.isComplete !== false ? '● Completa' : '⚠️ Incompleta'}
+                    {item.isComplete !== false ? '● Completa' : '⚠️ Pendente'}
                   </Badge>
                 ),
               },
             ]}
-            rows={displayRanking}
+            rows={sortedRanking}
             rowKey={(item, idx) => item.schoolId || idx}
+            emptyTitle="Nenhuma escola encontrada no ranking"
+            emptyHint="Verifique os filtros aplicados."
           />
         </div>
 
@@ -204,17 +220,17 @@ export default function PactoRanking({ program, onSelectTab }) {
             </svg>
           </div>
           <h3 style={{ fontSize: 16, fontWeight: 750, color: '#0f172a', margin: '0 0 8px 0' }}>
-            Classificação Geral da Rede
+            Classificação Geral da Rede Municipal
           </h3>
           <p style={{ fontSize: 12.5, color: '#64748b', maxWidth: 280, margin: '0 0 18px 0', lineHeight: 1.4 }}>
-            O gráfico vai visualizar o ranking de todas as escolas participantes e suas taxas de proficiência consolidada.
+            O ranking do Pacto calcula a média ponderada com base no alcance de níveis de proficiência em Leitura, Escrita e Matemática na avaliação vigente.
           </p>
 
           <Button
             variant="secondary"
             onClick={() => setDisplayScope('ALL')}
           >
-            Ver ranking completo →
+            Ver Todas as Escolas ({schoolRanking.length})
           </Button>
         </div>
       </div>

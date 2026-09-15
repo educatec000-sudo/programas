@@ -1,106 +1,138 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi.js';
 import { analyticsApi, programsApi } from '../services/resources.js';
 import PageHeader from '../components/PageHeader.jsx';
-import { Alert, LoadingBlock, Field, Select, StatCard } from '../components/ui.jsx';
+import { Alert, LoadingBlock, Field, Select, StatCard, ErrorBoundary } from '../components/ui.jsx';
 import DataTable from '../components/DataTable.jsx';
 import { EvolutionChart, ClassificationDonut, ComparisonBarChart, MultiLineChart, CHART_COLORS } from '../components/charts.jsx';
-import { fmt, fmtInt, yearsRange, PERIODS, CLASSIFICATION_INFO } from '../utils/format.js';
+import { fmt, fmtInt, yearsRange, CLASSIFICATION_INFO } from '../utils/format.js';
 import { Icon } from '../components/icons.jsx';
-import { supportsSharedFeature } from '../programs/registry.js';
+import { getProgramImplementation } from '../programs/registry.js';
 
 export default function Analytics() {
-  const [programId, setProgramId] = useState('');
+  const [searchParams] = useSearchParams();
+  const [programId, setProgramId] = useState(searchParams.get('programId') || '');
   const [indicatorId, setIndicatorId] = useState('');
   const [year, setYear] = useState(new Date().getFullYear());
   const [compareProgramYear, setCompareProgramYear] = useState(new Date().getFullYear());
 
-  const { data: overview, loading } = useApi(
-    () => programId
-      ? analyticsApi.overview({ programId, indicatorId: indicatorId || undefined, year })
-      : Promise.resolve(null),
-    [programId, indicatorId, year],
+  const { data: programsData, loading: loadingPrograms } = useApi(
+    () => programsApi.list({ pageSize: 100 }),
+    [],
   );
+  const programs = programsData?.data || [];
 
-  const { data: programs } = useApi(() => programsApi.list({ pageSize: 1000 }), []);
-  const { data: program } = useApi(
-    () => (programId ? programsApi.get(programId) : Promise.resolve(null)),
-    [programId],
-  );
-
-  React.useEffect(() => {
-    if (program?.year && program.year !== year) {
-      setYear(program.year);
-      setCompareProgramYear(program.year);
+  // Seleciona o primeiro programa automaticamente por padrão
+  useEffect(() => {
+    if (!programId && programs.length > 0) {
+      setProgramId(programs[0].id);
     }
-  }, [program?.id, program?.year]);
+  }, [programId, programs]);
+
+  const selectedProgram = useMemo(() => {
+    return programs.find((p) => p.id === programId) || programs[0] || null;
+  }, [programs, programId]);
+
+  const implementation = useMemo(() => {
+    return getProgramImplementation(selectedProgram);
+  }, [selectedProgram]);
+
+  // Procura aba analítica específica do programa (ex.: pacto-analises, cnca-analises, parc-evolucao, sispae-analises)
+  const specificAnalyticsTab = useMemo(() => {
+    if (!implementation?.adminTabs) return null;
+    return (
+      implementation.adminTabs.find((t) => t.key.includes('analise')) ||
+      implementation.adminTabs.find((t) => t.key.includes('evolucao')) ||
+      null
+    );
+  }, [implementation]);
+
+  const { data: overview, loading: loadingOverview } = useApi(
+    () =>
+      programId && !specificAnalyticsTab
+        ? analyticsApi.overview({ programId, indicatorId: indicatorId || undefined, year })
+        : Promise.resolve(null),
+    [programId, indicatorId, year, specificAnalyticsTab],
+  );
 
   const [selectedSchools, setSelectedSchools] = useState([]);
   const { data: comparison } = useApi(
     () =>
-      selectedSchools.length && programId
+      selectedSchools.length && programId && !specificAnalyticsTab
         ? analyticsApi.compareSchools({ schoolIds: selectedSchools.join(','), programId, year })
         : Promise.resolve(null),
-    [selectedSchools.join(','), programId, year],
+    [selectedSchools.join(','), programId, year, specificAnalyticsTab],
   );
 
   const { data: programComparison } = useApi(
-    () => analyticsApi.comparePrograms({ year: compareProgramYear }),
-    [compareProgramYear],
+    () => (!specificAnalyticsTab ? analyticsApi.comparePrograms({ year: compareProgramYear }) : Promise.resolve(null)),
+    [compareProgramYear, specificAnalyticsTab],
   );
 
   const toggleSchool = (id) =>
     setSelectedSchools((sel) => (sel.includes(id) ? sel.filter((s) => s !== id) : [...sel, id].slice(-6)));
 
+  if (loadingPrograms && programs.length === 0) {
+    return <LoadingBlock label="Carregando análises dos programas educacionais..." />;
+  }
+
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <PageHeader
-        title="Análises"
-        subtitle="Desempenho, metas e evolução sempre calculados dentro do programa selecionado"
+        title="Análises & Indicadores Pedagógicos"
+        subtitle="Evolução, desempenho e gráficos detalhados por programa educacional"
       />
 
-      <div className="filter-bar">
-        <Field label="Programa">
+      {/* Barra de Seleção do Programa */}
+      <div className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', padding: '12px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 300px' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-2, #64748b)', textTransform: 'uppercase' }}>
+            Programa:
+          </span>
           <Select
             value={programId}
             onChange={(e) => {
-              const newId = e.target.value;
-              setProgramId(newId);
+              setProgramId(e.target.value);
               setIndicatorId('');
               setSelectedSchools([]);
-              const p = (programs?.data || []).find((item) => item.id === newId);
-              if (p?.year) {
-                setYear(p.year);
-                setCompareProgramYear(p.year);
-              }
             }}
+            style={{ fontSize: 13, fontWeight: 600, minWidth: 260 }}
           >
-            <option value="">Selecione um programa...</option>
-            {(programs?.data || []).filter((item) => supportsSharedFeature(item, 'graficos')).map((p) => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Indicador">
-          <Select value={indicatorId} onChange={(e) => setIndicatorId(e.target.value)} disabled={!programId}>
-            <option value="">Todos os critérios do programa</option>
-            {(program?.indicators || []).map((criterion) => (
-              <option key={criterion.id} value={criterion.id}>
-                {criterion.code} — {criterion.name}
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.year})
               </option>
             ))}
           </Select>
-        </Field>
-        <Field label="Ano">
-          <Select value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
-          </Select>
-        </Field>
+        </div>
+
+        {selectedProgram && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                background: 'rgba(2, 132, 199, 0.1)',
+                color: '#0284c7',
+                padding: '4px 10px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              {selectedProgram.periodLabel || `Ciclo ${selectedProgram.year}`}
+            </span>
+          </div>
+        )}
       </div>
 
-      {!programId ? (
-        <Alert type="info">Selecione um programa. As análises avaliativas não combinam resultados de programas diferentes.</Alert>
-      ) : loading || !overview ? (
+      {/* Renderização da Análise Específica do Programa ou Padrão */}
+      {specificAnalyticsTab && selectedProgram ? (
+        <ErrorBoundary>
+          <specificAnalyticsTab.Component program={selectedProgram} />
+        </ErrorBoundary>
+      ) : loadingOverview ? (
         <LoadingBlock label="Processando análises..." />
-      ) : (
+      ) : overview ? (
         <>
           <div className="stats-grid">
             <StatCard icon={Icon.check()} label="Escolas acima da meta" value={fmtInt(overview.goals.totals.met)} tone="green" />
@@ -152,7 +184,7 @@ export default function Analytics() {
             <div className="card-title">Comparação entre escolas</div>
             <div className="card-subtitle">Selecione até 6 escolas para comparar a evolução da pontuação</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 14 }}>
-              {(program?.schools || []).filter((school) => school.linkActive).slice(0, 24).map((s) => (
+              {(selectedProgram?.schools || []).filter((school) => school.linkActive).slice(0, 24).map((s) => (
                 <button
                   key={s.id}
                   className={`pill ${selectedSchools.includes(s.id) ? 'active' : ''}`}
@@ -179,31 +211,10 @@ export default function Analytics() {
               <div className="empty-state">Selecione escolas acima para comparar.</div>
             )}
           </div>
-
-          {/* Comparação entre programas */}
-          <div className="card card-pad">
-            <div className="card-header-row">
-              <div>
-                <div className="card-title">Comparação entre programas</div>
-                <div className="card-subtitle">Cada programa é calculado isoladamente; esta comparação não cria nota geral</div>
-              </div>
-              <Select value={compareProgramYear} onChange={(e) => setCompareProgramYear(Number(e.target.value))} style={{ width: 110 }}>
-                {yearsRange(2023).map((y) => <option key={y} value={y}>{y}</option>)}
-              </Select>
-            </div>
-            {programComparison?.programs?.length ? (
-              <ComparisonBarChart
-                title=""
-                subtitle=""
-                data={programComparison.programs.map((p) => ({ name: p.code, score: p.currentScore }))}
-                height={280}
-              />
-            ) : (
-              <div className="empty-state">Sem dados de programas neste ano.</div>
-            )}
-          </div>
         </>
+      ) : (
+        <Alert type="info">Selecione um programa acima para visualizar as análises pedagógicas.</Alert>
       )}
-    </>
+    </div>
   );
 }

@@ -198,16 +198,25 @@ function resultFields() {
               levelAliases.push('Não proficiente', 'Nao proficiente', 'Até 4 pontos', 'Ate 4 pontos', '0 a 4 pontos');
             } else if (level.code === 'PROFICIENTE_INICIAL') {
               extraAliases.push(
+                'Não proficiente', 'Nao proficiente', 'Até 4 pontos', 'Ate 4 pontos',
+                'Nº de alunos com até 4 pontos', 'com até 4 pontos', '0 a 4 pontos',
+                'Nº alunos NP', 'No alunos NP', 'Nº NP', 'No NP', 'NP',
+              );
+              levelAliases.push('Não proficiente', 'Nao proficiente', 'Até 4 pontos', 'Ate 4 pontos', '0 a 4 pontos', 'NP', 'Alunos NP');
+            } else if (level.code === 'PROFICIENTE_INICIAL') {
+              extraAliases.push(
                 'Proficiente inicial', '5 a 6 pontos', 'De 5 a 6 pontos',
                 'Nº de alunos com 5 a 6 pontos', 'com 5 a 6 pontos',
+                'Nº alunos PI', 'No alunos PI', 'Nº PI', 'No PI', 'PI',
               );
-              levelAliases.push('Proficiente inicial', '5 a 6 pontos', 'De 5 a 6 pontos');
+              levelAliases.push('Proficiente inicial', '5 a 6 pontos', 'De 5 a 6 pontos', 'PI', 'Alunos PI');
             } else if (level.code === 'PROFICIENTE') {
               extraAliases.push(
                 'Proficiente', '7 a 10 pontos', 'De 7 a 10 pontos',
                 'Nº de alunos com 7 a 10 pontos', 'com 7 a 10 pontos',
+                'Nº alunos P', 'No alunos P', 'Nº P', 'No P', 'P',
               );
-              levelAliases.push('Proficiente', '7 a 10 pontos', 'De 7 a 10 pontos');
+              levelAliases.push('Proficiente', '7 a 10 pontos', 'De 7 a 10 pontos', 'P', 'Alunos P');
             }
           } else if (component.code === 'PORTUGUES') {
             if (skill.code === 'LEITURA') {
@@ -218,32 +227,32 @@ function resultFields() {
               skillAliases.push('Escrita', 'Perfil de escrita', 'Produção escrita');
             }
             if (level.code === 'PRE_LEITOR') {
-              extraAliases.push('Pré-leitores', 'Pre-leitores', 'Pre leitores', 'Nº de alunos PRÉ-LEITORES', 'Alunos pré-leitores');
-              levelAliases.push('Pré-leitores', 'Pre-leitores', 'Pre leitores', 'Pré leitor');
+              extraAliases.push('Pré-leitores', 'Pre-leitores', 'Pre leitores', 'Nº de alunos PRÉ-LEITORES', 'Alunos pré-leitores', 'Nº PL', 'No PL', 'PL', '%PL');
+              levelAliases.push('Pré-leitores', 'Pre-leitores', 'Pre leitores', 'Pré leitor', 'PL');
             } else if (level.code === 'LEITOR_INICIAL') {
-              extraAliases.push('Leitores iniciais', 'Leitores inicial', 'Leitor inicial', 'Nº de alunos LEITORES INICIAL', 'Alunos leitores inicial');
-              levelAliases.push('Leitores iniciais', 'Leitores inicial', 'Leitor inicial');
+              extraAliases.push('Leitores iniciais', 'Leitores inicial', 'Leitor inicial', 'Nº de alunos LEITORES INICIAL', 'Alunos leitores inicial', 'Nº LI', 'No LI', 'LI', '%LI');
+              levelAliases.push('Leitores iniciais', 'Leitores inicial', 'Leitor inicial', 'LI');
             } else if (level.code === 'LEITOR_FLUENTE') {
-              extraAliases.push('Leitores fluentes', 'Leitor fluente', 'Nº de alunos LEITORES FLUENTES', 'Alunos leitores fluentes');
-              levelAliases.push('Leitores fluentes', 'Leitor fluente');
+              extraAliases.push('Leitores fluentes', 'Leitor fluente', 'Nº de alunos LEITORES FLUENTES', 'Alunos leitores fluentes', 'Nº LF', 'No LF', 'LF', '%LF');
+              levelAliases.push('Leitores fluentes', 'Leitor fluente', 'LF');
             } else if (level.code === 'NAO_COMPREENDE') {
-              extraAliases.push('Não compreende', 'Nao compreende', 'Nº de alunos NÃO COMPREENDE', 'Alunos que não compreendem');
-              levelAliases.push('Não compreende', 'Nao compreende');
+              extraAliases.push('Não compreende', 'Nao compreende', 'Nº de alunos NÃO COMPREENDE', 'Alunos que não compreendem', 'Nº NC', 'No NC', 'NC', '%NC');
+              levelAliases.push('Não compreende', 'Nao compreende', 'NC');
             } else if (level.code === 'COMPREENDE_ORALIDADE') {
-              extraAliases.push('Compreende por oralidade', 'Nº de alunos COMPREENDE POR ORALIDADE', 'Alunos que compreendem por oralidade');
-              levelAliases.push('Compreende por oralidade', 'Oralidade');
+              extraAliases.push('Compreende por oralidade', 'Nº de alunos COMPREENDE POR ORALIDADE', 'Alunos que compreendem por oralidade', 'Nº CO', 'No CO', 'CO', '%CO');
+              levelAliases.push('Compreende por oralidade', 'Oralidade', 'CO');
             } else if (level.code === 'COMPREENDE_AUTONOMAMENTE') {
-              extraAliases.push('Compreende autonomamente', 'Nº de alunos COMPREENDE AUTONOMAMENTE', 'Alunos que compreendem autonomamente');
-              levelAliases.push('Compreende autonomamente', 'Autonomamente');
+              extraAliases.push('Compreende autonomamente', 'Nº de alunos COMPREENDE AUTONOMAMENTE', 'Alunos que compreendem autonomamente', 'Nº CA', 'No CA', 'CA', '%CA');
+              levelAliases.push('Compreende autonomamente', 'Autonomamente', 'CA');
             } else if (level.code === 'PRE_ALFABETICO') {
-              extraAliases.push('Pré-alfabético', 'Pre-alfabetico', 'Pre alfabetico', 'Nº de alunos PRÉ-ALFABÉTICO', 'Alunos pré-alfabéticos');
-              levelAliases.push('Pré-alfabético', 'Pre-alfabetico', 'Pre alfabetico');
+              extraAliases.push('Pré-alfabético', 'Pre-alfabetico', 'Pre alfabetico', 'Nº de alunos PRÉ-ALFABÉTICO', 'Alunos pré-alfabéticos', 'Nº PA', 'No PA', 'PA', '%PA');
+              levelAliases.push('Pré-alfabético', 'Pre-alfabetico', 'Pre alfabetico', 'PA');
             } else if (level.code === 'ALFABETICO_INICIAL') {
-              extraAliases.push('Alfabético inicial', 'Alfabetico inicial', 'Nº de alunos ALFABÉTICO INICIAL', 'Alunos em nível alfabético inicial');
-              levelAliases.push('Alfabético inicial', 'Alfabetico inicial');
+              extraAliases.push('Alfabético inicial', 'Alfabetico inicial', 'Nº de alunos ALFABÉTICO INICIAL', 'Alunos em nível alfabético inicial', 'Nº AI', 'No AI', 'AI', '%AI');
+              levelAliases.push('Alfabético inicial', 'Alfabetico inicial', 'AI');
             } else if (level.code === 'ALFABETICO_COMPLETO') {
-              extraAliases.push('Alfabético completo', 'Alfabetico completo', 'Nº de alunos ALFABÉTICO COMPLETO', 'Alunos em nível alfabético completo');
-              levelAliases.push('Alfabético completo', 'Alfabetico completo');
+              extraAliases.push('Alfabético completo', 'Alfabetico completo', 'Nº de alunos ALFABÉTICO COMPLETO', 'Alunos em nível alfabético completo', 'Nº AC', 'No AC', 'AC', '%AC');
+              levelAliases.push('Alfabético completo', 'Alfabetico completo', 'AC');
             }
           } else if (component.code === 'INICIAL') {
             if (skill.code === 'PRINCIPIO_ALFABETICO') {
