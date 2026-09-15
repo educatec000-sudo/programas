@@ -300,6 +300,13 @@ export async function getParcDashboard(programId, query = {}) {
 
   const draftCount = allResults.filter((r) => r.source === 'RASCUNHO').length;
 
+  // 8. Cálculo Objetivo das Escolas que Precisam de Atenção no PARC (Sem IA)
+  const attentionSchools = calculateParcAttentionSchools(activeResultSet, comparativeSchools, {
+    avgParticipation,
+    ifl,
+    pctFluentReader,
+  });
+
   return {
     kpis: {
       totalNetworkSchools: networkCount,
@@ -341,6 +348,278 @@ export async function getParcDashboard(programId, query = {}) {
     evolutionKpis,
     zoneBreakdown,
     comparativeSchools: comparativeSchools.slice(0, 50),
+    attentionSchools,
+  };
+}
+
+/**
+ * Motor de Regras Objetivo do PARC para Identificação de Escolas em Atenção.
+ * Avalia taxa de participação no 2º ano, proporção de Não Leitores/Soletradores (Pré-leitor 1 e 2),
+ * Índice de Fluência Leitora (IFL), carência de Leitores Fluentes e quedas entre ciclos.
+ */
+export function calculateParcAttentionSchools(activeResults = [], comparativeSchools = [], networkContext = {}) {
+  const compMap = new Map(comparativeSchools.map((cs) => [cs.schoolId, cs]));
+  const attentionList = [];
+
+  for (const r of activeResults) {
+    if (!r.school) continue;
+    const reasons = [];
+    let priorityPoints = 0;
+
+    // 1. Participação do 2º Ano
+    if (r.participationRate != null && r.participationRate > 0) {
+      if (r.participationRate < 75.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Fluência Leitora (2º Ano)',
+          currentValue: `${r.participationRate}%`,
+          referenceValue: '≥ 85.0%',
+          diff: `${round1(r.participationRate - 85.0)} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Apenas ${r.participationRate}% dos estudantes do 2º ano foram avaliados no teste de fluência leitora.`,
+          recommendation: 'Assegurar a aplicação censitária completa para todos os estudantes matriculados no 2º ano.',
+        });
+      } else if (r.participationRate < 85.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Fluência Leitora (2º Ano)',
+          currentValue: `${r.participationRate}%`,
+          referenceValue: '≥ 85.0%',
+          diff: `${round1(r.participationRate - 85.0)} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Participação de ${r.participationRate}% abaixo do patamar de cobertura de referência (85%).`,
+          recommendation: 'Acompanhar a frequência escolar e agendar repescagem para os ausentes.',
+        });
+      }
+    }
+
+    // 2. Não Leitores e Soletradores (Pré-leitor 1 e 2)
+    const pre1And2 = round1((r.preReaderLevel1 || 0) + (r.preReaderLevel2 || 0));
+    const preTotal = r.preReaderTotal != null ? r.preReaderTotal : round1(pre1And2 + (r.preReaderLevel3 || 0) + (r.preReaderLevel4 || 0));
+
+    if (pre1And2 > 35.0 || preTotal > 55.0) {
+      priorityPoints += 3;
+      reasons.push({
+        indicator: 'Não Leitores e Soletradores',
+        component: 'Fluência Leitora',
+        currentValue: `${pre1And2}% (Pré-leitor 1 e 2)`,
+        referenceValue: '≤ 15.0%',
+        diff: `+${round1(pre1And2 - 15.0)} p.p.`,
+        severity: 'HIGH',
+        severityLabel: 'Crítico',
+        severityColor: 'red',
+        description: `${pre1And2}% dos alunos avaliados não leem palavras isoladas ou apenas soletram fonemas/sílabas.`,
+        recommendation: 'Intervenção fônica sistemática intensiva, treino diário de correspondência grafema-fonema e leitura guiada.',
+      });
+    } else if (pre1And2 >= 20.0 || preTotal >= 40.0) {
+      priorityPoints += 2;
+      reasons.push({
+        indicator: 'Estágio Pré-leitor Elevado',
+        component: 'Fluência Leitora',
+        currentValue: `${preTotal}% pré-leitores`,
+        referenceValue: '≤ 20.0%',
+        diff: `+${round1(preTotal - 20.0)} p.p.`,
+        severity: 'MEDIUM',
+        severityLabel: 'Atenção',
+        severityColor: 'orange',
+        description: `Percentual relevante (${preTotal}%) de estudantes que ainda não alcançaram a leitura autônoma de palavras.`,
+        recommendation: 'Organizar grupos de nivelamento com foco em decodificação e fluência de palavras frequentes.',
+      });
+    }
+
+    // 3. Índice de Fluência Leitora (IFL)
+    if (r.ifl != null && r.ifl > 0) {
+      if (r.ifl < 4.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Índice de Fluência (IFL)',
+          component: 'Fluência Leitora',
+          currentValue: `${r.ifl}`,
+          referenceValue: '≥ 7.0 (escala 0-10)',
+          diff: `${round1(r.ifl - 7.0)} pts`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Índice de Fluência Leitora oficial em ${r.ifl}, caracterizando proficiência em estágio crítico.`,
+          recommendation: 'Visita técnica urgente de acompanhamento pedagógico da equipe da SEMED.',
+        });
+      } else if (r.ifl < 6.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Índice de Fluência (IFL)',
+          component: 'Fluência Leitora',
+          currentValue: `${r.ifl}`,
+          referenceValue: '≥ 7.0 (escala 0-10)',
+          diff: `${round1(r.ifl - 7.0)} pts`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Índice de Fluência Leitora de ${r.ifl} abaixo da referência de suficiência.`,
+          recommendation: 'Estimular leitura com ênfase na velocidade (PCPM) e precisão de leitura.',
+        });
+      }
+    }
+
+    // 4. Baixo percentual de Leitores Fluentes
+    if (r.fluentReader != null) {
+      if (r.fluentReader < 25.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Leitores Fluentes',
+          component: 'Fluência Leitora',
+          currentValue: `${r.fluentReader}% fluentes`,
+          referenceValue: '≥ 60.0%',
+          diff: `${round1(r.fluentReader - 60.0)} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Apenas ${r.fluentReader}% dos estudantes conseguem ler textos com entonação, prosódia e velocidade esperadas.`,
+          recommendation: 'Implementar sessões diárias de leitura em coro, leitura repetida e leitura dialogada.',
+        });
+      } else if (r.fluentReader < 50.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Leitores Fluentes',
+          component: 'Fluência Leitora',
+          currentValue: `${r.fluentReader}% fluentes`,
+          referenceValue: '≥ 60.0%',
+          diff: `${round1(r.fluentReader - 60.0)} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Índice de leitores fluentes (${r.fluentReader}%) abaixo da meta de 60%.`,
+          recommendation: 'Fortalecer a prática de leitura de pequenos textos narrativos e poéticos.',
+        });
+      }
+    }
+
+    // 5. Evolução entre Ciclos (Entrada × Saída)
+    const compEntry = compMap.get(r.schoolId);
+    if (compEntry) {
+      if (compEntry.deltaFluent != null && compEntry.deltaFluent < 0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Evolução Entrada × Saída',
+          component: 'Fluência Leitora',
+          currentValue: `${compEntry.deltaFluent} p.p. em fluentes`,
+          referenceValue: '≥ +10.0 p.p.',
+          diff: `${compEntry.deltaFluent} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Houve redução de ${Math.abs(compEntry.deltaFluent)} p.p. no percentual de leitores fluentes entre a avaliação de Entrada e de Saída.`,
+          recommendation: 'Analisar com a equipe docente as causas da regressão no aprendizado leitor.',
+        });
+      }
+      if (compEntry.deltaPreReaderReduction != null && compEntry.deltaPreReaderReduction < 0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Evolução de Pré-leitores',
+          component: 'Fluência Leitora',
+          currentValue: `Aumento de ${Math.abs(compEntry.deltaPreReaderReduction)} p.p.`,
+          referenceValue: 'Redução contínua',
+          diff: `${compEntry.deltaPreReaderReduction} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Aumento no contingente de pré-leitores no fechamento do ciclo letivo.`,
+          recommendation: 'Reavaliar individualmente os estudantes com maiores dificuldades de alfabetização.',
+        });
+      }
+    }
+
+    if (reasons.length > 0) {
+      let priority = 'LOW';
+      let priorityLabel = 'Baixa';
+      let priorityColor = 'yellow';
+
+      const hasHighReason = reasons.some((r) => r.severity === 'HIGH');
+      const mediumCount = reasons.filter((r) => r.severity === 'MEDIUM').length;
+
+      if (hasHighReason || priorityPoints >= 3 || mediumCount >= 2) {
+        priority = 'HIGH';
+        priorityLabel = 'Alta';
+        priorityColor = 'red';
+      } else if (mediumCount === 1 || priorityPoints === 2) {
+        priority = 'MEDIUM';
+        priorityLabel = 'Média';
+        priorityColor = 'orange';
+      }
+
+      const mainTitles = reasons.slice(0, 2).map((r) => {
+        if (r.indicator === 'Taxa de Participação') return 'Baixa participação';
+        if (r.indicator === 'Não Leitores e Soletradores') return 'Alto % Não Leitores';
+        if (r.indicator === 'Estágio Pré-leitor Elevado') return 'Alto % Pré-leitores';
+        if (r.indicator === 'Índice de Fluência (IFL)') return 'IFL crítico';
+        if (r.indicator === 'Leitores Fluentes') return 'Poucos Fluentes';
+        if (r.indicator === 'Evolução Entrada × Saída') return 'Queda entre ciclos';
+        if (r.indicator === 'Evolução de Pré-leitores') return 'Aumento de Pré-leitores';
+        return r.indicator;
+      });
+      const reasonsSummary = mainTitles.join(' + ') + (reasons.length > 2 ? ` (+${reasons.length - 2})` : '');
+
+      const keyMetrics = [];
+      if (r.participationRate != null) {
+        keyMetrics.push({
+          label: 'Participação',
+          value: `${r.participationRate}%`,
+          tone: r.participationRate < 80 ? 'critical' : 'normal',
+        });
+      }
+      if (pre1And2 > 0) {
+        keyMetrics.push({
+          label: 'Não Leu/Soletrou',
+          value: `${pre1And2}%`,
+          tone: pre1And2 > 30 ? 'critical' : 'normal',
+        });
+      }
+      if (r.ifl != null) {
+        keyMetrics.push({
+          label: 'IFL',
+          value: `${r.ifl}`,
+          tone: r.ifl < 5.0 ? 'critical' : 'normal',
+        });
+      }
+
+      attentionList.push({
+        schoolId: r.schoolId || r.school.id,
+        schoolName: r.school.name,
+        inep: r.school.inep,
+        zone: r.school.zone,
+        priority,
+        priorityLabel,
+        priorityColor,
+        priorityPoints,
+        reasonsSummary,
+        reasonsCount: reasons.length,
+        keyMetrics,
+        reasons,
+      });
+    }
+  }
+
+  const priorityOrder = { HIGH: 1, MEDIUM: 2, LOW: 3 };
+  attentionList.sort((a, b) => (
+    priorityOrder[a.priority] - priorityOrder[b.priority] ||
+    b.priorityPoints - a.priorityPoints ||
+    b.reasonsCount - a.reasonsCount ||
+    a.schoolName.localeCompare(b.schoolName)
+  ));
+
+  return {
+    summary: {
+      total: attentionList.length,
+      high: attentionList.filter((s) => s.priority === 'HIGH').length,
+      medium: attentionList.filter((s) => s.priority === 'MEDIUM').length,
+      low: attentionList.filter((s) => s.priority === 'LOW').length,
+    },
+    schools: attentionList,
   };
 }
 

@@ -19,6 +19,7 @@ import {
   ParcRanking,
   ParcEvolution,
   ParcImport,
+  ParcRelatorios,
 } from './parc/index.js';
 import {
   SispaeDashboard,
@@ -59,6 +60,15 @@ const SISPAE_ADMIN_TABS = [
   { key: 'sispae-analises', label: 'Análises & Habilidades', Component: SispaeAnalises },
   { key: 'sispae-import', label: 'Importação', Component: SispaeImport },
   { key: 'sispae-relatorios', label: 'Relatórios', Component: SispaeRelatorios },
+];
+
+const PARC_ADMIN_TABS = [
+  { key: 'parc-escolas', label: 'Escolas Participantes', Component: ParcSchools },
+  { key: 'parc-resultados', label: 'Resultados por Escola', Component: ParcSchoolResults },
+  { key: 'parc-ranking', label: 'Ranking Oficial', Component: ParcRanking },
+  { key: 'parc-evolucao', label: 'Evolução (Entrada × Saída)', Component: ParcEvolution },
+  { key: 'parc-import', label: 'Importar Planilha Oficial', Component: ParcImport },
+  { key: 'parc-relatorios', label: 'Relatórios', Component: ParcRelatorios },
 ];
 
 const implementations = [
@@ -105,25 +115,13 @@ const implementations = [
     year: 2026,
     disabledSharedTabs: PARC_DISABLED_SHARED_TABS,
     OverviewComponent: ParcDashboard,
-    adminTabs: [
-      { key: 'parc-escolas', label: 'Escolas Participantes', Component: ParcSchools },
-      { key: 'parc-resultados', label: 'Resultados por Escola', Component: ParcSchoolResults },
-      { key: 'parc-ranking', label: 'Ranking Oficial', Component: ParcRanking },
-      { key: 'parc-evolucao', label: 'Evolução (Entrada × Saída)', Component: ParcEvolution },
-      { key: 'parc-import', label: 'Importar Planilha Oficial', Component: ParcImport },
-    ],
+    adminTabs: PARC_ADMIN_TABS,
   },
   {
     code: 'PARC',
     disabledSharedTabs: PARC_DISABLED_SHARED_TABS,
     OverviewComponent: ParcDashboard,
-    adminTabs: [
-      { key: 'parc-escolas', label: 'Escolas Participantes', Component: ParcSchools },
-      { key: 'parc-resultados', label: 'Resultados por Escola', Component: ParcSchoolResults },
-      { key: 'parc-ranking', label: 'Ranking Oficial', Component: ParcRanking },
-      { key: 'parc-evolucao', label: 'Evolução (Entrada × Saída)', Component: ParcEvolution },
-      { key: 'parc-import', label: 'Importar Planilha Oficial', Component: ParcImport },
-    ],
+    adminTabs: PARC_ADMIN_TABS,
   },
   {
     code: 'SISPAE-2026',
@@ -184,13 +182,7 @@ export function getProgramImplementation(program) {
       catalogCode: 'PARC',
       disabledSharedTabs: PARC_DISABLED_SHARED_TABS,
       OverviewComponent: ParcDashboard,
-      adminTabs: [
-        { key: 'parc-escolas', label: 'Escolas Participantes', Component: ParcSchools },
-        { key: 'parc-resultados', label: 'Resultados por Escola', Component: ParcSchoolResults },
-        { key: 'parc-ranking', label: 'Ranking Oficial', Component: ParcRanking },
-        { key: 'parc-evolucao', label: 'Evolução (Entrada × Saída)', Component: ParcEvolution },
-        { key: 'parc-import', label: 'Importar Planilha Oficial', Component: ParcImport },
-      ],
+      adminTabs: PARC_ADMIN_TABS,
     };
   }
 

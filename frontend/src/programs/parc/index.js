@@ -4,6 +4,7 @@ import ParcSchoolResults from './ParcSchoolResults.jsx';
 import ParcRanking from './ParcRanking.jsx';
 import ParcEvolution from './ParcEvolution.jsx';
 import ParcImport from './ParcImport.jsx';
+import ParcRelatorios from './ParcRelatorios.jsx';
 
 export {
   ParcDashboard,
@@ -12,4 +13,5 @@ export {
   ParcRanking,
   ParcEvolution,
   ParcImport,
+  ParcRelatorios,
 };

@@ -1432,7 +1432,2218 @@ body.dark-theme {
   border-bottom-color: var(--border) !important;
 }
 
-/* CNCA Top Header Block */
+/* ==========================================================================
+   SISPAE DASHBOARD V2 — EXATAMENTE COMO O LAYOUT OFICIAL (image-1.png)
+   ========================================================================== */
+
+.sispae-v2-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* 1. Top 5 KPI Cards Strip */
+.sispae-kpi-row-5 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.sispae-kpi-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sispae-kpi-card-v2:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.sispae-kpi-top-v2 {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sispae-kpi-icon-v2 {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sispae-kpi-icon-v2.blue { background: #e0f2fe; color: #0284c7; }
+.sispae-kpi-icon-v2.purple { background: #f3e8ff; color: #8b5cf6; }
+.sispae-kpi-icon-v2.green { background: #dcfce7; color: #16a34a; }
+.sispae-kpi-icon-v2.amber { background: #fef3c7; color: #d97706; }
+.sispae-kpi-icon-v2.red { background: #fee2e2; color: #dc2626; }
+
+.sispae-kpi-info-v2 {
+  display: flex;
+  flex-direction: column;
+}
+
+.sispae-kpi-title-v2 {
+  font-size: 11px;
+  font-weight: 750;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  line-height: 1.2;
+}
+
+.sispae-kpi-val-v2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 2px 0 1px;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
+}
+
+.sispae-kpi-sub-v2 {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.3;
+}
+
+.sispae-kpi-progress-wrap-v2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sispae-kpi-track-v2 {
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.sispae-kpi-fill-v2 {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.sispae-kpi-fill-v2.blue { background: #0284c7; }
+.sispae-kpi-fill-v2.purple { background: #8b5cf6; }
+.sispae-kpi-fill-v2.green { background: #10b981; }
+
+.sispae-kpi-pct-v2 {
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sispae-kpi-pct-v2.blue { color: #0284c7; }
+.sispae-kpi-pct-v2.purple { color: #8b5cf6; }
+.sispae-kpi-pct-v2.green { color: #059669; }
+
+.sispae-kpi-trend-v2 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.sispae-kpi-trend-val {
+  font-weight: 750;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sispae-kpi-trend-val.green { color: #16a34a; }
+.sispae-kpi-trend-val.amber { color: #d97706; }
+
+.sispae-kpi-trend-sub {
+  color: #94a3b8;
+  font-size: 10.5px;
+}
+
+/* 2. Middle Row 2: 3 Columns (Donut, Line Evolution, Highlights) */
+.sispae-row2-grid-v2 {
+  display: grid;
+  grid-template-columns: 1.15fr 1.8fr 1.15fr;
+  gap: 14px;
+}
+
+.sispae-donut-card-v2,
+.sispae-evolution-card-v2,
+.sispae-highlights-card-v2,
+.sispae-dist-comp-card-v2,
+.sispae-skills-bar-card-v2,
+.sispae-alerts-card-v2,
+.sispae-schools-table-card-v2,
+.sispae-map-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.sispae-card-header-v2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sispae-card-title-group-v2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sispae-card-title-v2 {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.sispae-card-subtitle-v2 {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+/* Donut Body */
+.sispae-donut-body-v2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+
+.sispae-donut-svg-box-v2 {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+
+.sispae-donut-center-v2 {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.sispae-donut-center-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.sispae-donut-center-sub {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.sispae-donut-legend-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+}
+
+.sispae-donut-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.sispae-donut-legend-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.sispae-donut-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sispae-donut-legend-val {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Evolução Pill Toggle */
+.sispae-pill-toggle-group {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.sispae-pill-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.sispae-pill-toggle-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Destaques da Rede List */
+.sispae-highlights-list-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  justify-content: space-around;
+}
+
+.sispae-highlight-item-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+.sispae-highlight-left-v2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sispae-highlight-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.sispae-highlight-icon-box.green { background: #dcfce7; color: #16a34a; }
+.sispae-highlight-icon-box.amber { background: #fef3c7; color: #d97706; }
+.sispae-highlight-icon-box.blue { background: #e0f2fe; color: #0284c7; }
+
+.sispae-highlight-text-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.sispae-highlight-subtitle {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.sispae-highlight-name {
+  font-size: 12.5px;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.sispae-highlight-subdesc {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.sispae-highlight-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: right;
+}
+
+/* 3. Middle Row 3: 3 Columns (Distribution by Component, Skills Bar Chart, Alerts) */
+.sispae-row3-grid-v2 {
+  display: grid;
+  grid-template-columns: 1.15fr 1.8fr 1.15fr;
+  gap: 14px;
+}
+
+/* Distribuição por Componente Rows */
+.sispae-comp-dist-list-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  flex: 1;
+  justify-content: space-around;
+}
+
+.sispae-comp-dist-row-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sispae-comp-dist-label-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+
+.sispae-comp-dist-name-box {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 750;
+  color: #1e293b;
+}
+
+.sispae-comp-dist-icon {
+  font-size: 14px;
+}
+
+.sispae-comp-dist-val {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.sispae-comp-dist-subtext {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.sispae-comp-dist-track {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.sispae-comp-dist-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #10b981;
+  transition: width 0.5s ease;
+}
+
+/* Alertas List */
+.sispae-alerts-list-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.sispae-alert-item-v2 {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+.sispae-alert-icon-v2 {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.sispae-alert-icon-v2.amber { background: #fef3c7; color: #d97706; }
+.sispae-alert-icon-v2.red { background: #fee2e2; color: #dc2626; }
+
+.sispae-alert-body-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sispae-alert-title-v2 {
+  font-size: 11.5px;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.sispae-alert-sub-v2 {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.sispae-alerts-see-all {
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0284c7;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding-left: 0;
+  text-align: left;
+}
+
+.sispae-alerts-see-all:hover {
+  text-decoration: underline;
+}
+
+/* 4. Bottom Row 4: 2 Columns (Table, Map) */
+.sispae-row4-grid-v2 {
+  display: grid;
+  grid-template-columns: 1.55fr 1.45fr;
+  gap: 14px;
+}
+
+.sispae-perf-table-v2 {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.sispae-perf-table-v2 th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sispae-perf-table-v2 td {
+  padding: 8px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.sispae-perf-table-v2 tr:hover {
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.sispae-perf-table-v2 tr.selected {
+  background: #f0f9ff;
+}
+
+.sispae-situation-pill-v2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.sispae-situation-pill-v2.green { background: #dcfce7; color: #16a34a; }
+.sispae-situation-pill-v2.amber { background: #fef3c7; color: #d97706; }
+.sispae-situation-pill-v2.red { background: #fee2e2; color: #dc2626; }
+
+/* Embedded Leaflet Map in SisPAE */
+.sispae-map-box-v2 {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.sispae-map-footer-row-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sispae-map-legend-row-v2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.sispae-map-full-btn {
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.sispae-map-full-btn:hover {
+  background: #0369a1;
+}
+
+/* Responsividade SisPAE V2 */
+@media (max-width: 1200px) {
+  .sispae-kpi-row-5 { grid-template-columns: repeat(3, 1fr); }
+  .sispae-row2-grid-v2 { grid-template-columns: 1fr; }
+  .sispae-row3-grid-v2 { grid-template-columns: 1fr; }
+  .sispae-row4-grid-v2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .sispae-kpi-row-5 { grid-template-columns: 1fr; }
+}
+
+/* Dark Mode Overrides for SisPAE V2 */
+[data-theme="dark"] .sispae-kpi-card-v2,
+[data-theme="dark"] .sispae-donut-card-v2,
+[data-theme="dark"] .sispae-evolution-card-v2,
+[data-theme="dark"] .sispae-highlights-card-v2,
+[data-theme="dark"] .sispae-dist-comp-card-v2,
+[data-theme="dark"] .sispae-skills-bar-card-v2,
+[data-theme="dark"] .sispae-alerts-card-v2,
+[data-theme="dark"] .sispae-schools-table-card-v2,
+[data-theme="dark"] .sispae-map-card-v2 {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .sispae-kpi-val-v2,
+[data-theme="dark"] .sispae-card-title-v2,
+[data-theme="dark"] .sispae-donut-center-num,
+[data-theme="dark"] .sispae-highlight-name,
+[data-theme="dark"] .sispae-highlight-value,
+[data-theme="dark"] .sispae-comp-dist-name-box,
+[data-theme="dark"] .sispae-comp-dist-val,
+[data-theme="dark"] .sispae-alert-title-v2 {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .sispae-highlight-item-v2,
+[data-theme="dark"] .sispae-alert-item-v2 {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .sispae-pill-toggle-group {
+  background: var(--surface-2) !important;
+}
+
+[data-theme="dark"] .sispae-perf-table-v2 th {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+
+[data-theme="dark"] .sispae-perf-table-v2 td {
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* ==========================================================================
+   PARC DASHBOARD V2 — EXATAMENTE COMO O LAYOUT OFICIAL (image-1.png)
+   ========================================================================== */
+
+.parc-v2-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* 1. Top 4 KPI Cards Strip */
+.parc-kpi-row-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.parc-kpi-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.parc-kpi-card-v2:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.parc-kpi-top-v2 {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.parc-kpi-icon-v2 {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.parc-kpi-icon-v2.blue { background: #e0f2fe; color: #0284c7; }
+.parc-kpi-icon-v2.green { background: #dcfce7; color: #16a34a; }
+.parc-kpi-icon-v2.purple { background: #f3e8ff; color: #8b5cf6; }
+.parc-kpi-icon-v2.orange { background: #ffedd5; color: #ea580c; }
+
+.parc-kpi-info-v2 {
+  display: flex;
+  flex-direction: column;
+}
+
+.parc-kpi-title-v2 {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.parc-kpi-val-v2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 2px 0 1px;
+  letter-spacing: -0.3px;
+  line-height: 1.15;
+}
+
+.parc-kpi-sub-v2 {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.3;
+}
+
+.parc-kpi-progress-wrap-v2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.parc-kpi-track-v2 {
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.parc-kpi-fill-v2 {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.parc-kpi-fill-v2.blue { background: #0284c7; }
+.parc-kpi-fill-v2.green { background: #10b981; }
+
+.parc-kpi-pct-v2 {
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.parc-kpi-pct-v2.blue { color: #0284c7; }
+.parc-kpi-pct-v2.green { color: #059669; }
+
+.parc-kpi-trend-v2 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.parc-kpi-trend-val {
+  font-weight: 750;
+  color: #16a34a;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.parc-kpi-trend-sub {
+  color: #94a3b8;
+  font-size: 10.5px;
+}
+
+/* 2. Middle Row: 3 Columns (Left Gauges, Center Pie Chart, Right Level Bars) */
+.parc-row2-grid-v2 {
+  display: grid;
+  grid-template-columns: 260px 1.8fr 1.35fr;
+  gap: 14px;
+}
+
+/* Left Column: Semicircular Gauges Stack */
+.parc-gauges-stack-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.parc-gauge-item-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.parc-gauge-header-v2 {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.parc-gauge-header-icon {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.parc-gauge-header-icon.blue { color: #0284c7; }
+.parc-gauge-header-icon.orange { color: #ea580c; }
+.parc-gauge-header-icon.purple { color: #8b5cf6; }
+
+.parc-gauge-body-v2 {
+  position: relative;
+  width: 170px;
+  height: 90px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Center Column: PARC Official Pie Chart Card */
+.parc-pie-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.parc-pie-header-v2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.parc-pie-title-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.parc-pie-main-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.2px;
+}
+
+.parc-pie-sub-title {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.parc-pie-toggle-group {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.parc-pie-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.parc-pie-toggle-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.parc-pie-body-v2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 12px;
+}
+
+.parc-pie-svg-box {
+  position: relative;
+  flex: 1;
+  min-width: 280px;
+  height: 290px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.parc-pie-legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 175px;
+  padding-left: 6px;
+}
+
+.parc-pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.parc-pie-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Right Column: Distribuição por Nível de Fluência (Horizontal Bars Card) */
+.parc-levels-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.parc-levels-header-v2 {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 14px;
+}
+
+.parc-levels-list-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  flex: 1;
+  justify-content: space-around;
+}
+
+.parc-level-bar-row-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.parc-level-bar-label-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+
+.parc-level-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.parc-level-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.parc-level-values-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+}
+
+.parc-level-count-val {
+  font-weight: 700;
+  color: #64748b;
+  min-width: 32px;
+  text-align: right;
+}
+
+.parc-level-pct-val {
+  font-weight: 800;
+  color: #0f172a;
+  min-width: 44px;
+  text-align: right;
+}
+
+.parc-level-track-v2 {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.parc-level-bar-fill-v2 {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+/* 3. Bottom Row: 3 Columns (Components Table, Attention Points, Callout Banner) */
+.parc-row3-grid-v2 {
+  display: grid;
+  grid-template-columns: 1.35fr 1.35fr 1fr;
+  gap: 14px;
+}
+
+/* Column 1: Desempenho por Componente (Tabela V2) */
+.parc-comp-table-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.parc-comp-table-header-v2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.parc-comp-table-v2 {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.parc-comp-table-v2 th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.parc-comp-table-v2 td {
+  padding: 8px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.parc-comp-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.parc-comp-icon-box {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.parc-comp-icon-box.blue { background: #e0f2fe; color: #0284c7; }
+.parc-comp-icon-box.red { background: #fee2e2; color: #dc2626; }
+.parc-comp-icon-box.green { background: #dcfce7; color: #16a34a; }
+.parc-comp-icon-box.purple { background: #f3e8ff; color: #8b5cf6; }
+
+.parc-comp-result-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.parc-comp-result-num {
+  font-weight: 800;
+  color: #0f172a;
+  min-width: 42px;
+}
+
+.parc-comp-result-track {
+  flex: 1;
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  min-width: 50px;
+}
+
+.parc-comp-result-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.parc-comp-result-fill.blue { background: #0284c7; }
+.parc-comp-result-fill.red { background: #e11d48; }
+.parc-comp-result-fill.green { background: #10b981; }
+.parc-comp-result-fill.purple { background: #8b5cf6; }
+
+.parc-comp-meta-cell {
+  color: #64748b;
+  font-weight: 600;
+  text-align: right;
+  min-width: 36px;
+}
+
+/* Column 2: Pontos de Atenção (Feed Card V2) */
+.parc-attention-feed-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.parc-attention-feed-header-v2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.parc-attention-feed-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.parc-attention-see-all-btn {
+  background: none;
+  border: none;
+  color: #0284c7;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.parc-attention-see-all-btn:hover {
+  text-decoration: underline;
+}
+
+.parc-attention-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  justify-content: space-around;
+}
+
+.parc-attention-feed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+  background: #f8fafc;
+  transition: all 0.12s;
+}
+
+.parc-attention-feed-item.red { background: #fff1f2; border-color: #ffe4e6; }
+.parc-attention-feed-item.orange { background: #fffbeb; border-color: #fef3c7; }
+.parc-attention-feed-item.green { background: #f0fdf4; border-color: #dcfce7; }
+.parc-attention-feed-item.blue { background: #f0f7ff; border-color: #e0f2fe; }
+
+.parc-attention-feed-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.parc-attention-dot-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.parc-attention-dot-badge.red { background: #fee2e2; color: #dc2626; }
+.parc-attention-dot-badge.orange { background: #ffedd5; color: #ea580c; }
+.parc-attention-dot-badge.green { background: #dcfce7; color: #16a34a; }
+.parc-attention-dot-badge.blue { background: #e0f2fe; color: #0284c7; }
+
+.parc-attention-feed-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.parc-attention-feed-name {
+  font-size: 12px;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.parc-attention-feed-sub {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.parc-attention-feed-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.parc-attention-feed-pill.red { background: #fee2e2; color: #dc2626; }
+.parc-attention-feed-pill.orange { background: #fef3c7; color: #b45309; }
+.parc-attention-feed-pill.green { background: #dcfce7; color: #15803d; }
+.parc-attention-feed-pill.blue { background: #e0f2fe; color: #0284c7; }
+
+/* Column 3: Mais dados, melhores decisões (PARC Callout Card) */
+.parc-callout-card-v2 {
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 20px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.parc-callout-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.parc-callout-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.parc-callout-desc {
+  font-size: 11px;
+  color: #475569;
+  line-height: 1.45;
+  max-width: 230px;
+}
+
+.parc-callout-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  transition: all 0.15s;
+}
+
+.parc-callout-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* Responsividade PARC V2 */
+@media (max-width: 1200px) {
+  .parc-kpi-row-4 { grid-template-columns: repeat(2, 1fr); }
+  .parc-row2-grid-v2 { grid-template-columns: 1fr; }
+  .parc-row3-grid-v2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .parc-kpi-row-4 { grid-template-columns: 1fr; }
+}
+
+/* Dark Mode Overrides for PARC V2 */
+[data-theme="dark"] .parc-kpi-card-v2,
+[data-theme="dark"] .parc-gauge-item-card-v2,
+[data-theme="dark"] .parc-pie-card-v2,
+[data-theme="dark"] .parc-levels-card-v2,
+[data-theme="dark"] .parc-comp-table-card-v2,
+[data-theme="dark"] .parc-attention-feed-card-v2 {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .parc-kpi-val-v2,
+[data-theme="dark"] .parc-pie-main-title,
+[data-theme="dark"] .parc-levels-header-v2,
+[data-theme="dark"] .parc-comp-table-header-v2,
+[data-theme="dark"] .parc-attention-feed-title,
+[data-theme="dark"] .parc-callout-title {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] .parc-callout-card-v2 {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.15) 0%, var(--surface) 100%) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .parc-attention-feed-item {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .parc-pie-toggle-group {
+  background: var(--surface-2) !important;
+}
+
+[data-theme="dark"] .parc-comp-table-v2 th {
+  background: var(--surface-2) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+
+[data-theme="dark"] .parc-comp-table-v2 td {
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+
+/* ==========================================================================
+   CNCA DASHBOARD V2 — EXATAMENTE COMO O LAYOUT OFICIAL (image-1.png)
+   ========================================================================== */
+
+.cnca-v2-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* 1. Barra de Filtros Superior V2 */
+.cnca-filter-card-v2 {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.cnca-filter-row-v2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.cnca-filter-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 155px;
+  flex-shrink: 0;
+}
+
+.cnca-filter-title-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #0284c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.cnca-filter-main-title {
+  font-size: 14px;
+  font-weight: 750;
+  color: #1e3a8a;
+  white-space: nowrap;
+}
+
+.cnca-filter-item-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.cnca-filter-label-v2 {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.cnca-select-v2 {
+  height: 36px !important;
+  font-size: 12.5px !important;
+  border-radius: 8px !important;
+  border: 1px solid #cbd5e1 !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  padding: 4px 10px !important;
+  width: 100% !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+
+.cnca-filter-actions-v2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 14px;
+}
+
+.cnca-btn-apply {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0284c7;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  height: 36px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
+  transition: all 0.15s ease;
+}
+
+.cnca-btn-apply:hover {
+  background: #0369a1;
+  transform: translateY(-1px);
+}
+
+.cnca-btn-clear-v2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  height: 36px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.cnca-btn-clear-v2:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.cnca-btn-collapse {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+/* 2. Grid de 3 Colunas na Linha 2 (Índice, Evolução, Níveis) */
+.cnca-row2-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1.6fr 1fr;
+  gap: 14px;
+}
+
+/* Card: Índice de Alfabetização */
+.cnca-gauge-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.cnca-gauge-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 750;
+  color: #0f172a;
+  margin-bottom: 12px;
+}
+
+.cnca-gauge-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.cnca-gauge-donut-wrap {
+  width: 120px;
+  height: 120px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cnca-gauge-center-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.cnca-gauge-pct {
+  font-size: 21px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+}
+
+.cnca-gauge-sub {
+  font-size: 10px;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.cnca-gauge-info-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.cnca-gauge-goal-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cnca-gauge-goal-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  display: flex;
+  justify-content: space-between;
+}
+
+.cnca-gauge-goal-bar {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cnca-gauge-goal-fill {
+  height: 100%;
+  background: #0284c7;
+  border-radius: 999px;
+}
+
+.cnca-gauge-alert-box {
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.cnca-gauge-pedagogical-text {
+  font-size: 10.5px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* Card: Níveis de Desempenho Horizontais */
+.cnca-levels-horizontal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.cnca-level-h-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cnca-level-h-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.cnca-level-h-icon.green { background: #dcfce7; color: #16a34a; }
+.cnca-level-h-icon.blue { background: #e0f2fe; color: #0284c7; }
+.cnca-level-h-icon.orange { background: #ffedd5; color: #ea580c; }
+
+.cnca-level-h-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cnca-level-h-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.cnca-level-h-bar-track {
+  width: 100%;
+  height: 7px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cnca-level-h-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.cnca-level-h-bar-fill.green { background: #10b981; }
+.cnca-level-h-bar-fill.blue { background: #0284c7; }
+.cnca-level-h-bar-fill.orange { background: #f59e0b; }
+
+.cnca-level-h-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  min-width: 38px;
+  text-align: right;
+}
+
+/* 3. Grid de 3 Colunas na Linha 3 (Componentes, Pontos Atenção, Alertas) */
+.cnca-row3-grid {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr 1fr;
+  gap: 14px;
+}
+
+/* Desempenho por Componente (4 Subcards) */
+.cnca-comp-subcards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cnca-comp-subcard {
+  border-radius: 10px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.cnca-comp-subcard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.cnca-comp-subcard.leitura {
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+}
+.cnca-comp-subcard.escrita {
+  background: #fff1f2;
+  border: 1px solid #ffe4e6;
+}
+.cnca-comp-subcard.matematica {
+  background: #f0fdf4;
+  border: 1px solid #dcfce7;
+}
+.cnca-comp-subcard.fluencia {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+}
+
+.cnca-comp-subcard-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 750;
+}
+
+.cnca-comp-subcard.leitura .cnca-comp-subcard-top { color: #1e3a8a; }
+.cnca-comp-subcard.escrita .cnca-comp-subcard-top { color: #9f1239; }
+.cnca-comp-subcard.matematica .cnca-comp-subcard-top { color: #14532d; }
+.cnca-comp-subcard.fluencia .cnca-comp-subcard-top { color: #92400e; }
+
+.cnca-comp-subcard-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 6px 0 2px;
+}
+
+.cnca-comp-subcard-sub {
+  font-size: 10px;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.cnca-comp-pill-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+}
+
+.cnca-comp-pill-badge.green {
+  background: #dcfce7;
+  color: #15803d;
+}
+.cnca-comp-pill-badge.red {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.cnca-comp-pill-badge.orange {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+/* Card: Pontos de Atenção */
+.cnca-attention-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cnca-attention-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+.cnca-attention-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cnca-attention-dot-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.cnca-attention-dot-badge.red { background: #fee2e2; color: #dc2626; }
+.cnca-attention-dot-badge.orange { background: #ffedd5; color: #ea580c; }
+.cnca-attention-dot-badge.green { background: #dcfce7; color: #16a34a; }
+
+.cnca-attention-item-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.cnca-attention-item-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.cnca-attention-item-sub {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.cnca-attention-severity-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cnca-attention-severity-pill.red { background: #fee2e2; color: #dc2626; }
+.cnca-attention-severity-pill.orange { background: #ffedd5; color: #ea580c; }
+.cnca-attention-severity-pill.green { background: #dcfce7; color: #16a34a; }
+
+/* Card: Alertas da Rede */
+.cnca-network-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.cnca-network-alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+.cnca-network-alert-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.cnca-network-alert-icon.red { background: #fee2e2; color: #dc2626; }
+.cnca-network-alert-icon.orange { background: #ffedd5; color: #ea580c; }
+.cnca-network-alert-icon.blue { background: #e0f2fe; color: #0284c7; }
+
+.cnca-network-alert-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cnca-network-alert-title {
+  font-size: 12px;
+  font-weight: 750;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.cnca-network-alert-sub {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+/* 4. Grid de 3 Colunas na Linha 4 (Tabela Escolas, Mapa, Banner Decisões) */
+.cnca-row4-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1.6fr 1fr;
+  gap: 14px;
+}
+
+/* Desempenho das Escolas (Tabela V2) */
+.cnca-schools-perf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.cnca-schools-tabs-group {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.cnca-schools-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.cnca-schools-tab-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.cnca-perf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cnca-perf-table th {
+  text-align: left;
+  padding: 6px 6px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.cnca-perf-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.cnca-perf-table tr.selected {
+  background: #f0f9ff;
+}
+
+.cnca-perf-table tr:hover {
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.cnca-situation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cnca-situation-badge.red { background: #fee2e2; color: #dc2626; }
+.cnca-situation-badge.yellow { background: #fef3c7; color: #d97706; }
+.cnca-situation-badge.green { background: #dcfce7; color: #16a34a; }
+
+/* Mapa CNCA com Floating Card */
+.cnca-map-card-wrap {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.cnca-map-canvas-box {
+  width: 100%;
+  height: 230px;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  margin: 10px 0 8px;
+}
+
+.cnca-map-floating-popup {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 500;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 210px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.15);
+  font-size: 11.5px;
+}
+
+.cnca-map-floating-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cnca-map-floating-meta {
+  font-size: 10.5px;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.cnca-map-floating-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.cnca-map-floating-bar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.cnca-map-floating-bar-track {
+  flex: 1;
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.cnca-map-floating-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.cnca-map-floating-btn {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0284c7;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.12s;
+}
+
+.cnca-map-floating-btn:hover {
+  background: #f0f9ff;
+  border-color: #0284c7;
+}
+
+.cnca-map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Card: Mais dados, melhores decisões */
+.cnca-callout-card {
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 22px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.cnca-callout-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+}
+
+.cnca-callout-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.cnca-callout-desc {
+  font-size: 11.5px;
+  color: #475569;
+  line-height: 1.45;
+  max-width: 240px;
+}
+
+.cnca-callout-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  transition: all 0.15s;
+}
+
+.cnca-callout-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* Responsividade V2 */
+@media (max-width: 1200px) {
+  .cnca-row2-grid { grid-template-columns: 1fr; }
+  .cnca-row3-grid { grid-template-columns: 1fr; }
+  .cnca-row4-grid { grid-template-columns: 1fr; }
+  .cnca-filter-row-v2 { flex-wrap: wrap; }
+}
+
+@media (max-width: 640px) {
+  .cnca-comp-subcards-grid { grid-template-columns: repeat(2, 1fr); }
+  .cnca-kpi-row-5 { grid-template-columns: 1fr; }
+}
+
 .cnca-top-header {
   display: flex;
   justify-content: space-between;
@@ -2766,7 +4977,21 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
 }
 
+.program-filter-action,
+.pacto-filter-action,
 .cnca-filter-action,
+.parc-filter-action,
+.sispae-filter-action {
+  display: flex !important;
+  align-items: flex-end !important;
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  height: auto !important;
+  box-shadow: none !important;
+}
+
 .program-btn-clear,
 .pacto-btn-clear,
 .cnca-btn-clear,
@@ -2774,8 +4999,9 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .sispae-btn-clear {
   display: inline-flex !important;
   align-items: center !important;
+  justify-content: center !important;
   gap: 6px !important;
-  padding: 7px 14px !important;
+  padding: 0 16px !important;
   height: 36px !important;
   border-radius: 8px !important;
   border: 1px solid #cbd5e1 !important;
@@ -2786,8 +5012,8 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   cursor: pointer !important;
   white-space: nowrap !important;
   flex-shrink: 0 !important;
-  align-self: flex-end !important;
-  transition: all 0.15s !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.15s ease !important;
 }
 
 .program-btn-clear:hover,
@@ -2797,6 +5023,8 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .sispae-btn-clear:hover {
   background: #f0f9ff !important;
   border-color: #0284c7 !important;
+  color: #0369a1 !important;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.15) !important;
 }
 
 /* 6 KPI Cards Grid Padrão */

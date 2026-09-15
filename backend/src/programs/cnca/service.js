@@ -209,7 +209,19 @@ export async function getCncaDashboard(programId, filters = {}) {
   const results = await prisma.cncaSchoolResult.findMany({
     where,
     include: {
-      school: { select: { id: true, inep: true, name: true, zone: true, district: true } },
+      school: {
+        select: {
+          id: true,
+          inep: true,
+          name: true,
+          zone: true,
+          district: true,
+          latitude: true,
+          longitude: true,
+          address: true,
+          responsible: true,
+        },
+      },
     },
     orderBy: [{ school: { name: 'asc' } }, { component: 'asc' }],
   });
@@ -542,6 +554,10 @@ export async function getCncaDashboard(programId, filters = {}) {
         inep: r.school.inep,
         name: r.school.name,
         zone: r.school.zone,
+        latitude: r.school.latitude,
+        longitude: r.school.longitude,
+        address: r.school.address,
+        responsible: r.school.responsible,
         results: [],
       };
       existing.results.push(r);
@@ -559,6 +575,24 @@ export async function getCncaDashboard(programId, filters = {}) {
 
     const sumFluent = items.filter((i) => i.fluentRate != null).reduce((a, b) => a + b.fluentRate, 0);
     const countFluent = items.filter((i) => i.fluentRate != null).length;
+
+    // Componentes individuais
+    let leituraScore = null;
+    let escritaScore = null;
+    let matematicaScore = null;
+    let fluenciaScore = null;
+
+    for (const it of items) {
+      if (it.component === 'LEITURA') {
+        leituraScore = it.averageScore ?? it.fluentRate;
+      } else if (it.component === 'ESCRITA') {
+        escritaScore = it.fluentRate ?? it.averageScore;
+      } else if (it.component === 'MATEMATICA') {
+        matematicaScore = it.averageScore ?? it.fluentRate;
+      } else if (it.component === 'FLUENCIA') {
+        fluenciaScore = it.fluentRate ?? it.pcpm;
+      }
+    }
 
     // Consolida níveis de desempenho da escola
     const schoolLevelsMap = new Map();
@@ -609,11 +643,19 @@ export async function getCncaDashboard(programId, filters = {}) {
       inep: sc.inep,
       name: sc.name,
       zone: sc.zone,
+      latitude: sc.latitude,
+      longitude: sc.longitude,
+      address: sc.address,
+      responsible: sc.responsible,
       enrolled: schoolEnrolled,
       evaluated: schoolEvaluated,
       participationRate: schoolParticipation,
       averageScore: countScore > 0 ? Math.round((sumScore / countScore) * 10) / 10 : null,
       fluentRate: countFluent > 0 ? Math.round((sumFluent / countFluent) * 10) / 10 : null,
+      leituraScore,
+      escritaScore,
+      matematicaScore,
+      fluenciaScore,
       score: schoolScore,
       performanceLevels: schoolPerformanceLevels,
       componentsEvaluatedCount: items.length,
@@ -1079,6 +1121,13 @@ export async function getCncaDashboard(programId, filters = {}) {
   const analysisText =
     `A rede municipal apresenta ${literacyAverage}% de estudantes no nível de alfabetização, com ${adequatePct}% dos estudantes no estágio adequado. Ao todo, ${expectedCount} das ${totalParticipatingSchools} escolas participantes já alcançaram os parâmetros esperados de desenvolvimento para o ciclo ${program.year}.`;
 
+  // 8. Cálculo Objetivo das Escolas que Precisam de Atenção (Sem IA)
+  const attentionSchools = calculateCncaAttentionSchools(schoolSummaries, {
+    networkAverageScore,
+    networkFluentRate,
+    literacyAverage,
+  });
+
   return {
     kpis: {
       totalNetworkSchools,
@@ -1113,7 +1162,401 @@ export async function getCncaDashboard(programId, filters = {}) {
     skillsPerformance,
     criticalSkills,
     schoolSummaries,
+    attentionSchools,
     resultsCount: results.length,
+  };
+}
+
+/**
+ * Motor de Regras Objetivo do CNCA para Identificação de Escolas em Atenção.
+ * Avalia de forma determinística participação, proficiência por componente, concentração
+ * em níveis mais baixos e descompassos entre áreas pedagógicas.
+ */
+export function calculateCncaAttentionSchools(schoolSummaries = [], networkContext = {}) {
+  const attentionList = [];
+  const networkAvg = networkContext.literacyAverage || networkContext.networkAverageScore || 65.0;
+
+  for (const sc of schoolSummaries) {
+    const reasons = [];
+    const items = sc.results || [];
+    let priorityPoints = 0;
+
+    // 1. Participação Escolar
+    if (sc.participationRate != null && sc.participationRate > 0) {
+      if (sc.participationRate < 75.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Geral',
+          currentValue: `${sc.participationRate}%`,
+          referenceValue: '≥ 80.0%',
+          diff: `${Math.round((sc.participationRate - 80.0) * 10) / 10} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Apenas ${sc.participationRate}% dos estudantes matriculados compareceram às avaliações censitárias do CNCA.`,
+          recommendation: 'Promover busca ativa e engajamento da gestão escolar para assegurar cobertura mínima de 80% dos estudantes.',
+        });
+      } else if (sc.participationRate < 85.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Geral',
+          currentValue: `${sc.participationRate}%`,
+          referenceValue: '≥ 85.0%',
+          diff: `${Math.round((sc.participationRate - 85.0) * 10) / 10} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `A taxa de participação de ${sc.participationRate}% está abaixo da meta de excelência da rede (85%).`,
+          recommendation: 'Monitorar a frequência escolar e reforçar a comunicação com as famílias nos períodos avaliativos.',
+        });
+      }
+    }
+
+    // 2. Concentração nos Níveis Mais Baixos (Pré-alfabético, Inadequado, Não Leitor)
+    let lowestLevelCount = 0;
+    let totalLevelsEvaluated = 0;
+    let lowestLevelPct = 0;
+
+    if (Array.isArray(sc.performanceLevels) && sc.performanceLevels.length > 0) {
+      for (const pl of sc.performanceLevels) {
+        const lvlName = (pl.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const cnt = pl.count || 0;
+        totalLevelsEvaluated += cnt;
+        if (
+          lvlName.includes('inadequado') ||
+          lvlName.includes('insuficiente') ||
+          lvlName.includes('insatisfatorio') ||
+          lvlName.includes('abaixo do basico') ||
+          lvlName.includes('pre-silabico') ||
+          lvlName.includes('silabico sem valor') ||
+          lvlName.includes('nao leitor') ||
+          lvlName.includes('pre-leitor 1') ||
+          lvlName.includes('pre-leitor 2') ||
+          lvlName.includes('pre-alfabetico') ||
+          lvlName === 'baixo'
+        ) {
+          lowestLevelCount += cnt;
+        }
+      }
+      if (totalLevelsEvaluated > 0) {
+        lowestLevelPct = Math.round((lowestLevelCount / totalLevelsEvaluated) * 1000) / 10;
+      }
+    }
+
+    if (lowestLevelPct > 45.0) {
+      priorityPoints += 3;
+      reasons.push({
+        indicator: 'Estudantes no Nível Inicial',
+        component: 'Geral',
+        currentValue: `${lowestLevelPct}% no nível mais baixo`,
+        referenceValue: '≤ 20.0%',
+        diff: `+${Math.round((lowestLevelPct - 20.0) * 10) / 10} p.p.`,
+        severity: 'HIGH',
+        severityLabel: 'Crítico',
+        severityColor: 'red',
+        description: `${lowestLevelPct}% dos alunos avaliados ainda se encontram nos níveis mais elementares (não alfabetizados ou pré-leitores).`,
+        recommendation: 'Implementar acompanhamento pedagógico emergencial e agrupamentos produtivos semanais focados em alfabetização.',
+      });
+    } else if (lowestLevelPct >= 30.0) {
+      priorityPoints += 2;
+      reasons.push({
+        indicator: 'Estudantes no Nível Inicial',
+        component: 'Geral',
+        currentValue: `${lowestLevelPct}% no nível mais baixo`,
+        referenceValue: '≤ 20.0%',
+        diff: `+${Math.round((lowestLevelPct - 20.0) * 10) / 10} p.p.`,
+        severity: 'MEDIUM',
+        severityLabel: 'Atenção',
+        severityColor: 'orange',
+        description: `Concentração expressiva (${lowestLevelPct}%) de estudantes em estágio inicial de aprendizagem.`,
+        recommendation: 'Reforçar intervenções pedagógicas de alfabetização e apoio individualizado nas turmas de 1º e 2º ano.',
+      });
+    }
+
+    // 3. Desempenho Crítico por Componente Específico
+    const compScores = {};
+    for (const it of items) {
+      const cKey = it.component;
+      if (!cKey) continue;
+
+      if (cKey === 'ESCRITA') {
+        const pLevels = normalizeResultLevels(it);
+        const alfaLevel = pLevels.find((l) => {
+          const n = (l.level || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          return n.includes('alfabetico') || (n.includes('satisfatorio') && !n.includes('insatisfatorio')) || n.includes('avancado') || n.includes('adequado');
+        });
+        const alfaPct = alfaLevel?.percentage ?? it.fluentRate ?? it.averageScore;
+        if (alfaPct != null) {
+          compScores.ESCRITA = alfaPct;
+          if (alfaPct < 45.0) {
+            priorityPoints += 3;
+            reasons.push({
+              indicator: 'Desempenho em Escrita',
+              component: 'Escrita',
+              currentValue: `${alfaPct}% alfabéticos`,
+              referenceValue: '≥ 60.0%',
+              diff: `${Math.round((alfaPct - 60.0) * 10) / 10} p.p.`,
+              severity: 'HIGH',
+              severityLabel: 'Crítico',
+              severityColor: 'red',
+              description: `Apenas ${alfaPct}% dos alunos atingiram a hipótese de escrita alfabética.`,
+              recommendation: 'Trabalhar atividades sistemáticas de consciência fonológica e correspondência fonema-grafema.',
+            });
+          } else if (alfaPct < 60.0) {
+            priorityPoints += 2;
+            reasons.push({
+              indicator: 'Desempenho em Escrita',
+              component: 'Escrita',
+              currentValue: `${alfaPct}% alfabéticos`,
+              referenceValue: '≥ 60.0%',
+              diff: `${Math.round((alfaPct - 60.0) * 10) / 10} p.p.`,
+              severity: 'MEDIUM',
+              severityLabel: 'Atenção',
+              severityColor: 'orange',
+              description: `Taxa de escrita alfabética (${alfaPct}%) abaixo da meta de referência (60%).`,
+              recommendation: 'Estimular produções de texto coletivas e individuais com mediação do professor.',
+            });
+          }
+        }
+      } else if (cKey === 'MATEMATICA') {
+        const score = it.averageScore ?? it.fluentRate;
+        if (score != null) {
+          compScores.MATEMATICA = score;
+          if (score < 45.0) {
+            priorityPoints += 3;
+            reasons.push({
+              indicator: 'Desempenho em Matemática',
+              component: 'Matemática',
+              currentValue: `${score}% proficiência`,
+              referenceValue: '≥ 60.0%',
+              diff: `${Math.round((score - 60.0) * 10) / 10} p.p.`,
+              severity: 'HIGH',
+              severityLabel: 'Crítico',
+              severityColor: 'red',
+              description: `Desempenho crítico em Matemática (${score}%), com dificuldades em numeramento e operações básicas.`,
+              recommendation: 'Adotar materiais manipulativos e resolução de problemas práticos no processo de alfabetização matemática.',
+            });
+          } else if (score < 60.0) {
+            priorityPoints += 2;
+            reasons.push({
+              indicator: 'Desempenho em Matemática',
+              component: 'Matemática',
+              currentValue: `${score}% proficiência`,
+              referenceValue: '≥ 60.0%',
+              diff: `${Math.round((score - 60.0) * 10) / 10} p.p.`,
+              severity: 'MEDIUM',
+              severityLabel: 'Atenção',
+              severityColor: 'orange',
+              description: `Desempenho em Matemática (${score}%) abaixo da meta municipal.`,
+              recommendation: 'Fortalecer a consolidação das habilidades essenciais de contagem e raciocínio lógico.',
+            });
+          }
+        }
+      } else if (cKey === 'LEITURA') {
+        const score = it.averageScore ?? it.fluentRate;
+        if (score != null) {
+          compScores.LEITURA = score;
+          if (score < 45.0) {
+            priorityPoints += 3;
+            reasons.push({
+              indicator: 'Desempenho em Leitura',
+              component: 'Leitura',
+              currentValue: `${score}% adequados`,
+              referenceValue: '≥ 60.0%',
+              diff: `${Math.round((score - 60.0) * 10) / 10} p.p.`,
+              severity: 'HIGH',
+              severityLabel: 'Crítico',
+              severityColor: 'red',
+              description: `Apenas ${score}% de estudantes com leitura no nível adequado ou avançado.`,
+              recommendation: 'Instituir momento diário de leitura compartilhada e exploração de diversos gêneros textuais.',
+            });
+          } else if (score < 60.0) {
+            priorityPoints += 2;
+            reasons.push({
+              indicator: 'Desempenho em Leitura',
+              component: 'Leitura',
+              currentValue: `${score}% adequados`,
+              referenceValue: '≥ 60.0%',
+              diff: `${Math.round((score - 60.0) * 10) / 10} p.p.`,
+              severity: 'MEDIUM',
+              severityLabel: 'Atenção',
+              severityColor: 'orange',
+              description: `Índice de leitura adequada (${score}%) abaixo da referência desejada.`,
+              recommendation: 'Incentivar a prática de leitura em voz alta e ampliação de vocabulário.',
+            });
+          }
+        }
+      } else if (cKey === 'FLUENCIA') {
+        const flu = it.fluentRate;
+        const pcpm = it.pcpm;
+        if (flu != null || pcpm != null) {
+          compScores.FLUENCIA = flu ?? pcpm;
+          if ((flu != null && flu < 30.0) || (pcpm != null && pcpm < 40.0)) {
+            priorityPoints += 3;
+            reasons.push({
+              indicator: 'Fluência Leitora',
+              component: 'Fluência',
+              currentValue: `${flu != null ? `${flu}% fluentes` : ''}${pcpm != null ? ` (${pcpm} ppm)` : ''}`,
+              referenceValue: '≥ 60% / ≥ 60 ppm',
+              diff: `${flu != null ? Math.round((flu - 60.0) * 10) / 10 : -20} p.p.`,
+              severity: 'HIGH',
+              severityLabel: 'Crítico',
+              severityColor: 'red',
+              description: `Nível crítico de fluência leitora com velocidade e precisão muito abaixo do padrão esperado.`,
+              recommendation: 'Aplicar rotina sistemática de leitura repetida, leitura em coro e prosódia.',
+            });
+          } else if ((flu != null && flu < 55.0) || (pcpm != null && pcpm < 55.0)) {
+            priorityPoints += 2;
+            reasons.push({
+              indicator: 'Fluência Leitora',
+              component: 'Fluência',
+              currentValue: `${flu != null ? `${flu}% fluentes` : ''}${pcpm != null ? ` (${pcpm} ppm)` : ''}`,
+              referenceValue: '≥ 60% / ≥ 60 ppm',
+              diff: `${flu != null ? Math.round((flu - 60.0) * 10) / 10 : -10} p.p.`,
+              severity: 'MEDIUM',
+              severityLabel: 'Atenção',
+              severityColor: 'orange',
+              description: `Fluência leitora em processo de consolidação, necessitando ganho de ritmo e automaticidade.`,
+              recommendation: 'Realizar acompanhamento periódico da velocidade leitora (PCPM).',
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Descompasso entre Componentes (Diferença acentuada entre áreas)
+    const scoreVals = Object.values(compScores);
+    if (scoreVals.length >= 2) {
+      const maxSc = Math.max(...scoreVals);
+      const minSc = Math.min(...scoreVals);
+      const gap = Math.round((maxSc - minSc) * 10) / 10;
+      if (gap >= 25.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Descompasso entre Componentes',
+          component: 'Comparativo',
+          currentValue: `Diferença de ${gap} p.p.`,
+          referenceValue: '≤ 15.0 p.p.',
+          diff: `+${Math.round((gap - 15.0) * 10) / 10} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Discrepância expressiva (${gap} pontos) entre o melhor e o pior componente avaliado nesta escola.`,
+          recommendation: 'Alinhar o planejamento pedagógico para nivelar o tempo dedicado a cada componente.',
+        });
+      }
+    }
+
+    // 5. Resultado Geral Muito Abaixo da Média da Rede
+    if (sc.score != null && networkAvg != null && sc.score < (networkAvg - 15.0)) {
+      priorityPoints += 2;
+      reasons.push({
+        indicator: 'Comparativo com a Rede',
+        component: 'Geral',
+        currentValue: `${sc.score}%`,
+        referenceValue: `${networkAvg}% (Média da Rede)`,
+        diff: `${Math.round((sc.score - networkAvg) * 10) / 10} p.p.`,
+        severity: 'MEDIUM',
+        severityLabel: 'Atenção',
+        severityColor: 'orange',
+        description: `O desempenho global da escola está ${Math.round((networkAvg - sc.score) * 10) / 10} pontos percentuais abaixo da média da rede.`,
+        recommendation: 'Agendar visita técnica prioritária da tutoria pedagógica da Secretaria.',
+      });
+    }
+
+    // Se identificou motivos de atenção, classifica e monta o objeto da escola
+    if (reasons.length > 0) {
+      let priority = 'LOW';
+      let priorityLabel = 'Baixa';
+      let priorityColor = 'yellow';
+
+      const hasHighReason = reasons.some((r) => r.severity === 'HIGH');
+      const mediumCount = reasons.filter((r) => r.severity === 'MEDIUM').length;
+
+      if (hasHighReason || priorityPoints >= 3 || mediumCount >= 2) {
+        priority = 'HIGH';
+        priorityLabel = 'Alta';
+        priorityColor = 'red';
+      } else if (mediumCount === 1 || priorityPoints === 2) {
+        priority = 'MEDIUM';
+        priorityLabel = 'Média';
+        priorityColor = 'orange';
+      }
+
+      // Constrói resumo textual conciso dos motivos principais
+      const mainTitles = reasons.slice(0, 2).map((r) => {
+        if (r.indicator === 'Taxa de Participação') return 'Baixa participação';
+        if (r.indicator === 'Estudantes no Nível Inicial') return 'Alto % no nível inicial';
+        if (r.indicator === 'Desempenho em Escrita') return 'Dificuldade em Escrita';
+        if (r.indicator === 'Desempenho em Matemática') return 'Dificuldade em Matemática';
+        if (r.indicator === 'Desempenho em Leitura') return 'Baixo índice em Leitura';
+        if (r.indicator === 'Fluência Leitora') return 'Baixa Fluência Leitora';
+        if (r.indicator === 'Descompasso entre Componentes') return 'Descompasso entre áreas';
+        if (r.indicator === 'Comparativo com a Rede') return 'Abaixo da média da rede';
+        return r.indicator;
+      });
+      const reasonsSummary = mainTitles.join(' + ') + (reasons.length > 2 ? ` (+${reasons.length - 2})` : '');
+
+      // Mini métricas chave
+      const keyMetrics = [];
+      if (sc.participationRate != null) {
+        keyMetrics.push({
+          label: 'Participação',
+          value: `${sc.participationRate}%`,
+          tone: sc.participationRate < 80 ? 'critical' : 'normal',
+        });
+      }
+      if (sc.score != null) {
+        keyMetrics.push({
+          label: 'Desempenho',
+          value: `${sc.score}%`,
+          tone: sc.score < 50 ? 'critical' : sc.score < 60 ? 'warning' : 'normal',
+        });
+      }
+      if (lowestLevelPct > 0) {
+        keyMetrics.push({
+          label: 'Nível Inicial',
+          value: `${lowestLevelPct}%`,
+          tone: lowestLevelPct > 35 ? 'critical' : 'normal',
+        });
+      }
+
+      attentionList.push({
+        schoolId: sc.id,
+        schoolName: sc.name,
+        inep: sc.inep,
+        zone: sc.zone,
+        priority,
+        priorityLabel,
+        priorityColor,
+        priorityPoints,
+        reasonsSummary,
+        reasonsCount: reasons.length,
+        keyMetrics,
+        reasons,
+      });
+    }
+  }
+
+  // Ordenação: Prioridade (Alta > Média > Baixa) -> Pontos de Atenção -> Nome da Escola
+  const priorityOrder = { HIGH: 1, MEDIUM: 2, LOW: 3 };
+  attentionList.sort((a, b) => (
+    priorityOrder[a.priority] - priorityOrder[b.priority] ||
+    b.priorityPoints - a.priorityPoints ||
+    b.reasonsCount - a.reasonsCount ||
+    a.schoolName.localeCompare(b.schoolName)
+  ));
+
+  return {
+    summary: {
+      total: attentionList.length,
+      high: attentionList.filter((s) => s.priority === 'HIGH').length,
+      medium: attentionList.filter((s) => s.priority === 'MEDIUM').length,
+      low: attentionList.filter((s) => s.priority === 'LOW').length,
+    },
+    schools: attentionList,
   };
 }
 

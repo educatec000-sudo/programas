@@ -17,6 +17,7 @@ import { useApi } from '../../hooks/useApi.js';
 import { pactoAdminApi } from '../../services/resources.js';
 import DataTable from '../../components/DataTable.jsx';
 import { Badge, Button, Field, Input, LoadingBlock, Modal, Select } from '../../components/ui.jsx';
+import AttentionSchoolsSection from '../../components/AttentionSchoolsSection.jsx';
 import { buildPactoDashboard, dashboardAssessmentCodes, formatGradeLabel } from './dashboard.js';
 
 const COMPONENTS = [
@@ -201,12 +202,12 @@ export default function PactoDashboard({ program, onSelectTab }) {
           </Select>
         </div>
 
-        <div className="cnca-filter-action">
+        <div className="pacto-filter-action">
           <button type="button" className="pacto-btn-clear" onClick={handleClearFilters}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
             </svg>
-            Limpar filtros
+            <span>Limpar filtros</span>
           </button>
         </div>
       </div>
@@ -485,7 +486,15 @@ export default function PactoDashboard({ program, onSelectTab }) {
         </div>
       </div>
 
-      {/* 4. Barra de Informações Importantes */}
+      {/* 4. 🚨 SEÇÃO OFICIAL: Escolas que precisam de atenção */}
+      <AttentionSchoolsSection
+        attentionData={dashboard?.attentionSchools}
+        title="Escolas que precisam de atenção"
+        subtitle="Identificação automática baseada nas avaliações formativas e somativas do Pacto pela Alfabetização."
+        onSelectTab={onSelectTab}
+      />
+
+      {/* 5. Barra de Informações Importantes */}
       <div className="pacto-info-bar">
         <div className="pacto-info-bar-left">
           <div className="pacto-info-bulb-icon">

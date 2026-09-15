@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 
 /**
  * Cabeçalho Hero Padrão Oficial dos Programas Educacionais (CPE)
@@ -11,6 +12,7 @@ export default function ProgramHeader({
   onDeleteProgram,
   can,
 }) {
+  const navigate = useNavigate();
   const catalogCode = (program?.catalog?.code || program?.code || '').toUpperCase();
   const programName = program?.catalog?.name || program?.name || 'Programa Educacional';
 
@@ -49,14 +51,44 @@ export default function ProgramHeader({
   return (
     <div className="cpe-hero-banner program-hero-banner">
       <div className="cpe-hero-content">
-        <div className="cpe-hero-badge">
-          <span className="cpe-badge-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </span>
-          <span>{badge}</span>
+        {/* BOTÃO E BREADCRUMB DE RETORNO AOS PROGRAMAS */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => navigate('/programas')}
+            className="btn btn-sm"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 30,
+              padding: '0 12px',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#ffffff',
+              background: 'rgba(255, 255, 255, 0.15)',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
+              borderRadius: 6,
+              cursor: 'pointer',
+              backdropFilter: 'blur(6px)',
+              transition: 'all 0.15s ease',
+            }}
+            title="Voltar para a lista de todos os programas (Cards)"
+          >
+            <span>←</span>
+            <span>Voltar aos Programas</span>
+          </button>
+
+          <div className="cpe-hero-badge" style={{ margin: 0 }}>
+            <span className="cpe-badge-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </span>
+            <span>{badge}</span>
+          </div>
         </div>
+
         <h1 className="cpe-hero-title">{title}</h1>
         {subtitle && <p className="cpe-hero-subtitle">{subtitle}</p>}
       </div>

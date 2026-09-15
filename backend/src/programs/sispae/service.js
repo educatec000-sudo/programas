@@ -297,6 +297,8 @@ export async function getSispaeDashboard(programId, query = {}) {
           name: true,
           zone: true,
           schoolType: true,
+          latitude: true,
+          longitude: true,
         },
       },
     },
@@ -461,6 +463,8 @@ export async function getSispaeDashboard(programId, query = {}) {
         inep: r.school.inep,
         zone: r.school.zone,
         schoolType: r.school.schoolType,
+        latitude: r.school.latitude,
+        longitude: r.school.longitude,
         components: {},
         overallAdequateRate: null,
         overallAverageScore: null,
@@ -620,11 +624,13 @@ export async function getSispaeDashboard(programId, query = {}) {
     .sort((a, b) => (b.overallAdequateRate ?? 0) - (a.overallAdequateRate ?? 0))
     .slice(0, 5);
 
-  // 5 escolas com maior taxa de defasagem (pontos de atenção para intervenção pedagógica)
-  const attentionSchools = [...schoolRows]
-    .filter((s) => s.overallDeficitRate != null)
-    .sort((a, b) => (b.overallDeficitRate ?? 0) - (a.overallDeficitRate ?? 0))
-    .slice(0, 5);
+  // Cálculo Objetivo das Escolas que Precisam de Atenção no SisPAE (Sem IA)
+  const attentionSchools = calculateSispaeAttentionSchools(schoolRows, {
+    avgAdequate,
+    avgDeficit,
+    avgParticipation,
+    skillsSummary,
+  });
 
   return {
     program: {
@@ -675,9 +681,270 @@ export async function getSispaeDashboard(programId, query = {}) {
     performanceDistribution,
     skillsSummary,
     topSchools,
+    schoolSummaries: schoolRows,
     attentionSchools,
     totalResults: results.length,
   };
+}
+
+/**
+ * Motor de Regras Objetivo do SisPAE para Identificação de Escolas em Atenção.
+ * Avalia taxa de defasagem na matriz, percentual de aprendizado adequado,
+ * taxa de presença/participação, desempenho em LP/Matemática e habilidades críticas.
+ */
+export function calculateSispaeAttentionSchools(schoolRows = [], networkContext = {}) {
+  const attentionList = [];
+
+  for (const row of schoolRows) {
+    const reasons = [];
+    let priorityPoints = 0;
+
+    // 1. Taxa de Defasagem Crítica
+    if (row.overallDeficitRate != null) {
+      if (row.overallDeficitRate > 35.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Taxa de Defasagem',
+          component: 'Geral',
+          currentValue: `${row.overallDeficitRate}% em defasagem`,
+          referenceValue: '≤ 15.0%',
+          diff: `+${round(row.overallDeficitRate - 15.0)} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `${row.overallDeficitRate}% dos estudantes avaliados na escola encontram-se em situação de defasagem de aprendizagem.`,
+          recommendation: 'Planejar plano emergencial de recuperação de aprendizagens com monitoramento quinzenal.',
+        });
+      } else if (row.overallDeficitRate >= 20.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Taxa de Defasagem',
+          component: 'Geral',
+          currentValue: `${row.overallDeficitRate}% em defasagem`,
+          referenceValue: '≤ 15.0%',
+          diff: `+${round(row.overallDeficitRate - 15.0)} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Taxa de defasagem de ${row.overallDeficitRate}% acima do limite tolerável para a rede.`,
+          recommendation: 'Reforçar intervenções pedagógicas no contraturno para os alunos nos níveis iniciais.',
+        });
+      }
+    }
+
+    // 2. Aprendizado Adequado
+    if (row.overallAdequateRate != null) {
+      if (row.overallAdequateRate < 35.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Aprendizado Adequado',
+          component: 'Geral',
+          currentValue: `${row.overallAdequateRate}% adequado`,
+          referenceValue: '≥ 60.0%',
+          diff: `${round(row.overallAdequateRate - 60.0)} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Apenas ${row.overallAdequateRate}% dos estudantes alcançaram o padrão de aprendizado adequado na avaliação oficial/simulado.`,
+          recommendation: 'Revisar o alinhamento com a matriz de referência e metodologias ativas de ensino.',
+        });
+      } else if (row.overallAdequateRate < 50.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Aprendizado Adequado',
+          component: 'Geral',
+          currentValue: `${row.overallAdequateRate}% adequado`,
+          referenceValue: '≥ 60.0%',
+          diff: `${round(row.overallAdequateRate - 60.0)} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Índice de aprendizado adequado de ${row.overallAdequateRate}% abaixo da meta estabelecida de 60%.`,
+          recommendation: 'Intensificar simulados diagnósticos e acompanhamento dos descritores com menor acerto.',
+        });
+      }
+    }
+
+    // 3. Taxa de Participação
+    if (row.overallParticipation != null && row.overallParticipation > 0) {
+      if (row.overallParticipation < 75.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Geral',
+          currentValue: `${row.overallParticipation}%`,
+          referenceValue: '≥ 85.0%',
+          diff: `${round(row.overallParticipation - 85.0)} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Baixa presença discente (${row.overallParticipation}%) no dia da aplicação da avaliação.`,
+          recommendation: 'Averiguar causas de infrequência e estabelecer estratégias de mobilização escolar.',
+        });
+      } else if (row.overallParticipation < 85.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Geral',
+          currentValue: `${row.overallParticipation}%`,
+          referenceValue: '≥ 85.0%',
+          diff: `${round(row.overallParticipation - 85.0)} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Participação de ${row.overallParticipation}% abaixo da referência municipal.`,
+          recommendation: 'Fortalecer a comunicação prévia com responsáveis e estudantes.',
+        });
+      }
+    }
+
+    // 4. Desempenho por Componente (Língua Portuguesa vs Matemática)
+    const lpComp = row.components?.LINGUA_PORTUGUESA;
+    const matComp = row.components?.MATEMATICA;
+
+    if (lpComp) {
+      if (lpComp.deficitRate != null && lpComp.deficitRate > 40.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Defasagem em Língua Portuguesa',
+          component: 'Língua Portuguesa',
+          currentValue: `${lpComp.deficitRate}% em defasagem`,
+          referenceValue: '≤ 15.0%',
+          diff: `+${round(lpComp.deficitRate - 15.0)} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Elevada taxa de defasagem em Língua Portuguesa (${lpComp.deficitRate}%), apontando dificuldades severas em leitura e interpretação.`,
+          recommendation: 'Desenvolver oficina de leitura diária e estratégias de localização de informações e inferência.',
+        });
+      }
+    }
+
+    if (matComp) {
+      if (matComp.deficitRate != null && matComp.deficitRate > 40.0) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Defasagem em Matemática',
+          component: 'Matemática',
+          currentValue: `${matComp.deficitRate}% em defasagem`,
+          referenceValue: '≤ 15.0%',
+          diff: `+${round(matComp.deficitRate - 15.0)} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Elevada taxa de defasagem em Matemática (${matComp.deficitRate}%), com defasagem em cálculo e resolução de problemas.`,
+          recommendation: 'Adotar materiais concretos e resolução contextualizada de problemas matemáticos.',
+        });
+      }
+    }
+
+    // 5. Descompasso entre Língua Portuguesa e Matemática
+    if (lpComp && matComp && lpComp.adequateRate != null && matComp.adequateRate != null) {
+      const gap = Math.abs(lpComp.adequateRate - matComp.adequateRate);
+      if (gap >= 22.0) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Descompasso entre Componentes',
+          component: 'Comparativo',
+          currentValue: `Diferença de ${round(gap)} p.p.`,
+          referenceValue: '≤ 15.0 p.p.',
+          diff: `+${round(gap - 15.0)} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Descompasso expressivo entre o rendimento de Língua Portuguesa (${lpComp.adequateRate}%) e Matemática (${matComp.adequateRate}%).`,
+          recommendation: 'Equilibrar a carga horária de intervenção pedagógica entre os dois componentes.',
+        });
+      }
+    }
+
+    if (reasons.length > 0) {
+      let priority = 'LOW';
+      let priorityLabel = 'Baixa';
+      let priorityColor = 'yellow';
+
+      const hasHighReason = reasons.some((r) => r.severity === 'HIGH');
+      const mediumCount = reasons.filter((r) => r.severity === 'MEDIUM').length;
+
+      if (hasHighReason || priorityPoints >= 3 || mediumCount >= 2) {
+        priority = 'HIGH';
+        priorityLabel = 'Alta';
+        priorityColor = 'red';
+      } else if (mediumCount === 1 || priorityPoints === 2) {
+        priority = 'MEDIUM';
+        priorityLabel = 'Média';
+        priorityColor = 'orange';
+      }
+
+      const mainTitles = reasons.slice(0, 2).map((r) => {
+        if (r.indicator === 'Taxa de Participação') return 'Baixa participação';
+        if (r.indicator === 'Taxa de Defasagem') return 'Alta defasagem';
+        if (r.indicator === 'Aprendizado Adequado') return 'Baixo aprendizado';
+        if (r.indicator === 'Defasagem em Língua Portuguesa') return 'Dificuldade em Português';
+        if (r.indicator === 'Defasagem em Matemática') return 'Dificuldade em Matemática';
+        if (r.indicator === 'Descompasso entre Componentes') return 'Descompasso entre áreas';
+        return r.indicator;
+      });
+      const reasonsSummary = mainTitles.join(' + ') + (reasons.length > 2 ? ` (+${reasons.length - 2})` : '');
+
+      const keyMetrics = [];
+      if (row.overallParticipation != null) {
+        keyMetrics.push({
+          label: 'Participação',
+          value: `${row.overallParticipation}%`,
+          tone: row.overallParticipation < 80 ? 'critical' : 'normal',
+        });
+      }
+      if (row.overallDeficitRate != null) {
+        keyMetrics.push({
+          label: 'Defasagem',
+          value: `${row.overallDeficitRate}%`,
+          tone: row.overallDeficitRate > 30 ? 'critical' : 'normal',
+        });
+      }
+      if (row.overallAdequateRate != null) {
+        keyMetrics.push({
+          label: 'Adequado',
+          value: `${row.overallAdequateRate}%`,
+          tone: row.overallAdequateRate < 40 ? 'critical' : 'normal',
+        });
+      }
+
+      attentionList.push({
+        schoolId: row.schoolId,
+        schoolName: row.schoolName,
+        inep: row.inep,
+        zone: row.zone,
+        priority,
+        priorityLabel,
+        priorityColor,
+        priorityPoints,
+        reasonsSummary,
+        reasonsCount: reasons.length,
+        keyMetrics,
+        reasons,
+      });
+    }
+  }
+
+  const priorityOrder = { HIGH: 1, MEDIUM: 2, LOW: 3 };
+  attentionList.sort((a, b) => (
+    priorityOrder[a.priority] - priorityOrder[b.priority] ||
+    b.priorityPoints - a.priorityPoints ||
+    b.reasonsCount - a.reasonsCount ||
+    a.schoolName.localeCompare(b.schoolName)
+  ));
+
+  const summary = {
+    total: attentionList.length,
+    high: attentionList.filter((s) => s.priority === 'HIGH').length,
+    medium: attentionList.filter((s) => s.priority === 'MEDIUM').length,
+    low: attentionList.filter((s) => s.priority === 'LOW').length,
+  };
+
+  attentionList.summary = summary;
+  attentionList.schools = attentionList;
+  return attentionList;
 }
 
 /**

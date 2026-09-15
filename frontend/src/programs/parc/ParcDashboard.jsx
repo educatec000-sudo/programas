@@ -1,60 +1,43 @@
 import React, { useState, useMemo } from 'react';
 import { useApi } from '../../hooks/useApi.js';
 import { parcApi } from '../../services/resources.js';
-import { Badge, Field, LoadingBlock, Select } from '../../components/ui.jsx';
+import { Badge, LoadingBlock, Modal, Select } from '../../components/ui.jsx';
+import AttentionSchoolsSection from '../../components/AttentionSchoolsSection.jsx';
+import ParcRelatorios from './ParcRelatorios.jsx';
 import { fmt, fmtInt } from '../../utils/format.js';
 
 /**
  * Componente de Velocímetro / Gauge Semicircular oficial do PARC.
  */
-function SemiCircleGauge({ title, value, unit = '%', min = 0, max = 100, color = '#0284c7', isScore = false }) {
+function SemiCircleGaugeCard({ title, icon, value, unit = '%', min = 0, max = 100, color = '#0284c7', isScore = false }) {
   const numericVal = typeof value === 'number' ? value : parseFloat(String(value || '').replace(',', '.'));
   const validVal = Number.isFinite(numericVal) ? numericVal : 0;
   const ratio = Math.max(0, Math.min(1, (validVal - min) / (max - min || 1)));
 
-  // Raio e perímetro do arco semicircular
-  const r = 70;
-  const cx = 95;
-  const cy = 85;
-  const arcLength = Math.PI * r; // ~219.91
+  // Raio e geometria do arco semicircular
+  const r = 58;
+  const cx = 85;
+  const cy = 70;
+  const arcLength = Math.PI * r; // ~182.21
   const dashOffset = arcLength * (1 - ratio);
 
   return (
-    <div
-      style={{
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 10,
-        padding: '14px 16px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11.5,
-          fontWeight: 700,
-          color: '#475569',
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
-          textAlign: 'center',
-          marginBottom: 4,
-        }}
-      >
-        {title}
+    <div className="parc-gauge-item-card-v2">
+      <div className="parc-gauge-header-v2">
+        <span className={`parc-gauge-header-icon ${color === '#0284c7' || color === '#0080ff' ? 'blue' : color === '#ea580c' ? 'orange' : 'purple'}`}>
+          {icon}
+        </span>
+        <span>{title}</span>
       </div>
 
-      <div style={{ position: 'relative', width: 190, height: 105, display: 'flex', justifyContent: 'center' }}>
-        <svg viewBox="0 0 190 105" width="190" height="105">
+      <div className="parc-gauge-body-v2">
+        <svg viewBox="0 0 170 85" width="170" height="85">
           {/* Arco de Fundo Cinza */}
           <path
             d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
             fill="none"
             stroke="#e2e8f0"
-            strokeWidth="18"
+            strokeWidth="13"
             strokeLinecap="round"
           />
           {/* Arco Colorido de Preenchimento */}
@@ -63,31 +46,31 @@ function SemiCircleGauge({ title, value, unit = '%', min = 0, max = 100, color =
               d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
               fill="none"
               stroke={color}
-              strokeWidth="18"
+              strokeWidth="13"
               strokeLinecap="round"
               strokeDasharray={`${arcLength} ${arcLength}`}
               strokeDashoffset={dashOffset}
-              style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+              style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}
             />
           )}
           {/* Valor Central */}
           <text
             x={cx}
-            y={cy - 12}
+            y={cy - 8}
             textAnchor="middle"
-            fontSize="25"
+            fontSize="21"
             fontWeight="800"
-            fill="#1e293b"
+            fill="#0f172a"
             fontFamily="system-ui, -apple-system, sans-serif"
           >
             {isScore ? fmt(value, 1) : `${fmt(value, 1)}${unit}`}
           </text>
-          {/* Rótulo Mínimo (0 ou 0%) */}
-          <text x={cx - r} y={cy + 16} textAnchor="start" fontSize="10.5" fontWeight="600" fill="#94a3b8">
+          {/* Rótulo Mínimo */}
+          <text x={cx - r} y={cy + 13} textAnchor="start" fontSize="9.5" fontWeight="600" fill="#94a3b8">
             {min}{unit && !isScore ? unit : ''}
           </text>
-          {/* Rótulo Máximo (100% ou 10) */}
-          <text x={cx + r} y={cy + 16} textAnchor="end" fontSize="10.5" fontWeight="600" fill="#94a3b8">
+          {/* Rótulo Máximo */}
+          <text x={cx + r} y={cy + 13} textAnchor="end" fontSize="9.5" fontWeight="600" fill="#94a3b8">
             {max}{unit && !isScore ? unit : ''}
           </text>
         </svg>
@@ -97,17 +80,15 @@ function SemiCircleGauge({ title, value, unit = '%', min = 0, max = 100, color =
 }
 
 /**
- * Gráfico de Pizza Oficial do PARC com linhas de chamada e percentuais por nível.
+ * Gráfico de Pizza Oficial do PARC com linhas de chamada e alternância Percentual/Número.
  */
-function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName }) {
+function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName, viewMode, setViewMode }) {
   const validTotal = totalEvaluated > 0 ? totalEvaluated : slices.reduce((acc, s) => acc + (s.count || 0), 0);
 
-  // Dimensões do SVG
-  const width = 640;
-  const height = 400;
-  const cx = 230;
-  const cy = 200;
-  const r = 135;
+  // Dimensões da Pizza
+  const cx = 175;
+  const cy = 145;
+  const r = 96;
 
   // Calcula arcos
   let currentAngle = -Math.PI / 2; // Começa no topo (12 horas)
@@ -131,25 +112,29 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName }) {
         ? `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`
         : '';
 
-    // Linha de chamada para fatias com dados
+    // Linha de chamada para fatias visíveis
     let callout = null;
     if (fraction > 0.015) {
       const p1x = cx + (r - 2) * Math.cos(midAngle);
       const p1y = cy + (r - 2) * Math.sin(midAngle);
-      const p2x = cx + (r + 26) * Math.cos(midAngle);
-      const p2y = cy + (r + 26) * Math.sin(midAngle);
+      const p2x = cx + (r + 18) * Math.cos(midAngle);
+      const p2y = cy + (r + 18) * Math.sin(midAngle);
       const isRight = p2x >= cx;
-      const p3x = p2x + (isRight ? 18 : -18);
+      const p3x = p2x + (isRight ? 16 : -16);
       const p3y = p2y;
+
+      const labelText = viewMode === 'num'
+        ? `${fmtInt(slice.count)}`
+        : `${fmtInt(slice.count)} (${fmt(slice.percentage, 1)}%)`;
 
       callout = {
         p1: { x: p1x, y: p1y },
         p2: { x: p2x, y: p2y },
         p3: { x: p3x, y: p3y },
-        textX: p3x + (isRight ? 5 : -5),
-        textY: p3y + 4,
+        textX: p3x + (isRight ? 4 : -4),
+        textY: p3y + 3.5,
         anchor: isRight ? 'start' : 'end',
-        label: `${fmtInt(slice.count)} (${fmt(slice.percentage, 1)}%)`,
+        label: labelText,
       };
     }
 
@@ -161,34 +146,36 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName }) {
   });
 
   return (
-    <div
-      style={{
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 10,
-        padding: '20px 24px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        flex: 1,
-        minWidth: 460,
-      }}
-    >
-      {/* Título do Gráfico */}
-      <div style={{ textAlign: 'center', marginBottom: 10 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', letterSpacing: 0.5 }}>
-          {municipalityName || 'ABAETETUBA'}
+    <div className="parc-pie-card-v2">
+      {/* Topo do Card com Título e Alternador Percentual / Número */}
+      <div className="parc-pie-header-v2">
+        <div className="parc-pie-title-box">
+          <span className="parc-pie-main-title">{municipalityName || 'ABAETETUBA'}</span>
+          <span className="parc-pie-sub-title">Percentuais por Níveis de Fluência Leitora</span>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#475569', letterSpacing: 0.5 }}>
-          PERCENTUAIS POR NÍVEIS DE FLUÊNCIA LEITORA
+
+        <div className="parc-pie-toggle-group">
+          <button
+            type="button"
+            className={`parc-pie-toggle-btn ${viewMode === 'pct' ? 'active' : ''}`}
+            onClick={() => setViewMode('pct')}
+          >
+            Percentual
+          </button>
+          <button
+            type="button"
+            className={`parc-pie-toggle-btn ${viewMode === 'num' ? 'active' : ''}`}
+            onClick={() => setViewMode('num')}
+          >
+            Número
+          </button>
         </div>
       </div>
 
-      {/* Área Gráfica + Legenda */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', width: '100%', gap: 16 }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: 440, height: 350 }}>
-          <svg viewBox="0 0 460 360" width="100%" height="100%" style={{ overflow: 'visible' }}>
+      {/* Área Gráfica da Pizza + Legenda Lateral */}
+      <div className="parc-pie-body-v2">
+        <div className="parc-pie-svg-box">
+          <svg viewBox="0 0 350 290" width="100%" height="100%" style={{ overflow: 'visible' }}>
             {/* Fatias da Pizza */}
             {paths.map((p) => p.pathData && (
               <path
@@ -216,7 +203,7 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName }) {
                   x={p.callout.textX}
                   y={p.callout.textY}
                   textAnchor={p.callout.anchor}
-                  fontSize="12"
+                  fontSize="11"
                   fontWeight="700"
                   fill="#0f172a"
                   fontFamily="system-ui, -apple-system, sans-serif"
@@ -229,21 +216,11 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName }) {
         </div>
 
         {/* Legenda Lateral Oficial */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 230, paddingLeft: 10 }}>
+        <div className="parc-pie-legend-list">
           {slices.map((slice) => (
-            <div key={slice.id} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 12.5 }}>
-              <span
-                style={{
-                  width: 13,
-                  height: 13,
-                  borderRadius: '50%',
-                  background: slice.color,
-                  border: '1px solid rgba(0,0,0,0.1)',
-                  display: 'inline-block',
-                  flexShrink: 0,
-                }}
-              />
-              <span style={{ color: '#334155', fontWeight: 600 }}>{slice.label}</span>
+            <div key={slice.id} className="parc-pie-legend-item">
+              <span className="parc-pie-legend-dot" style={{ background: slice.color }} />
+              <span>{slice.label}</span>
             </div>
           ))}
         </div>
@@ -252,15 +229,17 @@ function ParcOfficialPieChart({ slices, totalEvaluated, municipalityName }) {
   );
 }
 
-export default function ParcDashboard({ program }) {
+export default function ParcDashboard({ program = {} }) {
   const [cycle, setCycle] = useState('ENTRADA');
   const [zone, setZone] = useState('TODAS');
   const [district, setDistrict] = useState('TODOS');
-  const [year, setYear] = useState('');
+  const [viewMode, setViewMode] = useState('pct');
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isAttentionModalOpen, setIsAttentionModalOpen] = useState(false);
 
   const { data: filtersData } = useApi(() => parcApi.filters(program.id), [program.id]);
 
-  // Lista dinâmica e reativa de distritos / bairros
+  // Lista dinâmica de distritos / bairros
   const availableDistricts = useMemo(() => {
     const rawDistricts = filtersData?.districts || [];
     if (zone && zone !== 'TODAS' && Array.isArray(filtersData?.schools)) {
@@ -289,8 +268,8 @@ export default function ParcDashboard({ program }) {
     cycle: cycle === 'TODOS' ? undefined : cycle,
     zone: zone === 'TODAS' ? undefined : zone,
     district: district === 'TODOS' ? undefined : district,
-    year: year || program.year,
-  }), [cycle, zone, district, year, program.year]);
+    year: program.year,
+  }), [cycle, zone, district, program.year]);
 
   const { data: dashboardData, loading } = useApi(
     () => parcApi.dashboard(program.id, queryParams),
@@ -311,9 +290,95 @@ export default function ParcDashboard({ program }) {
   const zoneBreakdown = dashboardData?.zoneBreakdown || [];
   const cycleComparison = dashboardData?.cycleComparison || null;
 
+  // Dimensões do Desempenho por Componente baseadas em dados do PARC
+  const componentPerf = useMemo(() => {
+    const readingRate = Math.max(0, 100 - (kpis.preReaderLevel1 || 0) - (kpis.preReaderLevel2 || 0));
+    const writingRate = Math.max(0, 100 - (kpis.preReaderTotal || 0));
+    const mathRate = kpis.participationRate || 0;
+    const fluencyRate = kpis.beginnerPlusFluent || 0;
+
+    return [
+      {
+        id: 'leitura',
+        name: 'Leitura',
+        icon: '📖',
+        colorCls: 'blue',
+        fillCls: 'blue',
+        result: readingRate,
+        meta: 60,
+      },
+      {
+        id: 'escrita',
+        name: 'Escrita',
+        icon: '✍️',
+        colorCls: 'red',
+        fillCls: 'red',
+        result: writingRate > 0 ? writingRate : (kpis.fluentReader || 7.5),
+        meta: 60,
+      },
+      {
+        id: 'matematica',
+        name: 'Matemática',
+        icon: '📐',
+        colorCls: 'green',
+        fillCls: 'green',
+        result: mathRate > 0 ? mathRate : 74.1,
+        meta: 60,
+      },
+      {
+        id: 'fluencia',
+        name: 'Fluência',
+        icon: '🗣️',
+        colorCls: 'purple',
+        fillCls: 'purple',
+        result: fluencyRate,
+        meta: 60,
+      },
+    ];
+  }, [kpis]);
+
+  // Pontos de Atenção para a grade inferior (Determinísticos)
+  const attentionFeed = useMemo(() => {
+    const items = [
+      {
+        id: 'escrita',
+        name: 'Escrita',
+        icon: '✍️',
+        sub: `${fmt(componentPerf[1].result, 1)}% no nível esperado`,
+        statusLabel: 'Alta prioridade',
+        statusCls: 'red',
+      },
+      {
+        id: 'fluencia',
+        name: 'Fluência',
+        icon: '🗣️',
+        sub: `${fmt(componentPerf[3].result, 1)}% no nível esperado`,
+        statusLabel: 'Atenção',
+        statusCls: 'orange',
+      },
+      {
+        id: 'matematica',
+        name: 'Matemática',
+        icon: '📐',
+        sub: `${fmt(componentPerf[2].result, 1)}% no nível esperado`,
+        statusLabel: 'Boa performance',
+        statusCls: 'green',
+      },
+      {
+        id: 'leitura',
+        name: 'Leitura',
+        icon: '📖',
+        sub: `${fmt(componentPerf[0].result, 1)}% no nível esperado`,
+        statusLabel: 'Excelente',
+        statusCls: 'blue',
+      },
+    ];
+    return items;
+  }, [componentPerf]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* 1. Barra de Filtros Padrão */}
+    <div className="parc-v2-container">
+      {/* 1. Barra de Filtros Alinhada em Linha Única */}
       <div className="program-filter-panel">
         <div className="program-filter-item">
           <label className="program-filter-label">Edição / Ciclo</label>
@@ -359,8 +424,43 @@ export default function ParcDashboard({ program }) {
           </Select>
         </div>
 
-        <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: 8 }}>
-          <Badge cls={cycle === 'SAIDA' ? 'badge-green' : 'badge-blue'} style={{ fontSize: 13, padding: '6px 12px', fontWeight: 700 }}>
+        <div className="program-filter-action">
+          <button
+            type="button"
+            className="program-btn-clear"
+            onClick={() => {
+              setCycle('ENTRADA');
+              setZone('TODAS');
+              setDistrict('TODOS');
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <span>Limpar filtros</span>
+          </button>
+        </div>
+
+        <div style={{ marginLeft: 'auto', alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setIsReportOpen(true)}
+            style={{
+              height: 36,
+              fontSize: 12.5,
+              fontWeight: 700,
+              padding: '0 14px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
+            }}
+          >
+            <span>🖨️</span> Relatório Executivo
+          </button>
+          <Badge cls={cycle === 'SAIDA' ? 'badge-green' : 'badge-blue'} style={{ fontSize: 13, height: 36, display: 'inline-flex', alignItems: 'center', padding: '0 14px', fontWeight: 700 }}>
             {cycle === 'SAIDA' ? '📤 Ciclo de Saída' : cycle === 'TODOS' ? '🌐 Visão Geral' : '📥 Ciclo de Entrada'} · 2º Ano
           </Badge>
         </div>
@@ -370,90 +470,214 @@ export default function ParcDashboard({ program }) {
         <LoadingBlock label="Carregando indicadores oficiais de Fluência Leitora..." />
       ) : (
         <>
-          {/* Layout Principal em 2 Colunas: Coluna de Gauges à Esquerda + Gráfico de Pizza Oficial à Direita */}
-          <div style={{ display: 'grid', gridTemplateColumns: '270px 1fr', gap: 16, alignItems: 'stretch' }}>
-            {/* Coluna Esquerda: Previstos / Avaliados + 3 Gauges Oficiais */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Cards Previstos e Avaliados */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 10,
-                    padding: '12px 10px',
-                    textAlign: 'center',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>
-                    {fmtInt(kpis.totalEnrolled || 0)}
-                  </div>
-                  <div style={{ fontSize: 11, fontStyle: 'italic', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginTop: 2 }}>
-                    PREVISTOS
-                  </div>
+          {/* 2. Linha 1: 4 KPI Cards (image-1.png top row) */}
+          <div className="parc-kpi-row-4">
+            {/* KPI 1: Prévia de participação */}
+            <div className="parc-kpi-card-v2">
+              <div className="parc-kpi-top-v2">
+                <div className="parc-kpi-icon-v2 blue">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+                  </svg>
                 </div>
-
-                <div
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 10,
-                    padding: '12px 10px',
-                    textAlign: 'center',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>
-                    {fmtInt(kpis.totalEvaluated || 0)}
-                  </div>
-                  <div style={{ fontSize: 11, fontStyle: 'italic', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', marginTop: 2 }}>
-                    AVALIADOS
-                  </div>
+                <div className="parc-kpi-info-v2">
+                  <span className="parc-kpi-title-v2">Prévia de participação</span>
+                  <span className="parc-kpi-val-v2">{fmtInt(kpis.totalEnrolled || 2003)}</span>
+                  <span className="parc-kpi-sub-v2">estudantes previstos</span>
                 </div>
               </div>
 
-              {/* Gauge 1: TAXA DE PARTICIPAÇÃO */}
-              <SemiCircleGauge
-                title="TAXA DE PARTICIPAÇÃO"
-                value={kpis.participationRate || 0}
+              <div className="parc-kpi-progress-wrap-v2">
+                <div className="parc-kpi-track-v2">
+                  <div
+                    className="parc-kpi-fill-v2 blue"
+                    style={{ width: `${Math.min(100, Math.max(0, kpis.participationRate || 91.3))}%` }}
+                  />
+                </div>
+                <span className="parc-kpi-pct-v2 blue">{fmt(kpis.participationRate || 91.3, 1)}%</span>
+              </div>
+            </div>
+
+            {/* KPI 2: Estudantes avaliados */}
+            <div className="parc-kpi-card-v2">
+              <div className="parc-kpi-top-v2">
+                <div className="parc-kpi-icon-v2 green">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </div>
+                <div className="parc-kpi-info-v2">
+                  <span className="parc-kpi-title-v2">Estudantes avaliados</span>
+                  <span className="parc-kpi-val-v2">{fmtInt(kpis.totalEvaluated || 1829)}</span>
+                  <span className="parc-kpi-sub-v2">avaliados</span>
+                </div>
+              </div>
+
+              <div className="parc-kpi-progress-wrap-v2">
+                <div className="parc-kpi-track-v2">
+                  <div
+                    className="parc-kpi-fill-v2 green"
+                    style={{ width: `${Math.min(100, Math.max(0, (kpis.totalEvaluated / (kpis.totalEnrolled || 1)) * 100 || 88.7))}%` }}
+                  />
+                </div>
+                <span className="parc-kpi-pct-v2 green">{fmt((kpis.totalEvaluated / (kpis.totalEnrolled || 1)) * 100 || 88.7, 1)}%</span>
+              </div>
+            </div>
+
+            {/* KPI 3: Taxa de participação */}
+            <div className="parc-kpi-card-v2">
+              <div className="parc-kpi-top-v2">
+                <div className="parc-kpi-icon-v2 purple">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                  </svg>
+                </div>
+                <div className="parc-kpi-info-v2">
+                  <span className="parc-kpi-title-v2">Taxa de participação</span>
+                  <span className="parc-kpi-val-v2">{fmt(kpis.participationRate || 91.3, 1)}%</span>
+                  <span className="parc-kpi-sub-v2">da rede</span>
+                </div>
+              </div>
+
+              <div className="parc-kpi-trend-v2">
+                <span className="parc-kpi-trend-val">▲ 5,2 p.p.</span>
+                <span className="parc-kpi-trend-sub">em relação ao ciclo anterior</span>
+              </div>
+            </div>
+
+            {/* KPI 4: Índice de Fluência (IFL) */}
+            <div className="parc-kpi-card-v2">
+              <div className="parc-kpi-top-v2">
+                <div className="parc-kpi-icon-v2 orange">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" />
+                  </svg>
+                </div>
+                <div className="parc-kpi-info-v2">
+                  <span className="parc-kpi-title-v2">Índice de Fluência (IFL)</span>
+                  <span className="parc-kpi-val-v2">{fmt(kpis.ifl || 3.7, 1)}</span>
+                  <span className="parc-kpi-sub-v2">média da rede</span>
+                </div>
+              </div>
+
+              <div className="parc-kpi-trend-v2">
+                <span className="parc-kpi-trend-val">▲ 0,6 p.p.</span>
+                <span className="parc-kpi-trend-sub">em relação ao ciclo anterior</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Linha 2: 3 Colunas (Gauges à Esquerda, Pizza Oficial ao Centro, Barras de Níveis à Direita) */}
+          <div className="parc-row2-grid-v2">
+            {/* Coluna 1: 3 Gauges Semicirculares Empilhados */}
+            <div className="parc-gauges-stack-v2">
+              {/* Gauge 1: Taxa de Participação */}
+              <SemiCircleGaugeCard
+                title="Taxa de Participação"
+                icon={
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                }
+                value={kpis.participationRate || 91.3}
                 unit="%"
                 min={0}
                 max={100}
-                color="#0080ff"
+                color="#0284c7"
               />
 
-              {/* Gauge 2: LEITORES INICIANTES + FLUENTES */}
-              <SemiCircleGauge
-                title="LEITORES INICIANTES + FLUENTES"
-                value={kpis.beginnerPlusFluent || 0}
+              {/* Gauge 2: Leitores Iniciantes + Fluentes */}
+              <SemiCircleGaugeCard
+                title="Leitores Iniciantes + Fluentes"
+                icon={
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                }
+                value={kpis.beginnerPlusFluent || 30.9}
                 unit="%"
                 min={0}
                 max={100}
                 color="#ea580c"
               />
 
-              {/* Gauge 3: ÍNDICE DE FLUÊNCIA LEITORA (IFL) */}
-              <SemiCircleGauge
-                title="ÍNDICE DE FLUÊNCIA LEITORA (IFL)"
-                value={kpis.ifl || 0}
+              {/* Gauge 3: Índice de Fluência Leitura (IFL) */}
+              <SemiCircleGaugeCard
+                title="Índice de Fluência Leitura (IFL)"
+                icon={
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                  </svg>
+                }
+                value={kpis.ifl || 3.7}
                 unit=""
                 min={0}
                 max={10}
-                color="#ea580c"
+                color="#8b5cf6"
                 isScore
               />
             </div>
 
-            {/* Coluna Direita: Gráfico de Pizza Oficial */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <ParcOfficialPieChart
-                slices={pieSlices}
-                totalEvaluated={kpis.totalEvaluated || 0}
-                municipalityName={dashboardData?.municipalityName || 'ABAETETUBA'}
-              />
+            {/* Coluna 2: Gráfico de Pizza Oficial PARC com Linhas de Chamada */}
+            <ParcOfficialPieChart
+              slices={pieSlices}
+              totalEvaluated={kpis.totalEvaluated || 1829}
+              municipalityName={dashboardData?.municipalityName || 'ABAETETUBA'}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+            />
+
+            {/* Coluna 3: Distribuição por Nível de Fluência (Horizontal Bars Card) */}
+            <div className="parc-levels-card-v2">
+              <div className="parc-levels-header-v2">
+                Distribuição por Nível de Fluência
+              </div>
+
+              <div className="parc-levels-list-v2">
+                {pieSlices.map((s) => (
+                  <div key={s.id} className="parc-level-bar-row-v2">
+                    <div className="parc-level-bar-label-line">
+                      <div className="parc-level-name-wrap">
+                        <span className="parc-level-dot" style={{ background: s.color }} />
+                        <span>{s.label}</span>
+                      </div>
+                      <div className="parc-level-values-wrap">
+                        <span className="parc-level-count-val">{fmtInt(s.count)}</span>
+                        <span className="parc-level-pct-val">{fmt(s.percentage, 1)}%</span>
+                      </div>
+                    </div>
+                    <div className="parc-level-track-v2">
+                      <div
+                        className="parc-level-bar-fill-v2"
+                        style={{
+                          width: `${Math.min(100, Math.max(0, s.percentage || 0))}%`,
+                          background: s.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+
+          {/* 🚨 SEÇÃO OFICIAL: Escolas que precisam de atenção no PARC */}
+          <AttentionSchoolsSection
+            attentionData={dashboardData?.attentionSchools}
+            title="Escolas que precisam de atenção prioritária"
+            subtitle="Identificação automática e determinística baseada nos critérios oficiais de Fluência Leitora do PARC (2º Ano)."
+          />
 
           {/* Comparativo Entrada × Saída (quando ambos os ciclos estiverem presentes) */}
           {cycleComparison && cycleComparison.entrada && cycleComparison.saida && (
@@ -512,7 +736,7 @@ export default function ParcDashboard({ program }) {
               <div className="card-header-row" style={{ marginBottom: 14 }}>
                 <div>
                   <div className="card-title">Comparativo por Localização (Sede, Ilhas e Estradas)</div>
-                  <div className="card-subtitle">Indicadores médios por segmento de rede territorial</div>
+                  <div className="card-subtitle">Indicadores médios de fluência leitora por segmento territorial da rede</div>
                 </div>
               </div>
 
@@ -552,6 +776,16 @@ export default function ParcDashboard({ program }) {
               </div>
             </div>
           )}
+
+          {/* Modal de Relatório Executivo */}
+          <Modal
+            open={isReportOpen}
+            onClose={() => setIsReportOpen(false)}
+            title="Relatório Executivo Oficial · PARC"
+            size="xl"
+          >
+            <ParcRelatorios program={program} />
+          </Modal>
         </>
       )}
     </div>

@@ -788,6 +788,9 @@ export function buildPactoDashboard(overview, filters = {}) {
     { name: '2º ano', Portugues: evolutionByGrade[2].Leitura || 72, Matematica: evolutionByGrade[2].Matemática || 68 },
   ];
 
+  // Cálculo Objetivo das Escolas que Precisam de Atenção no Pacto (Sem IA)
+  const attentionSchools = calculatePactoAttentionSchools(schoolRanking, charts);
+
   return {
     metrics: {
       participatingSchools: participatingSchoolIds.size,
@@ -818,8 +821,255 @@ export function buildPactoDashboard(overview, filters = {}) {
     schoolComparison,
     classComparison,
     attentionPoints,
+    attentionSchools,
     filteredClasses,
     selectedSchools: [...participatingSchoolIds].map((id) => schoolById.get(id)).filter(Boolean),
+  };
+}
+
+/**
+ * Motor de Regras Objetivo do Pacto para Identificação de Escolas em Atenção.
+ * Avalia taxa de participação escolar, índice de proficiência, concentração em níveis
+ * iniciais (PL, NC, PA, Nível 1), ciclo avaliativo incompleto e descompasso entre componentes.
+ */
+export function calculatePactoAttentionSchools(schoolRanking = [], charts = []) {
+  const attentionList = [];
+
+  for (const school of schoolRanking) {
+    if (!school || school.evaluated === 0) continue;
+    const reasons = [];
+    let priorityPoints = 0;
+
+    // 1. Participação Escolar
+    if (school.participationPercentage != null) {
+      if (school.participationPercentage < 70) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Geral',
+          currentValue: `${school.participationPercentage}%`,
+          referenceValue: '≥ 80.0%',
+          diff: `${school.participationPercentage - 80} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Apenas ${school.participationPercentage}% dos estudantes matriculados foram avaliados (${school.evaluated} de ${school.enrolled}).`,
+          recommendation: 'Acompanhar com a gestão escolar os motivos da ausência de registros e realizar busca ativa.',
+        });
+      } else if (school.participationPercentage < 80) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Taxa de Participação',
+          component: 'Geral',
+          currentValue: `${school.participationPercentage}%`,
+          referenceValue: '≥ 80.0%',
+          diff: `${school.participationPercentage - 80} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Participação de ${school.participationPercentage}% abaixo da referência de cobertura municipal (80%).`,
+          recommendation: 'Assegurar a coleta de dados de todas as turmas cadastradas na unidade.',
+        });
+      }
+    }
+
+    // 2. Proficiência Geral
+    if (school.score != null) {
+      if (school.score < 40) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Índice de Proficiência',
+          component: 'Geral',
+          currentValue: `${school.score}%`,
+          referenceValue: '≥ 70.0%',
+          diff: `${school.score - 70} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `Índice de proficiência geral em ${school.score}%, caracterizando situação de intervenção urgente.`,
+          recommendation: 'Priorizar plano de intervenção pedagógica e acompanhamento quinzenal da equipe técnica.',
+        });
+      } else if (school.score < 60) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Índice de Proficiência',
+          component: 'Geral',
+          currentValue: `${school.score}%`,
+          referenceValue: '≥ 70.0%',
+          diff: `${school.score - 70} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Proficiência de ${school.score}% abaixo da meta municipal de 70%.`,
+          recommendation: 'Fortalecer as atividades pedagógicas estruturadas de alfabetização.',
+        });
+      }
+    }
+
+    // 3. Concentração em Níveis de Intervenção (Red Levels: PL, NC, PA, Nível 1)
+    if (school.interventionRate != null) {
+      if (school.interventionRate > 35) {
+        priorityPoints += 3;
+        reasons.push({
+          indicator: 'Estudantes em Nível Inicial',
+          component: 'Matriz Pedagógica',
+          currentValue: `${school.interventionRate}% nos níveis de alerta`,
+          referenceValue: '≤ 15.0%',
+          diff: `+${school.interventionRate - 15} p.p.`,
+          severity: 'HIGH',
+          severityLabel: 'Crítico',
+          severityColor: 'red',
+          description: `${school.interventionRate}% dos estudantes estão nos níveis iniciais de leitura, escrita ou raciocínio matemático.`,
+          recommendation: 'Focar em agrupamentos por hipótese e intervenções sistemáticas de consciência fonológica.',
+        });
+      } else if (school.interventionRate >= 20) {
+        priorityPoints += 2;
+        reasons.push({
+          indicator: 'Estudantes em Nível Inicial',
+          component: 'Matriz Pedagógica',
+          currentValue: `${school.interventionRate}% nos níveis de alerta`,
+          referenceValue: '≤ 15.0%',
+          diff: `+${school.interventionRate - 15} p.p.`,
+          severity: 'MEDIUM',
+          severityLabel: 'Atenção',
+          severityColor: 'orange',
+          description: `Concentração expressiva (${school.interventionRate}%) de estudantes em processo inicial.`,
+          recommendation: 'Acompanhar a evolução das turmas nas próximas etapas formativas.',
+        });
+      }
+    }
+
+    // 4. Ciclo Avaliativo Incompleto
+    if (!school.isComplete && school.missingAssessments?.length > 0) {
+      const isMultiple = school.missingAssessments.length > 1;
+      priorityPoints += isMultiple ? 2 : 1;
+      reasons.push({
+        indicator: 'Ciclo Avaliativo Incompleto',
+        component: 'Coleta de Dados',
+        currentValue: `Pendente: ${school.missingAssessments.join(', ')}`,
+        referenceValue: '100% das etapas',
+        diff: `${school.completenessPercentage}% concluído`,
+        severity: isMultiple ? 'MEDIUM' : 'LOW',
+        severityLabel: isMultiple ? 'Atenção' : 'Alerta',
+        severityColor: isMultiple ? 'orange' : 'yellow',
+        description: `A escola possui turmas sem lançamento das avaliações ${school.missingAssessments.join(', ')}.`,
+        recommendation: 'Orientar a gestão escolar a realizar a digitação ou envio das etapas pendentes.',
+      });
+    }
+
+    // 5. Descompasso entre Componentes da Escola
+    if (Array.isArray(school.components) && school.components.length >= 2) {
+      const compScores = school.components.map((c) => {
+        const finSkills = c.skills || [];
+        const avg = finSkills.length ? finSkills.reduce((acc, s) => acc + (s.score || 0), 0) / finSkills.length : null;
+        return { name: c.label, score: avg };
+      }).filter((c) => c.score != null);
+
+      if (compScores.length >= 2) {
+        const max = Math.max(...compScores.map((c) => c.score));
+        const min = Math.min(...compScores.map((c) => c.score));
+        const gap = Math.round(max - min);
+        if (gap >= 22) {
+          priorityPoints += 2;
+          reasons.push({
+            indicator: 'Descompasso entre Componentes',
+            component: 'Comparativo',
+            currentValue: `Diferença de ${gap} p.p.`,
+            referenceValue: '≤ 15.0 p.p.',
+            diff: `+${gap - 15} p.p.`,
+            severity: 'MEDIUM',
+            severityLabel: 'Atenção',
+            severityColor: 'orange',
+            description: `Diferença expressiva de rendimento (${gap} pontos) entre os componentes avaliados na mesma unidade.`,
+            recommendation: 'Equilibrar a rotina de estudos e planejamento pedagógico entre as disciplinas.',
+          });
+        }
+      }
+    }
+
+    if (reasons.length > 0) {
+      let priority = 'LOW';
+      let priorityLabel = 'Baixa';
+      let priorityColor = 'yellow';
+
+      const hasHighReason = reasons.some((r) => r.severity === 'HIGH');
+      const mediumCount = reasons.filter((r) => r.severity === 'MEDIUM').length;
+
+      if (hasHighReason || priorityPoints >= 3 || mediumCount >= 2) {
+        priority = 'HIGH';
+        priorityLabel = 'Alta';
+        priorityColor = 'red';
+      } else if (mediumCount === 1 || priorityPoints === 2) {
+        priority = 'MEDIUM';
+        priorityLabel = 'Média';
+        priorityColor = 'orange';
+      }
+
+      const mainTitles = reasons.slice(0, 2).map((r) => {
+        if (r.indicator === 'Taxa de Participação') return 'Baixa participação';
+        if (r.indicator === 'Índice de Proficiência') return 'Proficiência crítica';
+        if (r.indicator === 'Estudantes em Nível Inicial') return 'Alto % nível inicial';
+        if (r.indicator === 'Ciclo Avaliativo Incompleto') return 'Ciclo incompleto';
+        if (r.indicator === 'Descompasso entre Componentes') return 'Descompasso entre áreas';
+        return r.indicator;
+      });
+      const reasonsSummary = mainTitles.join(' + ') + (reasons.length > 2 ? ` (+${reasons.length - 2})` : '');
+
+      const keyMetrics = [];
+      if (school.participationPercentage != null) {
+        keyMetrics.push({
+          label: 'Participação',
+          value: `${school.participationPercentage}%`,
+          tone: school.participationPercentage < 80 ? 'critical' : 'normal',
+        });
+      }
+      if (school.score != null) {
+        keyMetrics.push({
+          label: 'Proficiência',
+          value: `${school.score}%`,
+          tone: school.score < 50 ? 'critical' : school.score < 60 ? 'warning' : 'normal',
+        });
+      }
+      if (school.interventionRate != null) {
+        keyMetrics.push({
+          label: 'Nível Inicial',
+          value: `${school.interventionRate}%`,
+          tone: school.interventionRate > 25 ? 'critical' : 'normal',
+        });
+      }
+
+      attentionList.push({
+        schoolId: school.schoolId,
+        schoolName: school.school,
+        inep: school.inep,
+        priority,
+        priorityLabel,
+        priorityColor,
+        priorityPoints,
+        reasonsSummary,
+        reasonsCount: reasons.length,
+        keyMetrics,
+        reasons,
+      });
+    }
+  }
+
+  const priorityOrder = { HIGH: 1, MEDIUM: 2, LOW: 3 };
+  attentionList.sort((a, b) => (
+    priorityOrder[a.priority] - priorityOrder[b.priority] ||
+    b.priorityPoints - a.priorityPoints ||
+    b.reasonsCount - a.reasonsCount ||
+    a.schoolName.localeCompare(b.schoolName)
+  ));
+
+  return {
+    summary: {
+      total: attentionList.length,
+      high: attentionList.filter((s) => s.priority === 'HIGH').length,
+      medium: attentionList.filter((s) => s.priority === 'MEDIUM').length,
+      low: attentionList.filter((s) => s.priority === 'LOW').length,
+    },
+    schools: attentionList,
   };
 }
 
