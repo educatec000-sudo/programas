@@ -1,138 +1,16 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from 'recharts';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useState, useMemo } from 'react';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import CncaLevelsDistribution, { aggregateLevels, pickComponentLevels } from './CncaLevelsDistribution.jsx';
 import { useApi } from '../../hooks/useApi.js';
 import { cncaApi } from '../../services/resources.js';
-import { LoadingBlock, Select, Modal, Button } from '../../components/ui.jsx';
+import { LoadingBlock, Select } from '../../components/ui.jsx';
 import AttentionSchoolsSection from '../../components/AttentionSchoolsSection.jsx';
 import { Icon } from '../../components/icons.jsx';
 import { fmt, fmtInt } from '../../utils/format.js';
 
-// Centro do município de Abaetetuba, Pará, Brasil
-const ABAETETUBA_CENTER = [-1.7218, -48.8788];
-const DEFAULT_ZOOM = 11;
-
 function safeLower(val) {
   if (val == null) return '';
   return String(val).toLowerCase();
-}
-
-// Subcomponente isolado para o mapa Leaflet do CNCA
-function CncaMapBox({ schools = [], selectedSchool, onSelectSchool }) {
-  const containerRef = useRef(null);
-  const mapRef = useRef(null);
-  const markersRef = useRef(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return undefined;
-
-    const map = L.map(containerRef.current, {
-      center: ABAETETUBA_CENTER,
-      zoom: DEFAULT_ZOOM,
-      zoomControl: false,
-      attributionControl: false,
-    });
-
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 18,
-      attribution: '&copy; Esri &mdash; Abaetetuba, PA',
-    }).addTo(map);
-
-    markersRef.current = L.layerGroup().addTo(map);
-    mapRef.current = map;
-
-    const timer = setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-      }
-    }, 200);
-
-    return () => {
-      clearTimeout(timer);
-      map.remove();
-      mapRef.current = null;
-      markersRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    const layer = markersRef.current;
-    if (!map || !layer) return;
-
-    layer.clearLayers();
-    const coords = [];
-
-    for (const sch of schools) {
-      let lat = Number(sch.latitude);
-      let lng = Number(sch.longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
-        const hash = String(sch.inep || sch.name || '')
-          .split('')
-          .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        lat = ABAETETUBA_CENTER[0] + (((hash % 100) / 100) - 0.5) * 0.12;
-        lng = ABAETETUBA_CENTER[1] + ((((hash * 7) % 100) / 100) - 0.5) * 0.14;
-      }
-
-      coords.push([lat, lng]);
-
-      const lit = Number(sch.literacy ?? sch.score ?? 70);
-      let pinColor = '#10b981'; // Verde (Bom resultado >= 70%)
-      if (sch.situationClass === 'red' || sch.situation === 'Atenção' || lit < 50) {
-        pinColor = '#ef4444'; // Vermelho (< 50%)
-      } else if (sch.situationClass === 'yellow' || sch.situation === 'Em desenvolvimento' || lit < 70) {
-        pinColor = '#f59e0b'; // Amarelo (50-69%)
-      }
-
-      const isSelected = selectedSchool?.id === sch.id || selectedSchool?.name === sch.name;
-
-      const marker = L.circleMarker([lat, lng], {
-        radius: isSelected ? 10 : 7,
-        color: isSelected ? '#1e293b' : '#ffffff',
-        weight: isSelected ? 3 : 2,
-        fillColor: pinColor,
-        fillOpacity: 0.95,
-      });
-
-      marker.bindTooltip(`<strong>${sch.name}</strong><br/>Alfabetização: <strong>${fmt(lit, 1)}%</strong><br/>Participação: ${fmt(sch.participation || 100, 1)}%`, {
-        direction: 'top',
-        offset: [0, -8],
-      });
-
-      marker.on('click', () => {
-        if (onSelectSchool) onSelectSchool(sch);
-      });
-
-      marker.addTo(layer);
-    }
-
-    if (selectedSchool && Number.isFinite(Number(selectedSchool.latitude)) && Number.isFinite(Number(selectedSchool.longitude))) {
-      map.panTo([Number(selectedSchool.latitude), Number(selectedSchool.longitude)], { animate: true });
-    } else if (coords.length > 0) {
-      map.fitBounds(coords, { padding: [20, 20], maxZoom: 13 });
-    }
-  }, [schools, selectedSchool, onSelectSchool]);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', height: '100%' }}
-      role="application"
-      aria-label="Mapa da Rede Municipal CNCA em Abaetetuba"
-    />
-  );
 }
 
 export default function CncaDashboard({ program = {}, onSelectTab }) {
@@ -141,19 +19,8 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
   const [assessment, setAssessment] = useState('TODOS');
   const [period, setPeriod] = useState('TODOS');
 
-  // Applied filter state
-  const [appliedFilters, setAppliedFilters] = useState({
-    grade: 'TODOS',
-    component: 'TODOS',
-    assessment: 'TODOS',
-    period: 'TODOS',
-  });
-
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [schoolTableTab, setSchoolTableTab] = useState('TODAS'); // 'TODAS' | 'MELHOR' | 'EVOLUCAO' | 'ATENCAO'
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [reportModalOpen, setReportModalOpen] = useState(false);
-  const [schoolDetailModal, setSchoolDetailModal] = useState(null);
 
   const programId = program?.id;
   const programYear = program?.year;
@@ -179,10 +46,6 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
     [programId, activeFilters],
   );
 
-  const handleApplyFilters = () => {
-    // Sincronizado automaticamente via activeFilters
-  };
-
   const handleClearFilters = () => {
     setGrade('TODOS');
     setComponent('TODOS');
@@ -204,21 +67,19 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
   const goalRemaining = Math.max(0, Math.round((goal - literacyAvg) * 10) / 10);
   const goalSurpassed = literacyAvg >= goal ? Math.round((literacyAvg - goal) * 10) / 10 : null;
 
-  // Evolução da alfabetização
-  const evolutionData = useMemo(() => {
-    if (Array.isArray(dashboard?.evolutionData) && dashboard.evolutionData.length > 0) {
-      return dashboard.evolutionData.map((d) => ({
-        ...d,
-        Meta: goal,
-      }));
+  // Distribuição por níveis: regida pelo filtro geral de componente; "Todos" agrega todos os componentes
+  const distributionLevels = useMemo(() => {
+    const levelsDistribution = dashboard?.levelsDistribution || [];
+    if (component !== 'TODOS') {
+      return pickComponentLevels({
+        levelsByComponent: dashboard?.levelsByComponent,
+        levelsDistribution,
+        component,
+        chartComponent: component,
+      });
     }
-    return [
-      { assessment: 'Diagnóstica', Leitura: 20.4, Escrita: 5.1, Matemática: 18.5, Meta: goal },
-      { assessment: 'Aval. 1', Leitura: 24.8, Escrita: 6.4, Matemática: 22.2, Meta: goal },
-      { assessment: 'Aval. 2', Leitura: 27.5, Escrita: 6.8, Matemática: 26.6, Meta: goal },
-      { assessment: 'Somativa', Leitura: 31.8, Escrita: 7.5, Matemática: 29.4, Meta: goal },
-    ];
-  }, [dashboard?.evolutionData, goal]);
+    return aggregateLevels(levelsDistribution);
+  }, [dashboard?.levelsByComponent, dashboard?.levelsDistribution, component]);
 
   // Níveis de desempenho
   const performanceLevels = useMemo(() => {
@@ -523,14 +384,7 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
     return list.slice(0, 5);
   }, [rawSchoolSummaries, schoolTableTab]);
 
-  // Set default selected school for the map
-  useEffect(() => {
-    if (!selectedSchool && rawSchoolSummaries.length > 0) {
-      // Prefer EMEIF SÃO PEDRO or the 5th item if available
-      const saoPedro = rawSchoolSummaries.find((s) => safeLower(s.name).includes('pedro'));
-      setSelectedSchool(saoPedro || rawSchoolSummaries[0]);
-    }
-  }, [rawSchoolSummaries, selectedSchool]);
+
 
   if (loading && !dashboard) {
     return <LoadingBlock label="Carregando visão geral do CNCA..." />;
@@ -615,20 +469,8 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
                 </Select>
               </div>
 
-              {/* Botões: Aplicar Filtros e Limpar */}
+              {/* Filtros aplicados automaticamente ao alterar os selects; botão apenas para limpar */}
               <div className="cnca-filter-actions-v2">
-                <button
-                  type="button"
-                  className="cnca-btn-apply"
-                  onClick={handleApplyFilters}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  <span>Aplicar filtros</span>
-                </button>
-
                 <button
                   type="button"
                   className="cnca-btn-clear-v2"
@@ -788,7 +630,12 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
         </div>
       </div>
 
-      {/* 3. LINHA 2: 3 CARDS ANALÍTICOS (Índice c/ Gauge, Evolução c/ Linha de Meta, Níveis de Desempenho) */}
+      {/* 3. TOPO: Distribuição por Níveis de Desempenho (container próprio, sem abas/mini cards; regido pelo filtro geral) */}
+      <div className="cnca-card cnca-chart-card">
+        <CncaLevelsDistribution chartOnly levels={distributionLevels} />
+      </div>
+
+      {/* 4. LINHA 2: 3 CARDS (Índice de Alfabetização, Níveis de Desempenho, Componentes) */}
       <div className="cnca-row2-grid">
         {/* Card 2.1: Índice de Alfabetização (com Gauge Donut e Callout de Meta) */}
         <div className="cnca-gauge-card">
@@ -852,90 +699,6 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
           </div>
         </div>
 
-        {/* Card 2.2: Evolução da Alfabetização (Multi-line chart com linha tracejada da Meta) */}
-        <div className="cnca-card cnca-chart-card">
-          <div className="cnca-chart-header">
-            <div className="cnca-chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
-              <span>Evolução da Alfabetização</span>
-            </div>
-            <div className="cnca-line-legend">
-              <span className="legend-item">
-                <span className="dot" style={{ background: '#0284c7' }} /> Leitura
-              </span>
-              <span className="legend-item">
-                <span className="dot" style={{ background: '#10b981' }} /> Escrita
-              </span>
-              <span className="legend-item">
-                <span className="dot" style={{ background: '#f59e0b' }} /> Matemática
-              </span>
-              <span className="legend-item" style={{ color: '#64748b' }}>
-                <span style={{ display: 'inline-block', width: 10, height: 0, borderTop: '2px dashed #94a3b8' }} /> Meta
-              </span>
-            </div>
-          </div>
-
-          <div style={{ width: '100%', height: 180, marginTop: 6 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={evolutionData} margin={{ top: 10, right: 15, left: -18, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis
-                  dataKey="assessment"
-                  tick={{ fontSize: 10.5, fill: '#64748b' }}
-                  axisLine={{ stroke: '#e2e8f0' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  ticks={[0, 25, 50, 75, 100]}
-                  tickFormatter={(v) => `${v}%`}
-                  tick={{ fontSize: 10.5, fill: '#64748b' }}
-                  axisLine={{ stroke: '#e2e8f0' }}
-                  tickLine={false}
-                />
-                <Tooltip
-                  formatter={(val, name) => [typeof val === 'number' ? `${fmt(val, 1)}%` : (val || '—'), name]}
-                  contentStyle={{ borderRadius: 8, fontSize: 11.5, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Leitura"
-                  stroke="#0284c7"
-                  strokeWidth={2.2}
-                  dot={{ r: 3, fill: '#0284c7', strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Escrita"
-                  stroke="#10b981"
-                  strokeWidth={2.2}
-                  dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Matemática"
-                  stroke="#f59e0b"
-                  strokeWidth={2.2}
-                  dot={{ r: 3, fill: '#f59e0b', strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Meta"
-                  stroke="#94a3b8"
-                  strokeWidth={1.8}
-                  strokeDasharray="4 4"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
         {/* Card 2.3: Níveis de Desempenho (Última Avaliação) com Barras Horizontais */}
         <div className="cnca-card cnca-chart-card">
           <div className="cnca-chart-header">
@@ -962,46 +725,106 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
             ))}
           </div>
         </div>
+        {/* Card 3.1: Desempenho por Componente (4 subcards) */}
+        
+
       </div>
 
-      {/* 4. LINHA 3: 3 CARDS (Desempenho por Componente, Pontos de Atenção, Alertas da Rede) */}
-      <div className="cnca-row3-grid">
-        {/* Card 3.1: Desempenho por Componente (4 subcards) */}
-        <div className="cnca-card cnca-chart-card">
-          <div className="cnca-chart-header">
-            <div className="cnca-chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" />
-                <rect x="14" y="3" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" />
-                <rect x="3" y="14" width="7" height="7" />
-              </svg>
-              <span>Desempenho por Componente</span>
+      {/* 5. LINHA 3: 3 CARDS (Escolas, Pontos de Atenção, Alertas da Rede) */}
+      <div className="cnca-row4-grid">
+        {/* Card 4.1: Desempenho das Escolas (Tabela com Tabs) */}
+        <div className="cnca-card cnca-chart-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div className="cnca-schools-perf-header">
+              <div className="cnca-chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6" />
+                </svg>
+                <span>Desempenho das Escolas</span>
+              </div>
+
+              {/* Tabs de Filtro de Categoria */}
+              <div className="cnca-schools-tabs-group">
+                <button
+                  type="button"
+                  className={`cnca-schools-tab-btn ${schoolTableTab === 'TODAS' ? 'active' : ''}`}
+                  onClick={() => setSchoolTableTab('TODAS')}
+                >
+                  Todas
+                </button>
+                <button
+                  type="button"
+                  className={`cnca-schools-tab-btn ${schoolTableTab === 'MELHOR' ? 'active' : ''}`}
+                  onClick={() => setSchoolTableTab('MELHOR')}
+                >
+                  Melhor desempenho
+                </button>
+                <button
+                  type="button"
+                  className={`cnca-schools-tab-btn ${schoolTableTab === 'EVOLUCAO' ? 'active' : ''}`}
+                  onClick={() => setSchoolTableTab('EVOLUCAO')}
+                >
+                  Maior evolução
+                </button>
+                <button
+                  type="button"
+                  className={`cnca-schools-tab-btn ${schoolTableTab === 'ATENCAO' ? 'active' : ''}`}
+                  onClick={() => setSchoolTableTab('ATENCAO')}
+                >
+                  Atenção
+                </button>
+              </div>
             </div>
+
+            {/* Tabela de Escolas */}
+            <table className="cnca-perf-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 22 }}>#</th>
+                  <th>Escola</th>
+                  <th style={{ width: 75, textAlign: 'right' }}>Part.</th>
+                  <th style={{ width: 75, textAlign: 'right' }}>Alfab.</th>
+                  <th style={{ width: 105, textAlign: 'right' }}>Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSchoolsTable.map((sch, idx) => {
+                  return (
+                    <tr
+                      key={sch.id || sch.name}
+                    >
+                      <td style={{ fontWeight: 700, color: idx === 0 ? '#f59e0b' : '#64748b' }}>
+                        {idx + 1}
+                      </td>
+                      <td>
+                        <strong style={{ fontSize: 11.5, color: '#0f172a' }}>{sch.name}</strong>
+                      </td>
+                      <td style={{ textAlign: 'right', color: '#64748b' }}>
+                        {fmt(sch.participation, 1)}%
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                        {fmt(sch.literacy, 1)}%
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span className={`cnca-situation-badge ${sch.situationClass || 'yellow'}`}>
+                          ● {sch.situation || 'Em desenvolvimento'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          <div className="cnca-comp-subcards-grid">
-            {componentCards.map((c) => (
-              <div
-                key={c.key}
-                className={`cnca-comp-subcard ${c.key}`}
-                onClick={() => {
-                  setComponent(c.key.toUpperCase());
-                  if (onSelectTab) onSelectTab('cnca-analises');
-                }}
-                title={`Clique para ver análises de ${c.name}`}
-              >
-                <div className="cnca-comp-subcard-top">
-                  <span>{c.icon}</span>
-                  <span>{c.name}</span>
-                </div>
-                <div className="cnca-comp-subcard-value">{fmt(c.value, 1)}%</div>
-                <div className="cnca-comp-subcard-sub">• no nível esperado</div>
-                <span className={`cnca-comp-pill-badge ${c.pillClass}`}>
-                  {c.statusLabel}
-                </span>
-              </div>
-            ))}
+          <div style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="cnca-link-action"
+              onClick={() => onSelectTab && onSelectTab('cnca-ranking')}
+            >
+              Ver ranking completo →
+            </button>
           </div>
         </div>
 
@@ -1073,354 +896,16 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
         </div>
       </div>
 
-      {/* 5. LINHA 4: 3 CARDS OPERACIONAIS (Desempenho das Escolas, Mapa com Floating Card, Banner Decisões) */}
-      <div className="cnca-row4-grid">
-        {/* Card 4.1: Desempenho das Escolas (Tabela com Tabs) */}
-        <div className="cnca-card cnca-chart-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div className="cnca-schools-perf-header">
-              <div className="cnca-chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6" />
-                </svg>
-                <span>Desempenho das Escolas</span>
-              </div>
-
-              {/* Tabs de Filtro de Categoria */}
-              <div className="cnca-schools-tabs-group">
-                <button
-                  type="button"
-                  className={`cnca-schools-tab-btn ${schoolTableTab === 'TODAS' ? 'active' : ''}`}
-                  onClick={() => setSchoolTableTab('TODAS')}
-                >
-                  Todas
-                </button>
-                <button
-                  type="button"
-                  className={`cnca-schools-tab-btn ${schoolTableTab === 'MELHOR' ? 'active' : ''}`}
-                  onClick={() => setSchoolTableTab('MELHOR')}
-                >
-                  Melhor desempenho
-                </button>
-                <button
-                  type="button"
-                  className={`cnca-schools-tab-btn ${schoolTableTab === 'EVOLUCAO' ? 'active' : ''}`}
-                  onClick={() => setSchoolTableTab('EVOLUCAO')}
-                >
-                  Maior evolução
-                </button>
-                <button
-                  type="button"
-                  className={`cnca-schools-tab-btn ${schoolTableTab === 'ATENCAO' ? 'active' : ''}`}
-                  onClick={() => setSchoolTableTab('ATENCAO')}
-                >
-                  Atenção
-                </button>
-              </div>
-            </div>
-
-            {/* Tabela de Escolas */}
-            <table className="cnca-perf-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 22 }}>#</th>
-                  <th>Escola</th>
-                  <th style={{ width: 75, textAlign: 'right' }}>Part.</th>
-                  <th style={{ width: 75, textAlign: 'right' }}>Alfab.</th>
-                  <th style={{ width: 105, textAlign: 'right' }}>Situação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSchoolsTable.map((sch, idx) => {
-                  const isSelected = selectedSchool?.id === sch.id || selectedSchool?.name === sch.name;
-                  return (
-                    <tr
-                      key={sch.id || sch.name}
-                      className={isSelected ? 'selected' : ''}
-                      onClick={() => setSelectedSchool(sch)}
-                      title="Clique para inspecionar no mapa ao lado"
-                    >
-                      <td style={{ fontWeight: 700, color: idx === 0 ? '#f59e0b' : '#64748b' }}>
-                        {idx + 1}
-                      </td>
-                      <td>
-                        <strong style={{ fontSize: 11.5, color: '#0f172a' }}>{sch.name}</strong>
-                      </td>
-                      <td style={{ textAlign: 'right', color: '#64748b' }}>
-                        {fmt(sch.participation, 1)}%
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                        {fmt(sch.literacy, 1)}%
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <span className={`cnca-situation-badge ${sch.situationClass || 'yellow'}`}>
-                          ● {sch.situation || 'Em desenvolvimento'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div style={{ marginTop: 10 }}>
-            <button
-              type="button"
-              className="cnca-link-action"
-              onClick={() => onSelectTab && onSelectTab('cnca-ranking')}
-            >
-              Ver ranking completo →
-            </button>
-          </div>
-        </div>
-
-        {/* Card 4.2: Distribuição dos Resultados na Rede (Mapa Interativo com Floating Card) */}
-        <div className="cnca-map-card-wrap">
-          <div className="cnca-chart-header">
-            <div className="cnca-chart-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
-                <line x1="8" y1="2" x2="8" y2="18" />
-                <line x1="16" y1="6" x2="16" y2="22" />
-              </svg>
-              <span>Distribuição dos Resultados na Rede</span>
-            </div>
-          </div>
-
-          {/* Canvas do Mapa com Floating Card */}
-          <div className="cnca-map-canvas-box">
-            <CncaMapBox
-              schools={rawSchoolSummaries}
-              selectedSchool={selectedSchool}
-              onSelectSchool={setSelectedSchool}
-            />
-
-            {/* Floating Card da Escola Selecionada */}
-            {selectedSchool && (
-              <div className="cnca-map-floating-popup">
-                <div className="cnca-map-floating-title" title={selectedSchool.name}>
-                  {selectedSchool.name}
-                </div>
-                <div className="cnca-map-floating-meta">
-                  👥 Alunos: {selectedSchool.students || 124} · 📊 Participação: {fmt(selectedSchool.participation || 96, 0)}%
-                </div>
-
-                <div className="cnca-map-floating-bars">
-                  <div className="cnca-map-floating-bar-row">
-                    <span style={{ color: '#0284c7' }}>Leitura</span>
-                    <div className="cnca-map-floating-bar-track">
-                      <div className="cnca-map-floating-bar-fill" style={{ width: `${selectedSchool.leitura || 68}%`, background: '#0284c7' }} />
-                    </div>
-                    <span>{selectedSchool.leitura || 68}%</span>
-                  </div>
-
-                  <div className="cnca-map-floating-bar-row">
-                    <span style={{ color: '#dc2626' }}>Escrita</span>
-                    <div className="cnca-map-floating-bar-track">
-                      <div className="cnca-map-floating-bar-fill" style={{ width: `${selectedSchool.escrita || 21}%`, background: '#dc2626' }} />
-                    </div>
-                    <span>{selectedSchool.escrita || 21}%</span>
-                  </div>
-
-                  <div className="cnca-map-floating-bar-row">
-                    <span style={{ color: '#16a34a' }}>Matemática</span>
-                    <div className="cnca-map-floating-bar-track">
-                      <div className="cnca-map-floating-bar-fill" style={{ width: `${selectedSchool.matematica || 72}%`, background: '#16a34a' }} />
-                    </div>
-                    <span>{selectedSchool.matematica || 72}%</span>
-                  </div>
-
-                  <div className="cnca-map-floating-bar-row">
-                    <span style={{ color: '#ea580c' }}>Fluência</span>
-                    <div className="cnca-map-floating-bar-track">
-                      <div className="cnca-map-floating-bar-fill" style={{ width: `${selectedSchool.fluencia || 44}%`, background: '#ea580c' }} />
-                    </div>
-                    <span>{selectedSchool.fluencia || 44}%</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="cnca-map-floating-btn"
-                  onClick={() => setSchoolDetailModal(selectedSchool)}
-                >
-                  Ver detalhes →
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Legenda do Mapa */}
-          <div className="cnca-map-legend-row">
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#10b981' }} /> Bom resultado
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#f59e0b' }} /> Em desenvolvimento
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ef4444' }} /> Atenção
-            </span>
-          </div>
-        </div>
-
-        {/* Card 4.3: Card Institucional "Mais dados, melhores decisões." */}
-        <div className="cnca-callout-card">
-          <div className="cnca-callout-icon-box">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-              <path d="M6 12v5c3 3 9 3 12 0v-5" />
-            </svg>
-          </div>
-          <div className="cnca-callout-title">Mais dados, melhores decisões.</div>
-          <div className="cnca-callout-desc">
-            O CNCA é uma ferramenta de acompanhamento e gestão para fortalecer a alfabetização em nossa rede municipal.
-          </div>
-          <button
-            type="button"
-            className="cnca-callout-btn"
-            onClick={() => setReportModalOpen(true)}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-            <span>Gerar relatório</span>
-          </button>
-        </div>
-      </div>
-
       {/* 6. 🚨 SEÇÃO OFICIAL: Escolas que precisam de atenção */}
       <AttentionSchoolsSection
         attentionData={dashboard?.attentionSchools}
         title="Escolas que precisam de atenção"
         subtitle="Identificação determinística baseada nas 4 matrizes oficiais do CNCA (Escrita, Leitura, Matemática e Fluência)."
         onSelectTab={onSelectTab}
+        collapsible
+        maxListHeight={380}
       />
 
-      {/* MODAL: Gerar Relatório Executivo */}
-      <Modal
-        open={reportModalOpen}
-        title="Relatório Executivo do CNCA"
-        onClose={() => setReportModalOpen(false)}
-        size="lg"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setReportModalOpen(false)}>
-              Fechar
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                window.print();
-                setReportModalOpen(false);
-              }}
-            >
-              Imprimir / Salvar PDF
-            </Button>
-          </>
-        }
-      >
-        <div style={{ padding: '8px 4px', lineHeight: 1.6, fontSize: 13.5, color: '#334155' }}>
-          <h4 style={{ margin: '0 0 8px 0', fontSize: 16, color: '#0f172a' }}>
-            Compromisso Nacional Criança Alfabetizada — Rede Municipal de Abaetetuba
-          </h4>
-          <p style={{ margin: '0 0 12px 0', color: '#64748b' }}>
-            Ano de Referência: <strong>{programYear || 2026}</strong> · Data da Emissão: {new Date().toLocaleDateString('pt-BR')}
-          </p>
-          <div style={{ background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px' }}>
-              <div><strong>Escolas Participantes:</strong> {totalParticipating} de {totalNetwork} ({partPercent}%)</div>
-              <div><strong>Estudantes Avaliados:</strong> {fmtInt(totalEvaluated)} ({fmt(participationRate, 1)}%)</div>
-              <div><strong>Média de Alfabetização:</strong> {fmt(literacyAvg, 1)}%</div>
-              <div><strong>Meta Municipal:</strong> {fmt(goal, 1)}% (Faltam {fmt(goalRemaining, 1)} p.p.)</div>
-            </div>
-          </div>
-          <p>
-            O relatório consolida as 4 dimensões avaliativas (Leitura, Escrita, Matemática e Fluência Leitora), permitindo o direcionamento de formações continuadas e alocação estratégica de suporte pedagógico para as escolas em atenção prioritária.
-          </p>
-        </div>
-      </Modal>
-
-      {/* MODAL: Detalhes Pedagógicos da Escola */}
-      <Modal
-        open={Boolean(schoolDetailModal)}
-        title={`Diagnóstico Detalhado — ${schoolDetailModal?.name || ''}`}
-        onClose={() => setSchoolDetailModal(null)}
-        size="md"
-        footer={
-          <Button variant="primary" onClick={() => setSchoolDetailModal(null)}>
-            Fechar
-          </Button>
-        }
-      >
-        {schoolDetailModal && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-              <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Participação</span>
-                <strong style={{ fontSize: 18, color: '#0f172a' }}>{fmt(schoolDetailModal.participation, 1)}%</strong>
-              </div>
-              <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Índice de Alfabetização</span>
-                <strong style={{ fontSize: 18, color: '#0f172a' }}>{fmt(schoolDetailModal.literacy, 1)}%</strong>
-              </div>
-              <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Situação na Rede</span>
-                <span className={`cnca-situation-badge ${schoolDetailModal.situationClass || 'yellow'}`} style={{ marginTop: 4 }}>
-                  ● {schoolDetailModal.situation || 'Em desenvolvimento'}
-                </span>
-              </div>
-            </div>
-
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
-              <h5 style={{ margin: '0 0 10px 0', fontSize: 13.5, color: '#0f172a' }}>Desempenho por Matriz Oficial</h5>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 12 }}>
-                    <span>📖 Leitura</span>
-                    <strong>{schoolDetailModal.leitura || 68}%</strong>
-                  </div>
-                  <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 99 }}>
-                    <div style={{ width: `${schoolDetailModal.leitura || 68}%`, height: '100%', background: '#0284c7', borderRadius: 99 }} />
-                  </div>
-                </div>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 12 }}>
-                    <span>✍️ Escrita</span>
-                    <strong>{schoolDetailModal.escrita || 21}%</strong>
-                  </div>
-                  <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 99 }}>
-                    <div style={{ width: `${schoolDetailModal.escrita || 21}%`, height: '100%', background: '#dc2626', borderRadius: 99 }} />
-                  </div>
-                </div>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 12 }}>
-                    <span>📐 Matemática</span>
-                    <strong>{schoolDetailModal.matematica || 72}%</strong>
-                  </div>
-                  <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 99 }}>
-                    <div style={{ width: `${schoolDetailModal.matematica || 72}%`, height: '100%', background: '#16a34a', borderRadius: 99 }} />
-                  </div>
-                </div>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 12 }}>
-                    <span>🗣️ Fluência Leitora</span>
-                    <strong>{schoolDetailModal.fluencia || 44}%</strong>
-                  </div>
-                  <div style={{ width: '100%', height: 6, background: '#e2e8f0', borderRadius: 99 }}>
-                    <div style={{ width: `${schoolDetailModal.fluencia || 44}%`, height: '100%', background: '#ea580c', borderRadius: 99 }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

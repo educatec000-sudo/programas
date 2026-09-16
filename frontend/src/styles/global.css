@@ -2928,29 +2928,6 @@ body.dark-theme {
   margin-top: 14px;
 }
 
-.cnca-btn-apply {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #0284c7;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 12.5px;
-  font-weight: 700;
-  height: 36px;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
-  transition: all 0.15s ease;
-}
-
-.cnca-btn-apply:hover {
-  background: #0369a1;
-  transform: translateY(-1px);
-}
-
 .cnca-btn-clear-v2 {
   display: inline-flex;
   align-items: center;
@@ -2988,8 +2965,9 @@ body.dark-theme {
 /* 2. Grid de 3 Colunas na Linha 2 (Índice, Evolução, Níveis) */
 .cnca-row2-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1.6fr 1fr;
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
 }
 
 /* Card: Índice de Alfabetização */
@@ -3176,7 +3154,7 @@ body.dark-theme {
 /* 3. Grid de 3 Colunas na Linha 3 (Componentes, Pontos Atenção, Alertas) */
 .cnca-row3-grid {
   display: grid;
-  grid-template-columns: 1.55fr 1fr 1fr;
+  grid-template-columns: 1fr 1.55fr;
   gap: 14px;
 }
 
@@ -3390,7 +3368,7 @@ body.dark-theme {
 /* 4. Grid de 3 Colunas na Linha 4 (Tabela Escolas, Mapa, Banner Decisões) */
 .cnca-row4-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1.6fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr;
   gap: 14px;
 }
 

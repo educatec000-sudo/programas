@@ -13,8 +13,11 @@ export default function AttentionSchoolsSection({
   title = 'Escolas que precisam de atenção',
   subtitle = 'Identificação automática de unidades escolares que demandam acompanhamento técnico e intervenção pedagógica prioritária.',
   onSelectTab,
+  collapsible = false,
+  maxListHeight = null,
 }) {
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [collapsed, setCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSchool, setSelectedSchool] = useState(null);
 
@@ -222,8 +225,35 @@ export default function AttentionSchoolsSection({
               🟡 Baixa ({summary.low})
             </button>
           )}
+          {collapsible && (
+            <button
+              type="button"
+              className="cnca-btn-collapse"
+              onClick={() => setCollapsed(!collapsed)}
+              title={collapsed ? 'Expandir lista de escolas' : 'Recolher lista de escolas'}
+              aria-label={collapsed ? 'Expandir lista de escolas' : 'Recolher lista de escolas'}
+              style={{ marginLeft: 6 }}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+              >
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
+
+      {!collapsed && (
+      <>
 
       {/* 2. BARRA DE BUSCA RÁPIDA */}
       {allSchools.length > 0 && (
@@ -256,7 +286,7 @@ export default function AttentionSchoolsSection({
 
       {/* 3. TABELA DE ESCOLAS EM ATENÇÃO */}
       {filteredSchools.length > 0 ? (
-        <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
+        <div style={{ overflowX: 'auto', overflowY: maxListHeight ? 'auto' : undefined, maxHeight: maxListHeight || undefined, borderRadius: 8, border: '1px solid var(--border)' }}>
           <table className="table" style={{ width: '100%', fontSize: 13, margin: 0 }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)' }}>
@@ -370,6 +400,8 @@ export default function AttentionSchoolsSection({
             Todas as escolas com avaliações enviadas estão apresentando taxas de participação e proficiência dentro dos parâmetros esperados.
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* 4. MODAL / DETALHAMENTO COMPLETO DA ESCOLA EM ATENÇÃO */}
