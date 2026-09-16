@@ -13,6 +13,13 @@ function safeLower(val) {
   return String(val).toLowerCase();
 }
 
+const COMPONENT_FILTER_OPTIONS = [
+  { value: 'LEITURA', label: 'Leitura', subtitle: 'Língua Portuguesa', icon: '📖', tone: 'leitura' },
+  { value: 'ESCRITA', label: 'Escrita', subtitle: 'Produção escrita', icon: '✍️', tone: 'escrita' },
+  { value: 'MATEMATICA', label: 'Matemática', subtitle: 'Raciocínio lógico', icon: '📐', tone: 'matematica' },
+  { value: 'FLUENCIA', label: 'Fluência', subtitle: 'Leitura oral', icon: '🗣️', tone: 'fluencia' },
+];
+
 export default function CncaDashboard({ program = {}, onSelectTab }) {
   const [grade, setGrade] = useState('TODOS');
   const [component, setComponent] = useState('TODOS');
@@ -422,22 +429,6 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
                 </Select>
               </div>
 
-              {/* Filtro: Componente */}
-              <div className="cnca-filter-item-v2">
-                <label className="cnca-filter-label-v2">Componente</label>
-                <Select
-                  value={component}
-                  onChange={(e) => setComponent(e.target.value)}
-                  className="cnca-select-v2"
-                >
-                  <option value="TODOS">Todos</option>
-                  <option value="LEITURA">Leitura</option>
-                  <option value="ESCRITA">Escrita</option>
-                  <option value="MATEMATICA">Matemática</option>
-                  <option value="FLUENCIA">Fluência</option>
-                </Select>
-              </div>
-
               {/* Filtro: Avaliação */}
               <div className="cnca-filter-item-v2">
                 <label className="cnca-filter-label-v2">Avaliação</label>
@@ -510,6 +501,45 @@ export default function CncaDashboard({ program = {}, onSelectTab }) {
             </button>
           </div>
         </div>
+
+        {!filtersCollapsed && (
+          <div className="cnca-component-filter-block-v2">
+            <div className="cnca-component-filter-header-v2">
+              <span className="cnca-component-filter-label-v2">Componente</span>
+              {component !== 'TODOS' && (
+                <button
+                  type="button"
+                  className="cnca-component-filter-reset-v2"
+                  onClick={() => setComponent('TODOS')}
+                >
+                  Mostrar todos
+                </button>
+              )}
+            </div>
+
+            <div className="cnca-component-filter-buttons-v2">
+              {COMPONENT_FILTER_OPTIONS.map((option) => {
+                const active = component === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`cnca-component-filter-btn-v2 ${option.tone} ${active ? 'active' : ''}`}
+                    onClick={() => setComponent(active ? 'TODOS' : option.value)}
+                    aria-pressed={active}
+                    title={active ? 'Clique para voltar a todos os componentes' : `Filtrar por ${option.label}`}
+                  >
+                    <span className="cnca-component-filter-icon-v2" aria-hidden="true">{option.icon}</span>
+                    <span className="cnca-component-filter-text-v2">
+                      <strong>{option.label}</strong>
+                      <small>{option.subtitle}</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2. LINHA 1: 5 CARDS KPI PRINCIPAIS */}

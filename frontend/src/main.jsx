@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import { ThemeProvider } from './contexts/ThemeContext.jsx';
 import './styles/global.css';
+import './styles/login-v3-overrides.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
