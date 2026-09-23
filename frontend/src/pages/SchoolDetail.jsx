@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import { LoadingBlock, Tabs, Badge, EmptyState, Button, Modal, Select, Input, Field, ConfirmDialog, Alert } from '../components/ui.jsx';
 import DataTable from '../components/DataTable.jsx';
-import { SCHOOL_SITUATION, SCHOOL_ZONE, DEPENDENCY, fmtDateTime, AUDIT_ACTION_LABELS, ENTITY_LABELS, PROGRAM_STATUS } from '../utils/format.js';
+import { SCHOOL_SITUATION, SCHOOL_ZONE, DEPENDENCY, fmtDateTime, fmtInt, AUDIT_ACTION_LABELS, ENTITY_LABELS, PROGRAM_STATUS } from '../utils/format.js';
 
 const SECTION = {
   fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
@@ -109,6 +109,8 @@ export default function SchoolDetail() {
               <KV label="Tipo de escola">{school.schoolType}</KV>
               <KV label="Situação">{situation && <Badge cls={situation.cls}>{situation.label}</Badge>}</KV>
               <KV label="Dependência">{DEPENDENCY[school.adminDependency]}</KV>
+              <KV label={school.enrollmentReferenceYear ? `Alunos matriculados (${school.enrollmentReferenceYear})` : 'Alunos matriculados'}>{school.enrolledStudents == null ? '—' : fmtInt(school.enrolledStudents)}</KV>
+              <KV label="Base de matrícula">{school.enrollmentApprovedAt ? fmtDateTime(school.enrollmentApprovedAt) : 'Sem base oficial'}</KV>
             </div>
           </div>
 

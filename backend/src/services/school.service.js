@@ -178,17 +178,40 @@ export async function getSchool(id) {
   });
   if (!school) throw notFound('Escola não encontrada');
 
-  const goals = await prisma.goal.findMany({
-    where: { schoolId: id },
-    include: { indicator: { select: { name: true, unit: true } }, program: { select: { name: true } } },
-    orderBy: { year: 'desc' },
-    take: 20,
-  });
+  const [goals, latestOfficialEnrollmentDataset] = await Promise.all([
+    prisma.goal.findMany({
+      where: { schoolId: id },
+      include: { indicator: { select: { name: true, unit: true } }, program: { select: { name: true } } },
+      orderBy: { year: 'desc' },
+      take: 20,
+    }),
+    prisma.enrollmentDataset.findFirst({
+      where: { status: 'OFICIAL' },
+      select: { id: true, referenceYear: true, approvedAt: true },
+      orderBy: [{ referenceYear: 'desc' }, { approvedAt: 'desc' }, { createdAt: 'desc' }],
+    }),
+  ]);
+
+  let enrolledStudents = null;
+  let enrollmentReferenceYear = null;
+  let enrollmentApprovedAt = null;
+  if (latestOfficialEnrollmentDataset?.id) {
+    const aggregate = await prisma.enrollmentRecord.aggregate({
+      where: { datasetId: latestOfficialEnrollmentDataset.id, schoolId: id },
+      _sum: { studentsCount: true },
+    });
+    enrolledStudents = Number(aggregate._sum.studentsCount || 0);
+    enrollmentReferenceYear = latestOfficialEnrollmentDataset.referenceYear;
+    enrollmentApprovedAt = latestOfficialEnrollmentDataset.approvedAt || null;
+  }
 
   return {
     ...school,
     resultsCount: school._count.results,
     goalsCount: school._count.goals,
+    enrolledStudents,
+    enrollmentReferenceYear,
+    enrollmentApprovedAt,
     schoolGoals: goals,
     technicians: school.technicianLinks.map((l) => ({
       linkId: l.id,
