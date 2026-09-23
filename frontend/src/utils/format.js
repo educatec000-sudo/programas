@@ -94,6 +94,8 @@ export const ENTITY_LABELS = {
   User: 'Usuário', Role: 'Perfil', School: 'Escola', Program: 'Programa',
   Indicator: 'Indicador', IndicatorCategory: 'Categoria', Result: 'Resultado',
   Goal: 'Meta', Evaluation: 'Avaliação', ImportJob: 'Importação', Document: 'Documento',
+  EnrollmentDataset: 'Base de Matrículas', ProjectionRuleSet: 'Regras de Projeção',
+  SchoolProjectionSetting: 'Configuração de Escola', ProjectionRun: 'Execução de Projeção',
   Report: 'Relatório', Session: 'Sessão', System: 'Sistema',
   SchoolTechnician: 'Vínculo Técnico-Escola',
 };

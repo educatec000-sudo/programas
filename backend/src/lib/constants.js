@@ -49,6 +49,10 @@ export const ENTITY_LABELS = {
   Goal: 'Meta',
   Evaluation: 'Avaliação',
   ImportJob: 'Importação',
+  EnrollmentDataset: 'Base de Matrículas',
+  ProjectionRuleSet: 'Regras de Projeção',
+  SchoolProjectionSetting: 'Configuração de Escola',
+  ProjectionRun: 'Execução de Projeção',
   Document: 'Documento',
 };
 

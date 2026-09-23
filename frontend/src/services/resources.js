@@ -276,6 +276,28 @@ export const reportsApi = {
   generate: (type, params) => download(`/reports/${type}`, { params, fallbackName: `relatorio_${type}` }),
 };
 
+export const enrollmentApi = {
+  overview: (params) => request('/enrollment/overview', { params }),
+  datasets: (params) => request('/enrollment/datasets', { params }),
+  settings: (params) => request('/enrollment/settings', { params }),
+  updateRules: (body) => request('/enrollment/settings/rules', { method: 'PUT', body }),
+  updateSchoolSetting: (schoolId, body) => request(`/enrollment/settings/schools/${schoolId}`, { method: 'PUT', body }),
+  previewImport: (file, body) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('referenceYear', String(body.referenceYear));
+    if (body.targetYear) form.append('targetYear', String(body.targetYear));
+    if (body.notes) form.append('notes', body.notes);
+    return request('/enrollment/import/preview', { method: 'POST', body: form });
+  },
+  confirmImport: (body) => request('/enrollment/import/confirm', { method: 'POST', body }),
+  runProjection: (body) => request('/enrollment/projection/run', { method: 'POST', body }),
+  schools: (params) => request('/enrollment/schools', { params }),
+  schoolDetail: (schoolId, params) => request(`/enrollment/schools/${schoolId}`, { params }),
+  exportSchools: (params) => download('/enrollment/schools/export', { params, fallbackName: 'prospeccao_escolas' }),
+  exportStages: (params) => download('/enrollment/stages/export', { params, fallbackName: 'prospeccao_etapas' }),
+};
+
 export const importsApi = {
   upload: (file, type) => {
     const form = new FormData();

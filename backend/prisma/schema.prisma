@@ -186,10 +186,13 @@ model School {
   evaluations     Evaluation[]
   technicianLinks SchoolTechnician[]
   collectionLinks ProgramCollectionLink[]
-  pactoClasses    PactoClass[]
-  cncaResults     CncaSchoolResult[]
-  parcResults     ParcSchoolResult[]
-  sispaeResults   SispaeSchoolResult[]
+  pactoClasses       PactoClass[]
+  cncaResults        CncaSchoolResult[]
+  parcResults        ParcSchoolResult[]
+  sispaeResults      SispaeSchoolResult[]
+  enrollmentRecords  EnrollmentRecord[]
+  projectionSettings SchoolProjectionSetting[]
+  projectionResults  ProjectionResult[]
 
   @@index([name])
   @@index([district])
@@ -776,6 +779,199 @@ model SispaeSchoolResult {
   @@index([applicationId])
 }
 
+// ---------------------------- PROSPECÇÃO DE MATRÍCULAS ----------------------------
+
+enum EnrollmentDatasetStatus {
+  RASCUNHO
+  OFICIAL
+  ARQUIVADO
+}
+
+enum ProjectionRuleSetStatus {
+  RASCUNHO
+  ATIVO
+  ARQUIVADO
+}
+
+enum ProjectionRunMode {
+  OFICIAL
+  SIMULACAO
+}
+
+enum ProjectionRunStatus {
+  PROCESSANDO
+  CONCLUIDO
+  APROVADO
+  CANCELADO
+}
+
+model EnrollmentStage {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  label           String
+  segment         String
+  orderIndex      Int
+  nextStageCode   String?
+  isEntryStage    Boolean  @default(false)
+  defaultCapacity Int      @default(25)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([orderIndex])
+  @@index([segment, active])
+}
+
+model EnrollmentDataset {
+  id             String                  @id @default(uuid())
+  referenceYear  Int
+  targetYear     Int?
+  status         EnrollmentDatasetStatus @default(RASCUNHO)
+  sourceFileName String
+  sourceHash     String?
+  notes          String?
+  importedById   String?
+  approvedById   String?
+  importJobId    String?
+  approvedAt     DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  records EnrollmentRecord[]
+  runs    ProjectionRun[]
+
+  @@index([referenceYear, status])
+  @@index([createdAt])
+}
+
+model EnrollmentRecord {
+  id                 String   @id @default(uuid())
+  datasetId          String
+  schoolId           String
+  referenceYear      Int
+  contextKey         String
+  classStageRaw      String
+  classLabel         String
+  shift              String
+  enrollmentStageRaw String
+  stageCode          String
+  studentsCount      Int
+  isMultiStage       Boolean  @default(false)
+  rawLine            Json?
+  createdAt          DateTime @default(now())
+
+  dataset EnrollmentDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  school  School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, schoolId, classStageRaw, classLabel, shift, stageCode])
+  @@index([datasetId, schoolId])
+  @@index([referenceYear, stageCode])
+}
+
+model ProjectionRuleSet {
+  id            String                  @id @default(uuid())
+  name          String
+  baseYear      Int
+  projectedYear Int
+  status        ProjectionRuleSetStatus @default(ATIVO)
+  notes         String?
+  createdById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  items ProjectionRuleItem[]
+  runs  ProjectionRun[]
+
+  @@index([baseYear, projectedYear, status])
+}
+
+model ProjectionRuleItem {
+  id             String   @id @default(uuid())
+  ruleSetId      String
+  stageCode      String
+  nextStageCode  String?
+  promotionRate  Float    @default(90)
+  repetitionRate Float    @default(10)
+  dropoutRate    Float    @default(0)
+  entryRate      Float    @default(100)
+  capacityLimit  Int?
+  roundingMode   String   @default("ARREDONDAR")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  ruleSet ProjectionRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleSetId, stageCode])
+  @@index([stageCode, active])
+}
+
+model SchoolProjectionSetting {
+  id                String   @id @default(uuid())
+  schoolId          String
+  projectedYear     Int
+  entryStageCode    String?
+  capacityOverrides Json?
+  notes             String?
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, projectedYear])
+  @@index([projectedYear])
+}
+
+model ProjectionRun {
+  id            String              @id @default(uuid())
+  datasetId     String
+  ruleSetId     String
+  baseYear      Int
+  projectedYear Int
+  mode          ProjectionRunMode   @default(OFICIAL)
+  status        ProjectionRunStatus @default(PROCESSANDO)
+  notes         String?
+  summary       Json?
+  createdById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  dataset EnrollmentDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  ruleSet ProjectionRuleSet  @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+  results ProjectionResult[]
+
+  @@index([baseYear, projectedYear, mode, status])
+  @@index([createdAt])
+}
+
+model ProjectionResult {
+  id                 String   @id @default(uuid())
+  runId              String
+  schoolId           String
+  stageCode          String
+  currentStudents    Int      @default(0)
+  projectedStudents  Int      @default(0)
+  currentClasses     Int      @default(0)
+  projectedClasses   Int      @default(0)
+  capacityLimit      Int?
+  occupancyRate      Float?
+  adjustmentApplied  Int      @default(0)
+  reasonJson         Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  run    ProjectionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  school  School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, schoolId, stageCode])
+  @@index([schoolId, stageCode])
+}
+
 // ---------------------------- IMPORTAÇÕES ----------------------------
 
 enum ImportType {
@@ -783,6 +979,7 @@ enum ImportType {
   PROGRAMAS
   INDICADORES
   RESULTADOS
+  MATRICULAS
 }
 
 enum ImportStatus {

@@ -20,6 +20,7 @@ const Rankings = lazy(() => import('../pages/Rankings.jsx'));
 const Analytics = lazy(() => import('../pages/Analytics.jsx'));
 const Reports = lazy(() => import('../pages/Reports.jsx'));
 const Imports = lazy(() => import('../pages/Imports.jsx'));
+const EnrollmentProspection = lazy(() => import('../pages/EnrollmentProspection.jsx'));
 const Users = lazy(() => import('../pages/Users.jsx'));
 const Roles = lazy(() => import('../pages/Roles.jsx'));
 const Audit = lazy(() => import('../pages/Audit.jsx'));
@@ -69,6 +70,7 @@ export default function AppRoutes() {
         <Route path="/analises" element={page(Analytics, 'analytics:read')} />
         <Route path="/relatorios" element={page(Reports, 'reports:read')} />
         <Route path="/importacoes" element={page(Imports, 'imports:read')} />
+        <Route path="/prospeccao-matriculas" element={page(EnrollmentProspection, 'schools:read')} />
         <Route path="/usuarios" element={page(Users, 'users:read')} />
         <Route path="/perfis" element={page(Roles, 'roles:read')} />
         <Route path="/auditoria" element={page(Audit, 'audit:read')} />

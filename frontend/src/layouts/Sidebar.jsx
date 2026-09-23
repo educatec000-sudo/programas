@@ -56,6 +56,14 @@ export default function Sidebar() {
           </NavLink>
 
           <NavLink
+            to="/prospeccao-matriculas"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <span className="icon">{Icon.book()}</span>
+            <span>Prospecção 2027</span>
+          </NavLink>
+
+          <NavLink
             to="/tecnicos-escola"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >

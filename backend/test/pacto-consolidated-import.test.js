@@ -18,6 +18,16 @@ import {
 } from '../src/programs/pacto/consolidatedImport.js';
 import { prisma } from '../src/lib/prisma.js';
 
+function findUploadFixture(filename) {
+  const candidates = [
+    path.join('/home/user/uploads', filename),
+    path.resolve(process.cwd(), '../uploads', filename),
+    path.resolve(process.cwd(), '../../uploads', filename),
+    path.resolve(process.cwd(), 'uploads', filename),
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
 test('Pacto Consolidado: normaliza INEP e extrai INEP embutido no nome da escola', () => {
   assert.equal(normalizeInep('15145425'), '15145425');
   assert.equal(normalizeInep('15.145.425'), '15145425');
@@ -84,9 +94,12 @@ test('Pacto Consolidado: identifica código de avaliação (A1, A2, A3, A0) e an
   assert.equal(parseGradeValue('Pré II'), 0);
 });
 
-test('Pacto Consolidado: processa arquivo real de Língua Portuguesa do 1º Ano (14).CSV', async () => {
-  const filePath = path.join('/home/user/uploads', 'Média do desempenho dos alunos por turma - 1ºano (detalhe), 2026. (14).CSV');
-  assert.ok(fs.existsSync(filePath), 'O arquivo de Língua Portuguesa deve existir no workspace.');
+test('Pacto Consolidado: processa arquivo real de Língua Portuguesa do 1º Ano (14).CSV', async (t) => {
+  const filePath = findUploadFixture('Média do desempenho dos alunos por turma - 1ºano (detalhe), 2026. (14).CSV');
+  if (!filePath) {
+    t.skip('Arquivo real de Língua Portuguesa não disponível neste ambiente.');
+    return;
+  }
 
   const buffer = fs.readFileSync(filePath);
   const rows = readConsolidatedSpreadsheet(buffer, 'lp-pacto.csv');
@@ -148,9 +161,12 @@ test('Pacto Consolidado: processa arquivo real de Língua Portuguesa do 1º Ano 
   }
 });
 
-test('Pacto Consolidado: processa arquivo real de Matemática do 1º Ano (15).CSV', async () => {
-  const filePath = path.join('/home/user/uploads', 'Média do desempenho dos alunos por turma - 1ºano (detalhe), 2026. (15).CSV');
-  assert.ok(fs.existsSync(filePath), 'O arquivo de Matemática deve existir no workspace.');
+test('Pacto Consolidado: processa arquivo real de Matemática do 1º Ano (15).CSV', async (t) => {
+  const filePath = findUploadFixture('Média do desempenho dos alunos por turma - 1ºano (detalhe), 2026. (15).CSV');
+  if (!filePath) {
+    t.skip('Arquivo real de Matemática não disponível neste ambiente.');
+    return;
+  }
 
   const buffer = fs.readFileSync(filePath);
   const rows = readConsolidatedSpreadsheet(buffer, 'mat-pacto.csv');

@@ -76,17 +76,22 @@ export default function Login() {
 
       <div className="login-card-wrap-v3">
         <div className="login-card-v3">
-             <div className="login-logo-v3" >{Icon.cpeLogo()}</div>
           <div className="login-card-top-v3">
-         
+            <div className="login-logo-v3">{Icon.cpeLogo()}</div>
             <div>
               <div className="login-kicker-v3">Controle de Programas Educacionais</div>
               <h1 className="login-title-v3">Acessar o sistema</h1>
-             
+              <p className="login-subtitle-v3">
+                Entre com suas credenciais para acompanhar programas, escolas, indicadores, metas e análises.
+              </p>
             </div>
           </div>
 
-      
+          <div className="login-tags-v3">
+            <span>{Icon.school()} Escolas</span>
+            <span>{Icon.analytics()} Indicadores</span>
+            <span>{Icon.report()} Relatórios</span>
+          </div>
 
           {location.state?.sessionExpired && (
             <Alert type="warn">Sua sessão expirou. Entre novamente para continuar.</Alert>

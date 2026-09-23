@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS "School_district_idx" ON "School"("district");
 -- que a tentativa seguinte possa recriá-los sem erro de objeto duplicado.
 DO $$
 BEGIN
-  IF NOT EXISTS (
+  IF to_regclass('public._prisma_migrations') IS NULL OR NOT EXISTS (
     SELECT 1
     FROM "_prisma_migrations"
     WHERE migration_name = '20260826190000_harden_data_integrity'

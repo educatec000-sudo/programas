@@ -16,6 +16,7 @@ import auditRoutes from './audit.routes.js';
 import notificationRoutes from './notification.routes.js';
 import documentRoutes from './document.routes.js';
 import technicianRoutes from './technician.routes.js';
+import enrollmentRoutes from './enrollment.routes.js';
 import pactoPublicRoutes from '../programs/pacto/public.routes.js';
 
 const router = Router();
@@ -25,6 +26,7 @@ router.use('/public/pacto', pactoPublicRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/schools', schoolRoutes);
 router.use('/tecnicos-escola', technicianRoutes);
+router.use('/enrollment', enrollmentRoutes);
 router.use('/programs', programRoutes);
 router.use('/indicators', indicatorRoutes);
 router.use('/results', resultRoutes);
